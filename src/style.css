@@ -30,6 +30,17 @@ a {
     background: color-mix(in srgb, var(--snap-accent) 35%, transparent);
 }
 
+.snap-capture,
+.snap-capture * {
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.snap-capture::selection,
+.snap-capture *::selection {
+    background: transparent;
+}
+
 *::-webkit-scrollbar {
     width: 5px;
 }

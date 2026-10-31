@@ -157,10 +157,13 @@ pub fn cover_monitor(window: &tauri::Window) {
         let _: () = msg_send![ns_window, setCollectionBehavior: behavior];
         let _: () = msg_send![ns_window, setHidesOnDeactivate: NO];
         let _: () = msg_send![ns_window, setMovable: NO];
+        let clear: *mut Object = msg_send![class!(NSColor), clearColor];
+        let _: () = msg_send![ns_window, setOpaque: NO];
+        let _: () = msg_send![ns_window, setBackgroundColor: clear];
         let _: () = msg_send![ns_window, setContentMinSize: frame.size];
         let _: () = msg_send![ns_window, setContentMaxSize: frame.size];
-        let _: () = msg_send![ns_window, setFrame:frame display:YES];
-        let _: () = msg_send![ns_window, orderFrontRegardless];
+        // Keep the window ordered out until the frozen frame is painted.
+        let _: () = msg_send![ns_window, setFrame:frame display:NO];
         info!(
             "overlay frame {:.0},{:.0} {:.0}x{:.0}",
             frame.origin.x, frame.origin.y, frame.size.width, frame.size.height

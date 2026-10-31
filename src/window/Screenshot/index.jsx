@@ -6,6 +6,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 import { drawShape } from '../Annotate/render';
 import { useToastStyle } from '../../hooks';
@@ -136,13 +137,13 @@ export default function Screenshot() {
 
     useEffect(() => {
         document.documentElement.style.borderRadius = '0px';
-        document.documentElement.style.setProperty('background', '#000', 'important');
-        document.body.style.background = '#000';
+        document.documentElement.style.setProperty('background', 'transparent', 'important');
+        document.body.style.background = 'transparent';
         document.body.style.overflow = 'hidden';
         const root = document.getElementById('root');
         if (root) {
             root.style.height = '100%';
-            root.style.background = '#000';
+            root.style.background = 'transparent';
         }
     }, []);
 
@@ -204,22 +205,24 @@ export default function Screenshot() {
             blobRef.current = objectUrl;
             const next = await loadHtmlImage(objectUrl);
             imageRef.current = next;
+            await invoke('fit_overlay_window');
+            const placed = placeImage(next, intentRef.current);
+            layoutRef.current = placed.layout;
+            flushSync(() => {
+                setLayout(placed.layout);
+                setImage(next);
+                if (placed.selection) {
+                    selectionRef.current = placed.selection;
+                    setSelection(placed.selection);
+                }
+            });
+            paint();
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
             await appWindow.show();
             await appWindow.setFocus();
             await appWindow.setAlwaysOnTop(true);
-            await invoke('fit_overlay_window');
-            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-            await invoke('fit_overlay_window');
             const fitted = await appWindow.innerPosition();
             originRef.current = { x: fitted.x, y: fitted.y };
-            const placed = placeImage(next, intentRef.current);
-            layoutRef.current = placed.layout;
-            setLayout(placed.layout);
-            setImage(next);
-            if (placed.selection) {
-                selectionRef.current = placed.selection;
-                setSelection(placed.selection);
-            }
         } catch (error) {
             setLoadError(String(error));
             await appWindow.show();
@@ -557,6 +560,7 @@ export default function Screenshot() {
         if (event.button !== 0 || selectionRef.current) {
             return;
         }
+        event.preventDefault();
         dragRef.current = { kind: 'new', x: event.clientX, y: event.clientY, origin: { x: event.clientX, y: event.clientY } };
         setSelection({ x: event.clientX, y: event.clientY, w: 0, h: 0 });
     };
@@ -679,11 +683,13 @@ export default function Screenshot() {
         return Math.max(8, selection.y - 78);
     };
 
-    const accent = '#1E63F0';
     const editing = Boolean(selection) && intentRef.current !== 'ocr' && intentRef.current !== 'translate';
 
     return (
-        <div className='fixed inset-0 overflow-hidden bg-black text-white'>
+        <div
+            className='snap-capture fixed inset-0 overflow-hidden bg-transparent text-white'
+            onMouseDown={(event) => event.preventDefault()}
+        >
             <Toaster />
             <canvas
                 ref={sampleRef}
@@ -707,44 +713,22 @@ export default function Screenshot() {
                         : { left: 0, top: 0, width: '100%', height: '100%' }
                 }
             />
-            {layout && (
-                <>
-                    <div
-                        className='pointer-events-none absolute bg-black/45'
-                        style={{ left: 0, top: 0, right: 0, height: selection ? selection.y : hover ? hover.y : '100%' }}
-                    />
-                    {(selection || hover) && (
-                        <>
-                            <div
-                                className='pointer-events-none absolute bg-black/45'
-                                style={{
-                                    left: 0,
-                                    top: (selection || hover).y,
-                                    width: (selection || hover).x,
-                                    height: (selection || hover).h,
-                                }}
-                            />
-                            <div
-                                className='pointer-events-none absolute bg-black/45'
-                                style={{
-                                    left: (selection || hover).x + (selection || hover).w,
-                                    top: (selection || hover).y,
-                                    right: 0,
-                                    height: (selection || hover).h,
-                                }}
-                            />
-                            <div
-                                className='pointer-events-none absolute bg-black/45'
-                                style={{
-                                    left: 0,
-                                    top: (selection || hover).y + (selection || hover).h,
-                                    right: 0,
-                                    bottom: 0,
-                                }}
-                            />
-                        </>
-                    )}
-                </>
+            {layout && !(selection || hover) && (
+                <div className='pointer-events-none absolute inset-0 bg-black/45' />
+            )}
+            {(selection || hover) && (
+                <div
+                    className='pointer-events-none absolute z-20'
+                    style={{
+                        left: (selection || hover).x,
+                        top: (selection || hover).y,
+                        width: Math.max(0, (selection || hover).w),
+                        height: Math.max(0, (selection || hover).h),
+                        boxShadow: '0 0 0 1px rgba(0,0,0,0.45), 0 0 0 9999px rgba(0,0,0,0.45)',
+                        border: '1px solid rgba(255,255,255,0.92)',
+                        background: 'transparent',
+                    }}
+                />
             )}
             {!selection && (
                 <div
@@ -752,18 +736,6 @@ export default function Screenshot() {
                     onMouseDown={onBackgroundDown}
                 />
             )}
-            {(hover && !selection) || selection ? (
-                <div
-                    className='pointer-events-none absolute z-20 border-2'
-                    style={{
-                        left: (selection || hover).x,
-                        top: (selection || hover).y,
-                        width: (selection || hover).w,
-                        height: (selection || hover).h,
-                        borderColor: accent,
-                    }}
-                />
-            ) : null}
             {selection && (
                 <div
                     className='pointer-events-none absolute z-20 rounded bg-black/70 px-1.5 py-0.5 text-[11px]'

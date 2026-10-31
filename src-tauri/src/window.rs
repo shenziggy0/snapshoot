@@ -405,7 +405,7 @@ fn cover_monitor_win(window: &Window) -> bool {
             rect.top,
             rect.right - rect.left,
             rect.bottom - rect.top,
-            0x0040 | 0x0020,
+            0x0010 | 0x0020,
         );
     }
     true
@@ -468,7 +468,7 @@ pub(crate) fn screenshot_window() -> Window {
     .skip_taskbar(true)
     .always_on_top(true)
     .decorations(false)
-    .transparent(false)
+    .transparent(true)
     .additional_browser_args("--disable-web-security");
 
     #[cfg(target_os = "macos")]
