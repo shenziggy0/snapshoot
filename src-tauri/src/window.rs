@@ -362,17 +362,28 @@ pub fn recognize_window() {
     window.emit("new_image", "").unwrap();
 }
 
-pub(crate) fn screenshot_window() -> Window {
+fn place_screenshot_window(window: &Window) {
+    #[cfg(target_os = "macos")]
+    if let Some(geo) = crate::capture_macos::overlay_geometry() {
+        let _ = window.set_position(tauri::PhysicalPosition::new(geo.x, geo.y));
+        let _ = window.set_size(tauri::PhysicalSize::new(geo.width, geo.height));
+        crate::capture_macos::exclude_from_capture(window);
+        return;
+    }
     let monitor = monitor_at_mouse();
     let pos = *monitor.position();
     let size = *monitor.size();
+    let _ = window.set_position(tauri::PhysicalPosition::new(pos.x, pos.y));
+    let _ = window.set_size(tauri::PhysicalSize::new(size.width, size.height));
+}
+
+/// Capture is finished before this runs. The page shows itself after the
+/// frozen image is decoded, so the window is not on screen during capture.
+pub(crate) fn screenshot_window() -> Window {
     let app_handle = APP.get().unwrap();
     if let Some(window) = app_handle.get_window("screenshot") {
-        let _ = window.set_position(tauri::PhysicalPosition::new(pos.x, pos.y));
-        let _ = window.set_size(tauri::PhysicalSize::new(size.width, size.height));
+        place_screenshot_window(&window);
         let _ = window.set_always_on_top(true);
-        let _ = window.show();
-        let _ = window.set_focus();
         let _ = window.emit("screenshot-reload", ());
         return window;
     }
@@ -384,7 +395,7 @@ pub(crate) fn screenshot_window() -> Window {
     )
     .title("Snapshoot")
     .visible(false)
-    .focused(true)
+    .focused(false)
     .resizable(false)
     .skip_taskbar(true)
     .always_on_top(true)
@@ -398,18 +409,60 @@ pub(crate) fn screenshot_window() -> Window {
         .title_bar_style(tauri::TitleBarStyle::Overlay);
 
     let window = builder.build().expect("create screenshot window");
-    let _ = window.set_position(tauri::PhysicalPosition::new(pos.x, pos.y));
-    let _ = window.set_size(tauri::PhysicalSize::new(size.width, size.height));
+    place_screenshot_window(&window);
     window
+}
+
+pub(crate) fn open_frozen_overlay() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static BUSY: AtomicBool = AtomicBool::new(false);
+    if BUSY.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let was_visible = dismiss_screenshot_window();
+    std::thread::spawn(move || {
+        if was_visible {
+            // Return to the event loop first so macOS can drop the overlay
+            // from the framebuffer before the capture runs.
+            std::thread::sleep(std::time::Duration::from_millis(80));
+        }
+        let result = crate::screenshot::capture_for_overlay();
+        let queued = crate::image_io::spawn_main(move || {
+            BUSY.store(false, Ordering::SeqCst);
+            match result {
+                Ok(()) => {
+                    let _ = screenshot_window();
+                }
+                Err(err) => crate::screenshot::report_capture_failure(&err),
+            }
+        });
+        if queued.is_err() {
+            BUSY.store(false, Ordering::SeqCst);
+        }
+    });
+}
+
+fn dismiss_screenshot_window() -> bool {
+    let Some(app) = APP.get() else {
+        return false;
+    };
+    let Some(window) = app.get_window("screenshot") else {
+        return false;
+    };
+    let visible = window.is_visible().unwrap_or(false);
+    #[cfg(target_os = "macos")]
+    crate::capture_macos::order_out(&window);
+    let _ = window.hide();
+    visible
 }
 
 pub fn ocr_recognize() {
     crate::screenshot::prepare_screen_capture("ocr");
-    let _ = screenshot_window();
+    open_frozen_overlay();
 }
 pub fn ocr_translate() {
     crate::screenshot::prepare_screen_capture("translate");
-    let _ = screenshot_window();
+    open_frozen_overlay();
 }
 
 #[tauri::command(async)]

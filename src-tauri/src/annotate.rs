@@ -17,7 +17,7 @@ const TOOLBAR_CSS_PX: f64 = 108.0;
 pub fn screenshot_annotate() {
     clear_capture_origin();
     crate::screenshot::prepare_screen_capture("annotate");
-    let _ = crate::window::screenshot_window();
+    crate::window::open_frozen_overlay();
 }
 
 pub fn open_annotate_window() {

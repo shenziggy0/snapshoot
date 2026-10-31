@@ -2,7 +2,6 @@ import { appWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { save } from '@tauri-apps/api/dialog';
 import { writeText } from '@tauri-apps/api/clipboard';
-import { currentMonitor } from '@tauri-apps/api/window';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api';
@@ -137,7 +136,7 @@ export default function Screenshot() {
 
     useEffect(() => {
         document.documentElement.style.borderRadius = '0px';
-        document.documentElement.style.background = '#000';
+        document.documentElement.style.setProperty('background', '#000', 'important');
         document.body.style.background = '#000';
         document.body.style.overflow = 'hidden';
         const root = document.getElementById('root');
@@ -194,8 +193,6 @@ export default function Screenshot() {
             const intent = await invoke('screenshot_intent');
             intentRef.current = intent || 'annotate';
             if (intentRef.current !== 'edit') {
-                const monitor = await currentMonitor();
-                await invoke('screenshot', { x: monitor.position.x, y: monitor.position.y });
                 const inner = await appWindow.innerPosition();
                 originRef.current = { x: inner.x, y: inner.y };
                 framesRef.current = await invoke('list_capture_windows');

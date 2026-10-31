@@ -3,6 +3,8 @@
 
 mod annotate;
 mod backup;
+#[cfg(target_os = "macos")]
+mod capture_macos;
 mod clipboard;
 mod cmd;
 mod config;
