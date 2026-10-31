@@ -4,7 +4,7 @@
 
 > 跨平台截图、贴图、文字识别和翻译工具。基于 Pot（pot-app/pot-desktop），GPL-3.0。
 
-![License](https://img.shields.io/github/license/pot-app/pot-desktop.svg)
+![License](https://img.shields.io/github/license/shenziggy0/snapshoot.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-1.6.8-blue?logo=tauri)
 ![JavaScript](https://img.shields.io/badge/-JavaScript-yellow?logo=javascript&logoColor=white)
 ![Rust](https://img.shields.io/badge/-Rust-orange?logo=rust&logoColor=white)
@@ -180,12 +180,12 @@ pot 插件的扩展名为 `.potext`, 下载得到`.potext`文件之后， 在 �
 ### 通过 Winget 安装
 
 ```powershell
-winget install Pylogmon.pot
+# Snapshoot 尚未发布到 WinGet。请从 https://github.com/shenziggy0/snapshoot/releases 下载安装包。
 ```
 
 ### 手动安装
 
-1. 在 [Release](https://github.com/pot-app/pot-desktop/releases/latest) 页面下载最新 `exe` 安装包。
+1. 在 [Release](https://github.com/shenziggy0/snapshoot/releases/latest) 页面下载最新 `exe` 安装包。
 
     - 64 位机器下载 `Snapshoot_{version}_x64-setup.exe`
     - 32 位机器下载 `Snapshoot_{version}_x86-setup.exe`
@@ -209,46 +209,32 @@ winget install Pylogmon.pot
 
 1. 添加我们的 tap:
 
-```bash
-brew tap pot-app/homebrew-tap
-```
-
-2. 安装 pot:
-
-```bash
-brew install --cask pot
-```
-
-3. 更新 pot
-
-```bash
-brew upgrade --cask pot
-```
+Snapshoot 尚未发布 Homebrew cask。请从 [Release](https://github.com/shenziggy0/snapshoot/releases/latest) 下载 dmg。
 
 ### 手动安装
 
 1. 下载 `dmg` 安装包。（Apple 芯片请下载 `Snapshoot_{version}_aarch64.dmg`，Intel 芯片请下载 `Snapshoot_{version}_x64.dmg`）
-2. 双击下载的文件后将 pot 拖入 Applications 文件夹即可完成安装。
+2. 双击下载的文件后将 Snapshoot 拖入 Applications 文件夹即可完成安装。
 
 ### 故障排除
 
--   由于开发者无法验证，“pot”无法打开。
+-   由于开发者无法验证，“Snapshoot”无法打开。
 
-    点击 取消 按钮，然后去 设置 -> 隐私与安全性 页面，点击 仍要打开 按钮，然后在弹出窗口里点击 打开 按钮即可，以后打开 pot 就再也不会有任何弹窗告警了
+    点击 取消 按钮，然后去 设置 -> 隐私与安全性 页面，点击 仍要打开 按钮，然后在弹出窗口里点击 打开 按钮即可，以后打开 Snapshoot 就再也不会有任何弹窗告警了
 
-    如果在 隐私与安全性 中找不到以上选项，或启动时提示文件损坏。打开 Terminal.app，并输入以下命令，然后重启 pot 即可：
+    如果在 隐私与安全性 中找不到以上选项，或启动时提示文件损坏。打开 Terminal.app，并输入以下命令，然后重启 Snapshoot 即可：
 
     ```bash
-    sudo xattr -d com.apple.quarantine /Applications/pot.app
+    sudo xattr -d com.apple.quarantine /Applications/Snapshoot.app
     ```
 
--   如果每次打开时都遇到辅助功能权限提示，或者无法进行划词翻译，请前往设置 -> 隐私与安全 -> 辅助功能，移除 “pot”，并重新添加 “pot”。
+-   如果每次打开时都遇到辅助功能权限提示，或者无法进行划词翻译，请前往设置 -> 隐私与安全 -> 辅助功能，移除 “Snapshoot”，并重新添加 “Snapshoot”。
 
 ## Linux
 
 ### Debian/Ubuntu
 
-1. 从 [Release](https://github.com/pot-app/pot-desktop/releases/latest) 页面下载最新的对应架构的 `deb` 安装包。
+1. 从 [Release](https://github.com/shenziggy0/snapshoot/releases/latest) 页面下载最新的对应架构的 `deb` 安装包。
 
 2. 使用 `apt-get` 进行安装
 
@@ -348,14 +334,14 @@ rm ~/.cache/top.shenziggy.snapshoot/pot_screenshot_cut.png && flameshot gui -s -
 ### SnipDo (Windows)
 
 1. 从 [Microsoft Store](https://apps.microsoft.com/store/detail/snipdo/9NPZ2TVKJVT7) 下载安装 SnipDo。
-2. 从 [Release](https://github.com/pot-app/pot-desktop/releases/latest) 下载 pot 的 SnipDo 扩展 (pot.pbar)
+2. SnipDo 扩展 (pot.pbar) 仍发布在上游 Pot 的 [Release](https://github.com/pot-app/pot-desktop/releases/latest)。Snapshoot 本体见 https://github.com/shenziggy0/snapshoot
 3. 双击下载的扩展文件完成安装。
 4. 选中文字，可以看到弹出的 SnipDo 工具条，点击翻译按钮即可翻译。
 
 ### PopClip (MacOS)
 
 1. 从 [App Store](https://apps.apple.com/us/app/popclip/id445189367?mt=12) 下载安装 PopClip
-2. 从 [Release](https://github.com/pot-app/pot-desktop/releases/latest) 下载 pot 的 PopClip 扩展 (pot.popclipextz)
+2. PopClip 扩展 (pot.popclipextz) 仍发布在上游 Pot 的 [Release](https://github.com/pot-app/pot-desktop/releases/latest)。Snapshoot 本体见 https://github.com/shenziggy0/snapshoot
 3. 双击下载的扩展文件完成安装。
 4. 在 PopClip 的扩展中启用 pot 扩展，选中文本即可点击翻译。
 
@@ -415,7 +401,9 @@ windowrulev2 = move cursor 0 0, class:(pot), title:(Translator|PopClip|Screensho
 
 </div>
 
-<img src="https://github.com/pot-app/.github/blob/master/pot-desktop-contributions.svg?raw=true" width="100%"/>
+仓库：https://github.com/shenziggy0/snapshoot
+
+上游 Pot：https://github.com/pot-app/pot-desktop （GPL-3.0）
 
 ## 手动编译
 
@@ -432,7 +420,7 @@ Rust >= 1.80.0
 1. Clone 仓库
 
     ```bash
-    git clone https://github.com/pot-app/pot-desktop.git
+    git clone https://github.com/shenziggy0/snapshoot.git
     ```
 
 2. 安装依赖

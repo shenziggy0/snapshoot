@@ -31,7 +31,7 @@ export default function About() {
                         className='my-[5px]'
                         size='sm'
                         onPress={() => {
-                            open('https://pot-app.com');
+                            open('https://github.com/shenziggy0/snapshoot');
                         }}
                     >
                         {t('config.about.website')}
@@ -41,7 +41,7 @@ export default function About() {
                         className='my-[5px]'
                         size='sm'
                         onPress={() => {
-                            open('https://github.com/pot-app/pot-desktop');
+                            open('https://github.com/shenziggy0/snapshoot');
                         }}
                     >
                         {t('config.about.github')}
@@ -66,7 +66,7 @@ export default function About() {
                                     className='my-[5px]'
                                     size='sm'
                                     onPress={() => {
-                                        open('https://github.com/pot-app/pot-desktop/issues');
+                                        open('https://github.com/shenziggy0/snapshoot/issues');
                                     }}
                                 >
                                     {t('config.about.issue')}
@@ -146,7 +146,7 @@ export default function About() {
                                         className='my-[5px]'
                                         size='lg'
                                         onPress={() => {
-                                            open('https://github.com/pot-app/pot-desktop/discussions');
+                                            open('https://github.com/shenziggy0/snapshoot/issues');
                                         }}
                                     >
                                         <BsGithub />
