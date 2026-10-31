@@ -73,15 +73,15 @@ export async function collection(source, target, options = {}) {
         return results;
     }
 
-    await ankiConnect('createDeck', 6, { deck: 'Pot' });
+    await ankiConnect('createDeck', 6, { deck: 'Snapshoot' });
 
     await ankiConnect('createModel', 6, {
-        modelName: 'Pot Card 2',
+        modelName: 'Snapshoot Card',
         inOrderFields: ['Front', 'Back', 'Symbol1', 'Voice1', 'Symbol2', 'Voice2'],
         isCloze: false,
         cardTemplates: [
             {
-                Name: 'Pot Card 2',
+                Name: 'Snapshoot Card',
                 Front: '{{Front}}',
                 Back: '{{FrontSide}}<br>{{Symbol1}} {{Voice1}}<br>{{Symbol2}} {{Voice2}}<hr id=answer>{{Back}}',
             },
@@ -91,8 +91,8 @@ export async function collection(source, target, options = {}) {
     let pronunciations = ankiPronunciation(target);
     await ankiConnect('addNote', 6, {
         note: {
-            deckName: 'Pot',
-            modelName: 'Pot Card 2',
+            deckName: 'Snapshoot',
+            modelName: 'Snapshoot Card',
             fields: {
                 Front: source,
                 Back: ankiText(target),

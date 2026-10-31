@@ -164,7 +164,7 @@ fn build_window(label: &str, title: &str) -> (Window, bool) {
 }
 
 pub fn config_window() {
-    let (window, _exists) = build_window("config", "Config");
+    let (window, _exists) = build_window("config", "Snapshoot");
     window
         .set_min_size(Some(tauri::LogicalSize::new(800, 400)))
         .unwrap();
@@ -182,7 +182,7 @@ fn translate_window() -> Window {
             Position { x: 0, y: 0 }
         }
     };
-    let (window, exists) = build_window("translate", "Translate");
+    let (window, exists) = build_window("translate", "Snapshoot");
     if exists {
         return window;
     }
@@ -331,7 +331,7 @@ pub fn image_translate() {
 }
 
 pub fn recognize_window() {
-    let (window, exists) = build_window("recognize", "Recognize");
+    let (window, exists) = build_window("recognize", "Snapshoot");
     if exists {
         window.emit("new_image", "").unwrap();
         return;
@@ -382,7 +382,7 @@ pub(crate) fn screenshot_window() -> Window {
         "screenshot",
         tauri::WindowUrl::App("index.html".into()),
     )
-    .title("Screenshot")
+    .title("Snapshoot")
     .visible(false)
     .focused(true)
     .resizable(false)
@@ -414,7 +414,7 @@ pub fn ocr_translate() {
 
 #[tauri::command(async)]
 pub fn updater_window() {
-    let (window, _exists) = build_window("updater", "Updater");
+    let (window, _exists) = build_window("updater", "Snapshoot");
     window
         .set_min_size(Some(tauri::LogicalSize::new(600, 400)))
         .unwrap();

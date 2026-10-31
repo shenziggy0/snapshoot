@@ -48,9 +48,9 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, cwd| {
             Notification::new(&app.config().tauri.bundle.identifier)
-                .title("The program is already running. Please do not start it again!")
+                .title("Snapshoot is already running. Please do not start it again!")
                 .body(cwd)
-                .icon("pot")
+                .icon("snapshoot")
                 .show()
                 .unwrap();
         }))
@@ -98,7 +98,7 @@ fn main() {
                 Err(e) => Notification::new(app.config().tauri.bundle.identifier.clone())
                     .title("Failed to register global shortcut")
                     .body(&e)
-                    .icon("pot")
+                    .icon("snapshoot")
                     .show()
                     .unwrap(),
             }

@@ -242,7 +242,7 @@ export default function Annotate() {
     const onSave = async () => {
         try {
             const path = await save({
-                defaultPath: 'pot-screenshot.png',
+                defaultPath: 'snapshoot-screenshot.png',
                 filters: [{ name: 'PNG', extensions: ['png'] }],
             });
             if (!path) {

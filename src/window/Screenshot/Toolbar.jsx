@@ -47,9 +47,11 @@ function IconButton({ title, active, disabled, onClick, dark, children }) {
             onMouseDown={(event) => event.stopPropagation()}
             onClick={onClick}
             className={`flex h-7 w-7 items-center justify-center rounded-md disabled:opacity-30 ${
-                dark
-                    ? `text-white hover:bg-white/15 ${active ? 'bg-white/20' : ''}`
-                    : `text-neutral-800 hover:bg-black/10 ${active ? 'bg-black/10' : ''}`
+                active
+                    ? 'bg-[#1E63F0] text-white'
+                    : dark
+                      ? 'text-white hover:bg-white/15'
+                      : 'text-neutral-800 hover:bg-black/10'
             }`}
         >
             {children}

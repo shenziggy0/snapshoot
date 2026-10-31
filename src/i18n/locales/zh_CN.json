@@ -213,7 +213,8 @@
                 "qq_channel": "QQ 频道",
                 "qq_group": "QQ 群",
                 "telegram": "Telegram",
-                "discussion": "Github 讨论"
+                "discussion": "Github 讨论",
+                "credit": "基于 Pot（pot-app/pot-desktop），GPL-3.0"
             }
         },
         "updater": {

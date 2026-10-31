@@ -4646,42 +4646,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pot"
-version = "0.0.0"
-dependencies = [
- "arboard",
- "base64 0.22.1",
- "dirs 5.0.1",
- "font-kit",
- "image 0.25.4",
- "lingua",
- "log",
- "macos-accessibility-client",
- "mouse_position",
- "once_cell",
- "reqwest 0.12.9",
- "reqwest_dav",
- "screenshots",
- "selection",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-autostart",
- "tauri-plugin-fs-watch",
- "tauri-plugin-log",
- "tauri-plugin-single-instance",
- "tauri-plugin-sql",
- "tauri-plugin-store",
- "thiserror",
- "tiny_http",
- "walkdir",
- "window-shadows",
- "windows 0.58.0",
- "zip",
-]
-
-[[package]]
 name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5793,6 +5757,42 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "snapshoot"
+version = "0.0.0"
+dependencies = [
+ "arboard",
+ "base64 0.22.1",
+ "dirs 5.0.1",
+ "font-kit",
+ "image 0.25.4",
+ "lingua",
+ "log",
+ "macos-accessibility-client",
+ "mouse_position",
+ "once_cell",
+ "reqwest 0.12.9",
+ "reqwest_dav",
+ "screenshots",
+ "selection",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-autostart",
+ "tauri-plugin-fs-watch",
+ "tauri-plugin-log",
+ "tauri-plugin-single-instance",
+ "tauri-plugin-sql",
+ "tauri-plugin-store",
+ "thiserror",
+ "tiny_http",
+ "walkdir",
+ "window-shadows",
+ "windows 0.58.0",
+ "zip",
 ]
 
 [[package]]

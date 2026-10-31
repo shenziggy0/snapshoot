@@ -129,7 +129,7 @@ export default function Pin() {
                 toast.success(t('pin.copied'), { style: toastStyle });
             } else if (action === 'save') {
                 const path = await save({
-                    defaultPath: 'pot-pin.png',
+                    defaultPath: 'snapshoot-pin.png',
                     filters: [{ name: 'PNG', extensions: ['png'] }],
                 });
                 if (!path) {
@@ -189,7 +189,7 @@ export default function Pin() {
                 style={{
                     opacity,
                     display: loadError ? 'none' : 'block',
-                    outline: hover ? (dark ? '1px solid rgba(255,255,255,0.8)' : '1px solid rgba(0,0,0,0.45)') : '1px solid transparent',
+                    outline: hover ? '1px solid #1E63F0' : '1px solid transparent',
                     boxShadow: hover ? '0 10px 28px rgba(0,0,0,0.28)' : 'none',
                 }}
                 onMouseEnter={() => setHover(true)}

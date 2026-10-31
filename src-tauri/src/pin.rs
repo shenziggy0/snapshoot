@@ -142,7 +142,7 @@ fn open_pin_rgba(image: RgbaImage) {
         },
     );
 
-    let builder = new_overlay_builder(&label, "Pin");
+    let builder = new_overlay_builder(&label, "Snapshoot");
     let window = match builder.build() {
         Ok(window) => window,
         Err(err) => {
@@ -200,7 +200,7 @@ fn notify_no_image() {
     let _ = Notification::new(&app.config().tauri.bundle.identifier)
         .title(title)
         .body(body)
-        .icon("pot")
+        .icon("snapshoot")
         .show();
 }
 

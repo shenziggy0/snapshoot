@@ -7,7 +7,7 @@
         "withGlobalTauri": false
     },
     "package": {
-        "productName": "pot",
+        "productName": "Snapshoot",
         "version": "3.0.7"
     },
     "tauri": {
@@ -67,9 +67,9 @@
             "category": "Utility",
             "copyright": "GPLv3",
             "targets": "all",
-            "identifier": "com.pot-app.desktop",
-            "longDescription": "A cross-platform text translation and ocr software",
-            "shortDescription": "Pot App",
+            "identifier": "top.shenziggy.snapshoot",
+            "longDescription": "Snapshoot is a cross-platform screenshot, pin, OCR, and translation app based on Pot (GPL-3.0).",
+            "shortDescription": "Snapshoot",
             "externalBin": [],
             "resources": [],
             "icon": [

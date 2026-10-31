@@ -459,7 +459,7 @@ export default function Screenshot() {
                 await invoke('copy_png_base64', { data });
             } else if (action === 'save') {
                 const path = await save({
-                    defaultPath: 'pot-screenshot.png',
+                    defaultPath: 'snapshoot-screenshot.png',
                     filters: [{ name: 'PNG', extensions: ['png'] }],
                 });
                 if (!path) {
@@ -661,7 +661,7 @@ export default function Screenshot() {
         return Math.max(8, selection.y - 78);
     };
 
-    const accent = '#2f80ff';
+    const accent = '#1E63F0';
     const editing = Boolean(selection) && intentRef.current !== 'ocr' && intentRef.current !== 'translate';
 
     return (

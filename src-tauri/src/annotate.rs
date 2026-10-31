@@ -73,7 +73,7 @@ pub fn open_annotate_window() {
         return;
     }
 
-    let builder = new_overlay_builder("annotate", "Annotate");
+    let builder = new_overlay_builder("annotate", "Snapshoot");
     let window = match builder.build() {
         Ok(window) => window,
         Err(err) => {
