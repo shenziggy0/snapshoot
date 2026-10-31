@@ -120,7 +120,9 @@ jobs:
               run: pnpm tauri build --bundles none
 
             - name: Install assertion library
-              run: python3 -m pip install --user pillow
+              run: |
+                  python3 -m venv .smoke-venv
+                  .smoke-venv/bin/pip install pillow
 
             - name: Launch and check
               run: |
@@ -132,7 +134,7 @@ jobs:
                   export SNAPSHOOT_SMOKE_DIR="$DIR"
                   src-tauri/target/release/snapshoot > "$DIR/stdout.log" 2>&1 &
                   echo $! > "$DIR/pid"
-                  python3 scripts/smoke_check.py --dir "$DIR" --platform macos
+                  .smoke-venv/bin/python scripts/smoke_check.py --dir "$DIR" --platform macos
 
             - name: Upload smoke artifacts
               if: always()
@@ -170,7 +172,9 @@ jobs:
               run: pnpm tauri build --bundles none
 
             - name: Install assertion library
-              run: python -m pip install pillow
+              run: |
+                  python -m venv .smoke-venv
+                  .\.smoke-venv\Scripts\python.exe -m pip install pillow
 
             - name: Launch and check
               shell: pwsh
@@ -181,7 +185,7 @@ jobs:
                   $env:SNAPSHOOT_SMOKE_TEST = "1"
                   $env:SNAPSHOOT_SMOKE_DIR = $dir
                   Start-Process -FilePath "src-tauri\target\release\snapshoot.exe" -WorkingDirectory (Get-Location)
-                  python scripts/smoke_check.py --dir "$dir" --platform windows
+                  .\.smoke-venv\Scripts\python.exe scripts/smoke_check.py --dir "$dir" --platform windows
 
             - name: Upload smoke artifacts
               if: always()

@@ -10,10 +10,19 @@ from pathlib import Path
 
 from PIL import Image
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 
 def log(directory: Path, message: str) -> None:
     line = message.rstrip()
-    print(line, flush=True)
+    try:
+        print(line, flush=True)
+    except UnicodeEncodeError:
+        print(line.encode("ascii", "backslashreplace").decode("ascii"), flush=True)
     with (directory / "smoke-assert.log").open("a", encoding="utf-8") as handle:
         handle.write(line + "\n")
 
@@ -76,18 +85,22 @@ def assert_pin_colors(directory: Path, path: Path) -> None:
     if not path.exists():
         fail(directory, f"pin screenshot missing: {path}")
     image = Image.open(path).convert("RGB")
-    red = blue = 0
-    step = max(1, min(image.size) // 400)
-    for y in range(0, image.size[1], step):
-        for x in range(0, image.size[0], step):
+    red = blue = yellow = 0
+    for y in range(0, image.size[1], 2):
+        for x in range(0, image.size[0], 2):
             r, g, b = image.getpixel((x, y))
-            if r > 160 and g < 110 and b < 110:
+            if r > 190 and g < 70 and b < 70:
                 red += 1
-            if b > 160 and r < 110 and g < 120:
+            if b > 170 and r < 70 and g < 100:
                 blue += 1
-    log(directory, f"pin screenshot {image.size[0]}x{image.size[1]} red={red} blue={blue}")
-    if red < 8 or blue < 8:
-        fail(directory, "pin screenshot does not show the red/blue test image")
+            if r > 190 and g > 160 and b < 90:
+                yellow += 1
+    log(
+        directory,
+        f"pin screenshot {image.size[0]}x{image.size[1]} red={red} blue={blue} yellow={yellow}",
+    )
+    if red < 40 or blue < 40 or yellow < 10:
+        fail(directory, "pin screenshot does not show the red/blue/yellow test image")
 
 
 def os_screenshot(path: Path, platform: str) -> None:

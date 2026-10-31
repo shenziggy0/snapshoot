@@ -180,6 +180,7 @@ export default function Pin() {
                     {loadError}
                 </div>
             ) : null}
+            {url ? (
             <img
                 id='pin-image'
                 alt=''
@@ -216,6 +217,7 @@ export default function Pin() {
                     setMenu({ x: event.clientX, y: event.clientY });
                 }}
             />
+            ) : null}
             {zoomText ? (
                 <div className='pointer-events-none fixed left-1/2 top-3 z-40 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 text-xs text-white'>
                     {zoomText}
