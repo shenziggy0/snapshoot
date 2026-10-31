@@ -2,8 +2,6 @@ use crate::image_io::{
     clear_capture_origin, clipboard_on_main, copy_to_clipboard, cut_image_path,
     decode_base64_image, ensure_png_extension, spawn_main, take_capture_origin, write_png,
 };
-#[cfg(not(target_os = "macos"))]
-use crate::window::screenshot_window;
 use crate::window::{image_translate, monitor_at_mouse, new_overlay_builder, recognize_window};
 use crate::APP;
 use base64::{engine::general_purpose, Engine as _};
@@ -18,47 +16,8 @@ const TOOLBAR_CSS_PX: f64 = 108.0;
 
 pub fn screenshot_annotate() {
     clear_capture_origin();
-    #[cfg(target_os = "macos")]
-    {
-        if macos_capture_to_cut() {
-            open_annotate_window();
-        }
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let window = screenshot_window();
-        let window_ = window.clone();
-        window.listen("success", move |event| {
-            open_annotate_window();
-            let _ = window_.unlisten(event.id());
-        });
-    }
-}
-
-#[cfg(target_os = "macos")]
-fn macos_capture_to_cut() -> bool {
-    let path = cut_image_path();
-    let path_str = path.to_string_lossy().to_string();
-    info!("Annotate screencapture path: {}", path_str);
-    match std::process::Command::new("/usr/sbin/screencapture")
-        .arg("-i")
-        .arg("-r")
-        .arg(&path_str)
-        .output()
-    {
-        Ok(output) if output.status.success() => match std::fs::metadata(&path) {
-            Ok(meta) => meta.len() > 32,
-            Err(_) => false,
-        },
-        Ok(output) => {
-            info!("screencapture exited: {}", output.status);
-            false
-        }
-        Err(err) => {
-            warn!("screencapture failed: {}", err);
-            false
-        }
-    }
+    crate::screenshot::prepare_screen_capture("annotate");
+    let _ = crate::window::screenshot_window();
 }
 
 pub fn open_annotate_window() {

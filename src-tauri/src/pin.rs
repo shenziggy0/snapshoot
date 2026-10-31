@@ -205,6 +205,14 @@ fn notify_no_image() {
 }
 
 #[tauri::command]
+pub fn annotate_pin(window: tauri::Window) -> Result<(), String> {
+    let meta = meta_for(&window)?;
+    crate::screenshot::prepare_edit_image(&meta.path);
+    let _ = crate::window::screenshot_window();
+    Ok(())
+}
+
+#[tauri::command]
 pub fn pin_png_base64(data: String) -> Result<(), String> {
     let image = crate::image_io::decode_base64_image(&data).map_err(|err| err.to_string())?;
     spawn_main(move || open_pin_dynamic(image))

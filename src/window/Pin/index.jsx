@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { useToastStyle } from '../../hooks';
+import { useSystemDark } from '../useSystemDark';
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -23,12 +24,16 @@ function base64ToObjectUrl(data) {
 export default function Pin() {
     const { t } = useTranslation();
     const toastStyle = useToastStyle();
+    const dark = useSystemDark();
     const infoRef = useRef(null);
     const zoomRef = useRef(1);
     const [url, setUrl] = useState('');
     const [loadError, setLoadError] = useState('');
     const [opacity, setOpacity] = useState(1);
     const [menu, setMenu] = useState(null);
+    const [hover, setHover] = useState(false);
+    const [zoomText, setZoomText] = useState('');
+    const zoomTimer = useRef(0);
     const blobUrlRef = useRef('');
 
     useEffect(() => {
@@ -92,6 +97,9 @@ export default function Pin() {
         zoomRef.current = nextZoom;
         await appWindow.setSize(new PhysicalSize(newW, newH));
         await appWindow.setPosition(new PhysicalPosition(newX, newY));
+        setZoomText(`${Math.round(nextZoom * 100)}%`);
+        window.clearTimeout(zoomTimer.current);
+        zoomTimer.current = window.setTimeout(() => setZoomText(''), 700);
     };
 
     useEffect(() => {
@@ -139,6 +147,11 @@ export default function Pin() {
                 await applyZoom(clamp(zoomRef.current * 1.1, 0.05, 8), window.innerWidth / 2, window.innerHeight / 2);
             } else if (action === 'zoom-out') {
                 await applyZoom(clamp(zoomRef.current / 1.1, 0.05, 8), window.innerWidth / 2, window.innerHeight / 2);
+            } else if (action === 'zoom-reset') {
+                const initial = infoRef.current?.zoom || 1;
+                await applyZoom(initial, window.innerWidth / 2, window.innerHeight / 2);
+            } else if (action === 'annotate') {
+                await invoke('annotate_pin');
             }
         } catch (error) {
             toast.error(String(error), { style: toastStyle });
@@ -150,8 +163,12 @@ export default function Pin() {
         ['save', t('pin.save')],
         ['ocr', t('pin.ocr')],
         ['translate', t('pin.translate')],
+        ['annotate', t('pin.annotate')],
+        ['sep', ''],
         ['zoom-in', t('pin.zoom_in')],
         ['zoom-out', t('pin.zoom_out')],
+        ['zoom-reset', t('pin.zoom_reset')],
+        ['sep2', ''],
         ['close', t('pin.close')],
     ];
 
@@ -169,7 +186,14 @@ export default function Pin() {
                 src={url}
                 draggable={false}
                 className='fixed inset-0 h-full w-full select-none'
-                style={{ opacity, display: loadError ? 'none' : 'block' }}
+                style={{
+                    opacity,
+                    display: loadError ? 'none' : 'block',
+                    outline: hover ? (dark ? '1px solid rgba(255,255,255,0.8)' : '1px solid rgba(0,0,0,0.45)') : '1px solid transparent',
+                    boxShadow: hover ? '0 10px 28px rgba(0,0,0,0.28)' : 'none',
+                }}
+                onMouseEnter={() => setHover(true)}
+                onMouseLeave={() => setHover(false)}
                 onError={() => setLoadError(t('pin.load_failed'))}
                 onMouseDown={(event) => {
                     if (event.button !== 0) {
@@ -192,9 +216,16 @@ export default function Pin() {
                     setMenu({ x: event.clientX, y: event.clientY });
                 }}
             />
+            {zoomText ? (
+                <div className='pointer-events-none fixed left-1/2 top-3 z-40 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 text-xs text-white'>
+                    {zoomText}
+                </div>
+            ) : null}
             {menu && (
                 <div
-                    className='fixed z-30 min-w-[180px] rounded-md border border-white/10 bg-neutral-900/95 p-1 text-sm text-white shadow-lg'
+                    className={`fixed z-30 min-w-[180px] rounded-md border p-1 text-sm shadow-lg ${
+                        dark ? 'border-white/10 bg-neutral-900/95 text-white' : 'border-black/10 bg-white/95 text-neutral-800'
+                    }`}
                     style={{
                         left: Math.max(4, Math.min(menu.x, window.innerWidth - 196)),
                         top: Math.max(4, Math.min(menu.y, window.innerHeight - 280)),
@@ -202,19 +233,26 @@ export default function Pin() {
                     onMouseDown={(event) => event.stopPropagation()}
                     onContextMenu={(event) => event.preventDefault()}
                 >
-                    {menuItems.map(([action, label]) => (
-                        <button
-                            key={action}
-                            type='button'
-                            className='block w-full rounded px-2 py-1 text-left hover:bg-white/15'
-                            onClick={() => {
-                                void run(action);
-                            }}
-                        >
-                            {label}
-                        </button>
-                    ))}
-                    <label className='mt-1 block px-2 py-1 text-xs text-white/80'>
+                    {menuItems.map(([action, label]) =>
+                        action.startsWith('sep') ? (
+                            <div
+                                key={action}
+                                className={`my-1 h-px ${dark ? 'bg-white/15' : 'bg-black/10'}`}
+                            />
+                        ) : (
+                            <button
+                                key={action}
+                                type='button'
+                                className={`block w-full rounded px-2 py-1 text-left ${dark ? 'hover:bg-white/15' : 'hover:bg-black/5'}`}
+                                onClick={() => {
+                                    void run(action);
+                                }}
+                            >
+                                {label}
+                            </button>
+                        )
+                    )}
+                    <label className={`mt-1 block px-2 py-1 text-xs ${dark ? 'text-white/80' : 'text-neutral-600'}`}>
                         {t('pin.opacity')} {Math.round(opacity * 100)}%
                         <input
                             type='range'

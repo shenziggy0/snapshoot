@@ -17,6 +17,7 @@ mod system_ocr;
 mod tray;
 mod updater;
 mod window;
+mod windows_list;
 
 use backup::*;
 use clipboard::*;
@@ -26,7 +27,6 @@ use hotkey::*;
 use lang_detect::*;
 use log::info;
 use once_cell::sync::OnceCell;
-use screenshot::screenshot;
 use server::*;
 use std::sync::Mutex;
 use system_ocr::*;
@@ -148,7 +148,10 @@ fn main() {
             register_shortcut_by_frontend,
             update_tray,
             updater_window,
-            screenshot,
+            screenshot::screenshot,
+            screenshot::screenshot_intent,
+            screenshot::read_capture_image,
+            screenshot::list_capture_windows,
             lang_detect,
             webdav,
             local,
@@ -160,6 +163,7 @@ fn main() {
             annotate::save_png_base64,
             annotate::open_ocr_from_png_base64,
             annotate::open_translate_from_png_base64,
+            pin::annotate_pin,
             pin::pin_png_base64,
             pin::pin_image_base64,
             pin::pin_window_info,

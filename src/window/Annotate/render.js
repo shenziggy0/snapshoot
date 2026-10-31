@@ -38,6 +38,18 @@ function drawEllipse(ctx, shape) {
     ctx.restore();
 }
 
+function drawLine(ctx, shape) {
+    ctx.save();
+    ctx.strokeStyle = shape.color;
+    ctx.lineWidth = shape.strokeWidth;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(shape.x, shape.y);
+    ctx.lineTo(shape.x2, shape.y2);
+    ctx.stroke();
+    ctx.restore();
+}
+
 function drawArrow(ctx, shape) {
     const x1 = shape.x;
     const y1 = shape.y;
@@ -253,6 +265,9 @@ export function drawShape(ctx, shape, preview) {
             break;
         case 'ellipse':
             drawEllipse(ctx, shape);
+            break;
+        case 'line':
+            drawLine(ctx, shape);
             break;
         case 'arrow':
             drawArrow(ctx, shape);
