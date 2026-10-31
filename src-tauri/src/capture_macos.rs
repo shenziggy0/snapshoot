@@ -112,10 +112,8 @@ fn ns_window(window: &tauri::Window) -> Option<*mut Object> {
 }
 
 pub fn capture_to(path: &Path) -> Result<(), String> {
-    if !screen_recording_allowed() {
-        request_screen_recording();
-        return Err("screen recording permission is not granted".into());
-    }
+    let allowed = screen_recording_allowed();
+    info!("screen recording preflight: {allowed}");
     let target = display_under_cursor()?;
     info!(
         "capture display {} points {:.0},{:.0} {:.0}x{:.0} pixels {}x{}",
@@ -127,11 +125,22 @@ pub fn capture_to(path: &Path) -> Result<(), String> {
         target.geometry.width,
         target.geometry.height
     );
-    match capture_display_image(target.id, path) {
-        Ok(()) => return Ok(()),
-        Err(err) => warn!("CGDisplayCreateImage unusable: {err}"),
+    if allowed {
+        match capture_display_image(target.id, path) {
+            Ok(()) => return Ok(()),
+            Err(err) => warn!("CGDisplayCreateImage unusable: {err}"),
+        }
     }
-    capture_with_screencapture(&target, path)
+    match capture_with_screencapture(&target, path) {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            // The system prompt blocks a CI session where nobody can click it.
+            if !allowed && std::env::var("SNAPSHOOT_SMOKE_TEST").ok().as_deref() != Some("1") {
+                request_screen_recording();
+            }
+            Err(err)
+        }
+    }
 }
 
 fn capture_display_image(id: u32, path: &Path) -> Result<(), String> {

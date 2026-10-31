@@ -91,3 +91,102 @@ jobs:
                   name: Snapshoot-macos-${{ matrix.target }}-dmg
                   path: src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
                   if-no-files-found: error
+
+    smoke-macos:
+        name: Smoke test macOS
+        runs-on: macos-14
+        timeout-minutes: 60
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Nodejs
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 21
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - name: Install Rust Stable
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Install Dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build release app
+              run: pnpm tauri build --bundles none
+
+            - name: Install assertion library
+              run: python3 -m pip install --user pillow
+
+            - name: Launch and check
+              run: |
+                  set -euo pipefail
+                  DIR="${GITHUB_WORKSPACE}/smoke-artifacts"
+                  mkdir -p "$DIR"
+                  test -x src-tauri/target/release/snapshoot
+                  export SNAPSHOOT_SMOKE_TEST=1
+                  export SNAPSHOOT_SMOKE_DIR="$DIR"
+                  src-tauri/target/release/snapshoot > "$DIR/stdout.log" 2>&1 &
+                  echo $! > "$DIR/pid"
+                  python3 scripts/smoke_check.py --dir "$DIR" --platform macos
+
+            - name: Upload smoke artifacts
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: smoke-test-macos
+                  path: smoke-artifacts
+                  if-no-files-found: warn
+
+    smoke-windows:
+        name: Smoke test Windows
+        runs-on: windows-latest
+        timeout-minutes: 60
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Nodejs
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 21
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - name: Install Rust Stable
+              uses: dtolnay/rust-toolchain@stable
+
+            - name: Install Dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build release app
+              run: pnpm tauri build --bundles none
+
+            - name: Install assertion library
+              run: python -m pip install pillow
+
+            - name: Launch and check
+              shell: pwsh
+              run: |
+                  $dir = Join-Path (Get-Location) "smoke-artifacts"
+                  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+                  if (-not (Test-Path "src-tauri\target\release\snapshoot.exe")) { throw "snapshoot.exe was not built" }
+                  $env:SNAPSHOOT_SMOKE_TEST = "1"
+                  $env:SNAPSHOOT_SMOKE_DIR = $dir
+                  Start-Process -FilePath "src-tauri\target\release\snapshoot.exe" -WorkingDirectory (Get-Location)
+                  python scripts/smoke_check.py --dir "$dir" --platform windows
+
+            - name: Upload smoke artifacts
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: smoke-test-windows
+                  path: smoke-artifacts
+                  if-no-files-found: warn

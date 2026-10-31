@@ -15,6 +15,7 @@ mod lang_detect;
 mod pin;
 mod screenshot;
 mod server;
+mod smoke;
 mod system_ocr;
 mod tray;
 mod updater;
@@ -30,6 +31,7 @@ use lang_detect::*;
 use log::info;
 use once_cell::sync::OnceCell;
 use server::*;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use system_ocr::*;
 use tauri::api::notification::Notification;
@@ -42,6 +44,7 @@ use window::updater_window;
 
 // Global AppHandle
 pub static APP: OnceCell<tauri::AppHandle> = OnceCell::new();
+pub static ALLOW_EXIT: AtomicBool = AtomicBool::new(false);
 
 // Text to be translated
 pub struct StringWrapper(pub Mutex<String>);
@@ -72,7 +75,9 @@ fn main() {
         .setup(|app| {
             info!("============== Start App ==============");
             #[cfg(target_os = "macos")]
-            {
+            if smoke::enabled() {
+                app.set_activation_policy(tauri::ActivationPolicy::Regular);
+            } else {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 let trusted =
                     macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
@@ -84,7 +89,7 @@ fn main() {
             info!("Init Config Store");
             init_config(app);
             // Check First Run
-            if is_first_run() {
+            if is_first_run() && !smoke::enabled() {
                 // Open Config Window
                 info!("First Run, opening config window");
                 config_window();
@@ -134,6 +139,9 @@ fn main() {
             )));
             start_clipboard_monitor(app.handle());
             pin::cleanup_stale_pins();
+            if smoke::enabled() {
+                std::thread::spawn(|| smoke::run());
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -180,7 +188,9 @@ fn main() {
         // 窗口关闭不退出
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
+                if !ALLOW_EXIT.load(Ordering::SeqCst) {
+                    api.prevent_exit();
+                }
             }
         });
 }
