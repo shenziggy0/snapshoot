@@ -9,7 +9,9 @@ import { invoke } from '@tauri-apps/api/tauri';
 import Screenshot from './window/Screenshot';
 import Translate from './window/Translate';
 import Recognize from './window/Recognize';
+import Annotate from './window/Annotate';
 import Updater from './window/Updater';
+import Pin from './window/Pin';
 import { store } from './utils/store';
 import Config from './window/Config';
 import { useConfig } from './hooks';
@@ -20,6 +22,7 @@ const windowMap = {
     translate: <Translate />,
     screenshot: <Screenshot />,
     recognize: <Recognize />,
+    annotate: <Annotate />,
     config: <Config />,
     updater: <Updater />,
 };
@@ -113,5 +116,6 @@ export default function App() {
         }
     }, [appFont, appFallbackFont, appFontSize]);
 
-    return <BrowserRouter>{windowMap[appWindow.label]}</BrowserRouter>;
+    const page = appWindow.label.startsWith('pin_') ? <Pin /> : windowMap[appWindow.label];
+    return <BrowserRouter>{page}</BrowserRouter>;
 }

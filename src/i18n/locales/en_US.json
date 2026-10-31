@@ -151,6 +151,8 @@
                 "input_translate": "Text Translation",
                 "ocr_recognize": "Text Recognition",
                 "ocr_translate": "Screenshot Translation",
+                "screenshot_annotate": "Screenshot & Annotate",
+                "pin_clipboard": "Pin Clipboard Image",
                 "is_register": "The hotkey is already registered",
                 "success": "Hotkey register success",
                 "set_hotkey": "Press to Set Hotkey"
@@ -467,6 +469,47 @@
             "copy_text": "Copy",
             "delete_newline": "Delete Newline",
             "delete_space": "Delete Space"
+        },
+        "annotate": {
+            "title": "Annotate",
+            "rect": "Rectangle",
+            "ellipse": "Ellipse",
+            "arrow": "Arrow",
+            "pen": "Pen",
+            "highlighter": "Highlighter",
+            "text": "Text",
+            "mosaic": "Mosaic",
+            "blur": "Blur",
+            "number": "Step marker",
+            "undo": "Undo",
+            "redo": "Redo",
+            "copy": "Copy",
+            "save": "Save",
+            "pin": "Pin to screen",
+            "ocr": "OCR",
+            "translate": "Translate",
+            "close": "Close",
+            "color": "Color",
+            "stroke": "Stroke width",
+            "include_annotations": "Include annotations",
+            "raw_image": "Use original image",
+            "text_placeholder": "Text",
+            "copied": "Copied",
+            "saved": "Saved",
+            "empty": "Screenshot is empty"
+        },
+        "pin": {
+            "copy": "Copy",
+            "save": "Save",
+            "ocr": "OCR",
+            "translate": "Translate",
+            "opacity": "Opacity",
+            "close": "Close",
+            "zoom_in": "Zoom in",
+            "zoom_out": "Zoom out",
+            "copied": "Copied",
+            "saved": "Saved",
+            "no_image": "No image on the clipboard"
         }
     }
 }

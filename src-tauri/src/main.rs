@@ -1,13 +1,16 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod annotate;
 mod backup;
 mod clipboard;
 mod cmd;
 mod config;
 mod error;
 mod hotkey;
+mod image_io;
 mod lang_detect;
+mod pin;
 mod screenshot;
 mod server;
 mod system_ocr;
@@ -101,7 +104,10 @@ fn main() {
             }
             match get("proxy_enable") {
                 Some(v) => {
-                    if v.as_bool().unwrap() && get("proxy_host").map_or(false, |host| !host.as_str().unwrap().is_empty()) {
+                    if v.as_bool().unwrap()
+                        && get("proxy_host")
+                            .map_or(false, |host| !host.as_str().unwrap().is_empty())
+                    {
                         let _ = set_proxy();
                     }
                 }
@@ -125,6 +131,7 @@ fn main() {
                 clipboard_monitor.to_string(),
             )));
             start_clipboard_monitor(app.handle());
+            pin::cleanup_stale_pins();
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -147,7 +154,17 @@ fn main() {
             local,
             install_plugin,
             font_list,
-            aliyun
+            aliyun,
+            annotate::copy_png_base64,
+            annotate::save_png_base64,
+            annotate::open_ocr_from_png_base64,
+            annotate::open_translate_from_png_base64,
+            pin::pin_png_base64,
+            pin::pin_window_info,
+            pin::copy_pin_image,
+            pin::save_pin_image,
+            pin::ocr_pin_image,
+            pin::translate_pin_image
         ])
         .on_system_tray_event(tray_event_handler)
         .build(tauri::generate_context!())

@@ -1,9 +1,11 @@
+#[cfg(target_os = "macos")]
 use std::fs;
 
 use crate::config::get;
 use crate::config::set;
 use crate::StringWrapper;
 use crate::APP;
+#[cfg(target_os = "macos")]
 use dirs::cache_dir;
 use log::{info, warn};
 use tauri::Manager;
@@ -55,6 +57,59 @@ fn get_current_monitor(x: i32, y: i32) -> Monitor {
     }
     warn!("Current Monitor not found, using primary monitor");
     daemon_window.primary_monitor().unwrap().unwrap()
+}
+
+pub(crate) fn mouse_physical_position() -> (i32, i32) {
+    use mouse_position::mouse_position::Mouse;
+
+    match Mouse::get_mouse_position() {
+        Mouse::Position { x, y } => (x, y),
+        Mouse::Error => {
+            warn!("Mouse position not found, using (0, 0) as default");
+            (0, 0)
+        }
+    }
+}
+
+pub(crate) fn monitor_at_mouse() -> Monitor {
+    let (x, y) = mouse_physical_position();
+    get_current_monitor(x, y)
+}
+
+/// Borderless, transparent, always-on-top window used by the annotation editor and pins.
+/// macOS transparency needs `macos-private-api` plus `macOSPrivateApi` in tauri.conf.json.
+pub(crate) fn new_overlay_builder(
+    label: impl Into<String>,
+    title: impl Into<String>,
+) -> WindowBuilder<'static, tauri::Wry> {
+    let app_handle = APP.get().unwrap();
+    let mut builder = WindowBuilder::new(
+        app_handle,
+        label,
+        tauri::WindowUrl::App("index.html".into()),
+    )
+    .title(title)
+    .visible(false)
+    .focused(true)
+    .resizable(false)
+    .skip_taskbar(true)
+    .always_on_top(true)
+    .additional_browser_args("--disable-web-security");
+
+    #[cfg(target_os = "macos")]
+    {
+        builder = builder
+            .transparent(true)
+            .decorations(false)
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .hidden_title(true)
+            .accept_first_mouse(true);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        builder = builder.transparent(true).decorations(false);
+    }
+    builder
 }
 
 // Creating a window on the mouse monitor
@@ -313,7 +368,7 @@ pub fn recognize_window() {
 }
 
 #[cfg(not(target_os = "macos"))]
-fn screenshot_window() -> Window {
+pub(crate) fn screenshot_window() -> Window {
     let (window, _exists) = build_window("screenshot", "Screenshot");
 
     window.set_skip_taskbar(true).unwrap();

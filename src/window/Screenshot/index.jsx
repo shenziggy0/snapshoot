@@ -89,7 +89,20 @@ export default function Screenshot() {
                         warn('Screenshot area is too small');
                         await appWindow.close();
                     } else {
-                        await invoke('cut_image', { left, top, width, height });
+                        let screenX = null;
+                        let screenY = null;
+                        try {
+                            const monitor = await currentMonitor();
+                            const factor = monitor?.scaleFactor || dpi;
+                            const inner = await appWindow.innerPosition();
+                            const logicalLeft = Math.min(mouseDownX, e.clientX);
+                            const logicalTop = Math.min(mouseDownY, e.clientY);
+                            screenX = Math.round(inner.x + logicalLeft * factor);
+                            screenY = Math.round(inner.y + logicalTop * factor);
+                        } catch (error) {
+                            warn(String(error));
+                        }
+                        await invoke('cut_image', { left, top, width, height, screenX, screenY });
                         await emit('success');
                         await appWindow.close();
                     }

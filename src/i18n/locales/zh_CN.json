@@ -151,6 +151,8 @@
                 "input_translate": "输入翻译",
                 "ocr_recognize": "文字识别",
                 "ocr_translate": "截图翻译",
+                "screenshot_annotate": "截图标注",
+                "pin_clipboard": "剪贴板贴图",
                 "is_register": "快捷键已被注册",
                 "success": "快捷键注册成功",
                 "set_hotkey": "按下按键设置快捷键"
@@ -467,6 +469,47 @@
             "copy_text": "复制",
             "delete_newline": "删除换行",
             "delete_space": "删除空格"
+        },
+        "annotate": {
+            "title": "截图标注",
+            "rect": "矩形",
+            "ellipse": "椭圆",
+            "arrow": "箭头",
+            "pen": "画笔",
+            "highlighter": "荧光笔",
+            "text": "文字",
+            "mosaic": "马赛克",
+            "blur": "模糊",
+            "number": "步骤序号",
+            "undo": "撤销",
+            "redo": "重做",
+            "copy": "复制",
+            "save": "保存",
+            "pin": "贴到屏幕",
+            "ocr": "文字识别",
+            "translate": "翻译",
+            "close": "关闭",
+            "color": "颜色",
+            "stroke": "线宽",
+            "include_annotations": "包含标注",
+            "raw_image": "使用原图",
+            "text_placeholder": "输入文字",
+            "copied": "已复制",
+            "saved": "已保存",
+            "empty": "截图为空"
+        },
+        "pin": {
+            "copy": "复制",
+            "save": "保存",
+            "ocr": "文字识别",
+            "translate": "翻译",
+            "opacity": "不透明度",
+            "close": "关闭",
+            "zoom_in": "放大",
+            "zoom_out": "缩小",
+            "copied": "已复制",
+            "saved": "已保存",
+            "no_image": "剪贴板中没有图片"
         }
     }
 }
