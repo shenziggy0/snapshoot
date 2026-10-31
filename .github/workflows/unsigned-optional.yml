@@ -1,0 +1,146 @@
+name: Unsigned optional builds
+
+# Manual only. Does not run on push.
+on:
+    workflow_dispatch:
+        inputs:
+            windows:
+                description: Build Windows NSIS and MSI
+                type: boolean
+                default: false
+            macos_x64:
+                description: Build the macOS x86_64 dmg
+                type: boolean
+                default: false
+            smoke:
+                description: Run macOS and Windows smoke tests
+                type: boolean
+                default: false
+
+permissions:
+    contents: read
+
+jobs:
+    build-windows-x64:
+        name: Windows x64 (NSIS + MSI)
+        if: inputs.windows == true
+        runs-on: windows-latest
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 21
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: x86_64-pc-windows-msvc
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis,msi
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: Snapshoot-windows-x64-nsis
+                  path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+                  if-no-files-found: error
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: Snapshoot-windows-x64-msi
+                  path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+                  if-no-files-found: error
+
+    build-macos-x64:
+        name: macOS x86_64 dmg
+        if: inputs.macos_x64 == true
+        runs-on: macos-14
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 21
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+            - uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: x86_64-apple-darwin
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm tauri build --target x86_64-apple-darwin --bundles dmg
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: Snapshoot-macos-x86_64-apple-darwin-dmg
+                  path: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+                  if-no-files-found: error
+
+    smoke-macos:
+        name: Smoke test macOS
+        if: inputs.smoke == true
+        runs-on: macos-14
+        continue-on-error: true
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 21
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+            - uses: dtolnay/rust-toolchain@stable
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm tauri build --bundles none
+            - run: |
+                  python3 -m venv .smoke-venv
+                  .smoke-venv/bin/pip install pillow
+            - run: |
+                  set -euo pipefail
+                  DIR="${GITHUB_WORKSPACE}/smoke-artifacts"
+                  mkdir -p "$DIR"
+                  test -x src-tauri/target/release/snapshoot
+                  export SNAPSHOOT_SMOKE_TEST=1
+                  export SNAPSHOOT_SMOKE_DIR="$DIR"
+                  src-tauri/target/release/snapshoot > "$DIR/stdout.log" 2>&1 &
+                  echo $! > "$DIR/pid"
+                  .smoke-venv/bin/python scripts/smoke_check.py --dir "$DIR" --platform macos
+            - if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: smoke-test-macos
+                  path: smoke-artifacts
+                  if-no-files-found: warn
+
+    smoke-windows:
+        name: Smoke test Windows
+        if: inputs.smoke == true
+        runs-on: windows-latest
+        continue-on-error: true
+        timeout-minutes: 60
+        steps:
+            - uses: actions/checkout@v4
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 21
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+            - uses: dtolnay/rust-toolchain@stable
+            - run: pnpm install --frozen-lockfile
+            - run: pnpm tauri build --bundles none
+            - run: |
+                  python -m venv .smoke-venv
+                  .\.smoke-venv\Scripts\python.exe -m pip install pillow
+            - shell: pwsh
+              run: |
+                  $dir = Join-Path (Get-Location) "smoke-artifacts"
+                  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+                  if (-not (Test-Path "src-tauri\target\release\snapshoot.exe")) { throw "snapshoot.exe was not built" }
+                  $env:SNAPSHOOT_SMOKE_TEST = "1"
+                  $env:SNAPSHOOT_SMOKE_DIR = $dir
+                  Start-Process -FilePath "src-tauri\target\release\snapshoot.exe" -WorkingDirectory (Get-Location)
+                  .\.smoke-venv\Scripts\python.exe scripts/smoke_check.py --dir "$dir" --platform windows
+            - if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: smoke-test-windows
+                  path: smoke-artifacts
+                  if-no-files-found: warn
