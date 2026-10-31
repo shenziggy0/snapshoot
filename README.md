@@ -426,7 +426,7 @@ Rust >= 1.80.0
 2. 安装依赖
 
     ```bash
-    cd pot-desktop
+    cd snapshoot
     pnpm install
     ```
 
