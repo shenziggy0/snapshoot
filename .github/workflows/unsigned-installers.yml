@@ -3,6 +3,19 @@ name: Unsigned installers
 # Builds unsigned Windows x64 and macOS installers without Apple or updater signing keys.
 on:
     workflow_dispatch:
+        inputs:
+            windows:
+                description: Also build Windows NSIS and MSI
+                type: boolean
+                default: false
+            macos_x64:
+                description: Also build the macOS x86_64 dmg
+                type: boolean
+                default: false
+            smoke:
+                description: Run macOS and Windows smoke tests
+                type: boolean
+                default: false
     push:
         branches:
             - 'cursor/**'
@@ -13,6 +26,7 @@ permissions:
 jobs:
     build-windows-x64:
         name: Windows x64 (NSIS + MSI)
+        if: github.event_name == 'workflow_dispatch' && inputs.windows == true
         runs-on: windows-latest
         steps:
             - name: Checkout
@@ -55,7 +69,8 @@ jobs:
 
     build-macos:
         name: macOS ${{ matrix.target }}
-        runs-on: macos-latest
+        runs-on: macos-14
+        if: matrix.target == 'aarch64-apple-darwin' || (github.event_name == 'workflow_dispatch' && inputs.macos_x64 == true)
         strategy:
             fail-fast: false
             matrix:
@@ -94,6 +109,7 @@ jobs:
 
     smoke-macos:
         name: Smoke test macOS
+        if: github.event_name == 'workflow_dispatch' && inputs.smoke == true
         runs-on: macos-14
         continue-on-error: true
         timeout-minutes: 60
@@ -147,6 +163,7 @@ jobs:
 
     smoke-windows:
         name: Smoke test Windows
+        if: github.event_name == 'workflow_dispatch' && inputs.smoke == true
         runs-on: windows-latest
         continue-on-error: true
         timeout-minutes: 60

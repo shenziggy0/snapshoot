@@ -446,13 +446,15 @@ extern "system" {
 }
 
 /// Capture is finished before this runs. The page shows itself after the
-/// frozen image is decoded, so the window is not on screen during capture.
+/// frozen image is decoded. A short fallback shows the window if that signal
+/// never arrives (hidden webviews often do not run animation frames).
 pub(crate) fn screenshot_window() -> Window {
     let app_handle = APP.get().unwrap();
     if let Some(window) = app_handle.get_window("screenshot") {
         place_screenshot_window(&window);
         let _ = window.set_always_on_top(true);
         let _ = window.emit("screenshot-reload", ());
+        reveal_overlay_fallback(window.clone());
         return window;
     }
 
@@ -478,7 +480,24 @@ pub(crate) fn screenshot_window() -> Window {
 
     let window = builder.build().expect("create screenshot window");
     place_screenshot_window(&window);
+    reveal_overlay_fallback(window.clone());
     window
+}
+
+fn reveal_overlay_fallback(window: Window) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(350));
+        match window.is_visible() {
+            Ok(true) => {}
+            Ok(false) => {
+                warn!("overlay still hidden after 350ms; showing it");
+                let _ = window.show();
+                let _ = window.set_focus();
+                let _ = window.set_always_on_top(true);
+            }
+            Err(err) => warn!("overlay visibility check failed: {err}"),
+        }
+    });
 }
 
 #[tauri::command]

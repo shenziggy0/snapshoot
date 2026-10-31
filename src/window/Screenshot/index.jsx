@@ -217,25 +217,47 @@ export default function Screenshot() {
                 }
             });
             paint();
-            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            await waitUntilPainted(300);
+            await revealOverlay();
+        } catch (error) {
+            console.error('overlay boot failed', error);
+            setLoadError(String(error));
+            await revealOverlay();
+        }
+    };
+
+    async function revealOverlay() {
+        try {
             await appWindow.show();
             await appWindow.setFocus();
             await appWindow.setAlwaysOnTop(true);
             const fitted = await appWindow.innerPosition();
             originRef.current = { x: fitted.x, y: fitted.y };
         } catch (error) {
-            setLoadError(String(error));
-            await appWindow.show();
+            console.error('overlay show failed', error);
         }
-    };
+    }
 
     useEffect(() => {
-        void boot();
-        const unlisten = listen('screenshot-reload', () => {
-            void boot();
-        });
+        let cancel = false;
+        let unlisten = () => {};
+        (async () => {
+            try {
+                unlisten = await listen('screenshot-reload', () => {
+                    if (!cancel) {
+                        void boot();
+                    }
+                });
+            } catch (error) {
+                console.error('overlay reload listener failed', error);
+            }
+            if (!cancel) {
+                await boot();
+            }
+        })();
         return () => {
-            unlisten.then((fn) => fn());
+            cancel = true;
+            unlisten();
             if (blobRef.current) {
                 URL.revokeObjectURL(blobRef.current);
             }
@@ -864,6 +886,29 @@ export default function Screenshot() {
             )}
         </div>
     );
+}
+
+function waitUntilPainted(limitMs) {
+    return new Promise((resolve) => {
+        let settled = false;
+        const finish = (reason) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            if (reason !== 'paint') {
+                console.warn(`overlay paint signal missing (${reason}); showing anyway`);
+            }
+            resolve();
+        };
+        const timer = setTimeout(() => finish('timeout'), limitMs);
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                clearTimeout(timer);
+                finish('paint');
+            });
+        });
+    });
 }
 
 function placeImage(image, intent) {
