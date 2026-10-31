@@ -5,8 +5,29 @@ use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 use core_graphics::geometry::CGRect;
 use image::RgbaImage;
 use log::{info, warn};
-use objc::runtime::Object;
-use objc::{msg_send, sel, sel_impl};
+use objc::runtime::{Object, NO, YES};
+use objc::{class, msg_send, sel, sel_impl};
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct NsPoint {
+    x: f64,
+    y: f64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct NsSize {
+    width: f64,
+    height: f64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct NsRect {
+    origin: NsPoint,
+    size: NsSize,
+}
 use std::path::Path;
 use std::process::Command;
 
@@ -94,6 +115,56 @@ pub fn exclude_from_capture(window: &tauri::Window) {
     unsafe {
         // NSWindowSharingNone. CGWindowListCreateImage skips this window.
         let _: () = msg_send![ns_window, setSharingType: 0isize];
+    }
+}
+
+/// Borderless window covering the whole monitor, above the menu bar and Dock,
+/// on every Space including other apps' fullscreen spaces.
+pub fn cover_monitor(window: &tauri::Window) {
+    let Some(ns_window) = ns_window(window) else {
+        return;
+    };
+    unsafe {
+        let mouse: NsPoint = msg_send![class!(NSEvent), mouseLocation];
+        let screens: *mut Object = msg_send![class!(NSScreen), screens];
+        if screens.is_null() {
+            return;
+        }
+        let count: usize = msg_send![screens, count];
+        if count == 0 {
+            return;
+        }
+        let mut screen: *mut Object = msg_send![screens, objectAtIndex:0usize];
+        for index in 0..count {
+            let candidate: *mut Object = msg_send![screens, objectAtIndex:index];
+            let frame: NsRect = msg_send![candidate, frame];
+            let inside = mouse.x >= frame.origin.x
+                && mouse.y >= frame.origin.y
+                && mouse.x < frame.origin.x + frame.size.width
+                && mouse.y < frame.origin.y + frame.size.height;
+            if inside {
+                screen = candidate;
+                break;
+            }
+        }
+        let frame: NsRect = msg_send![screen, frame];
+        // NSWindowStyleMaskBorderless
+        let _: () = msg_send![ns_window, setStyleMask: 0usize];
+        // NSScreenSaverWindowLevel: above the menu bar and Dock.
+        let _: () = msg_send![ns_window, setLevel: 1000isize];
+        // All Spaces, auxiliary to fullscreen apps, not listed in the window cycle.
+        let behavior: usize = 1 | (1 << 4) | (1 << 6) | (1 << 8);
+        let _: () = msg_send![ns_window, setCollectionBehavior: behavior];
+        let _: () = msg_send![ns_window, setHidesOnDeactivate: NO];
+        let _: () = msg_send![ns_window, setMovable: NO];
+        let _: () = msg_send![ns_window, setContentMinSize: frame.size];
+        let _: () = msg_send![ns_window, setContentMaxSize: frame.size];
+        let _: () = msg_send![ns_window, setFrame:frame display:YES];
+        let _: () = msg_send![ns_window, orderFrontRegardless];
+        info!(
+            "overlay frame {:.0},{:.0} {:.0}x{:.0}",
+            frame.origin.x, frame.origin.y, frame.size.width, frame.size.height
+        );
     }
 }
 

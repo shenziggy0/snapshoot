@@ -1,4 +1,4 @@
-import { appWindow, currentMonitor, PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window';
+import { appWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { save } from '@tauri-apps/api/dialog';
 import { writeText } from '@tauri-apps/api/clipboard';
@@ -207,18 +207,11 @@ export default function Screenshot() {
             await appWindow.show();
             await appWindow.setFocus();
             await appWindow.setAlwaysOnTop(true);
-            if (navigator.userAgent.includes('Windows')) {
-                const monitor = await currentMonitor();
-                if (monitor) {
-                    await appWindow.setPosition(
-                        new PhysicalPosition(monitor.position.x, monitor.position.y)
-                    );
-                    await appWindow.setSize(new PhysicalSize(monitor.size.width, monitor.size.height));
-                    await new Promise((resolve) => requestAnimationFrame(resolve));
-                    const fitted = await appWindow.innerPosition();
-                    originRef.current = { x: fitted.x, y: fitted.y };
-                }
-            }
+            await invoke('fit_overlay_window');
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            await invoke('fit_overlay_window');
+            const fitted = await appWindow.innerPosition();
+            originRef.current = { x: fitted.x, y: fitted.y };
             const placed = placeImage(next, intentRef.current);
             layoutRef.current = placed.layout;
             setLayout(placed.layout);
@@ -709,9 +702,9 @@ export default function Screenshot() {
                 height={image?.naturalHeight || image?.height || 1}
                 className='absolute'
                 style={
-                    layout
+                    layout && intentRef.current === 'edit'
                         ? { left: layout.left, top: layout.top, width: layout.width, height: layout.height }
-                        : { inset: 0, width: '100%', height: '100%' }
+                        : { left: 0, top: 0, width: '100%', height: '100%' }
                 }
             />
             {layout && (

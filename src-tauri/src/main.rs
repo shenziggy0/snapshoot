@@ -162,6 +162,7 @@ fn main() {
             screenshot::screenshot_intent,
             screenshot::read_capture_image,
             screenshot::list_capture_windows,
+            window::fit_overlay_window,
             lang_detect,
             webdav,
             local,

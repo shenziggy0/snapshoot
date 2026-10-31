@@ -364,17 +364,85 @@ pub fn recognize_window() {
 
 fn place_screenshot_window(window: &Window) {
     #[cfg(target_os = "macos")]
-    if let Some(geo) = crate::capture_macos::overlay_geometry() {
-        let _ = window.set_position(tauri::PhysicalPosition::new(geo.x, geo.y));
-        let _ = window.set_size(tauri::PhysicalSize::new(geo.width, geo.height));
-        crate::capture_macos::exclude_from_capture(window);
+    {
+        crate::capture_macos::cover_monitor(window);
         return;
     }
+    #[cfg(windows)]
+    {
+        if cover_monitor_win(window) {
+            return;
+        }
+    }
     let monitor = monitor_at_mouse();
-    let pos = *monitor.position();
-    let size = *monitor.size();
+    let pos = monitor.position();
+    let size = monitor.size();
     let _ = window.set_position(tauri::PhysicalPosition::new(pos.x, pos.y));
     let _ = window.set_size(tauri::PhysicalSize::new(size.width, size.height));
+}
+
+#[cfg(windows)]
+fn cover_monitor_win(window: &Window) -> bool {
+    let Ok(hwnd) = window.hwnd() else {
+        return false;
+    };
+    unsafe {
+        let raw = hwnd.0 as *mut std::ffi::c_void;
+        let monitor = MonitorFromWindow(raw, 2);
+        if monitor.is_null() {
+            return false;
+        }
+        let mut info: MonitorInfo = std::mem::zeroed();
+        info.cb_size = std::mem::size_of::<MonitorInfo>() as u32;
+        if GetMonitorInfoW(monitor, &mut info) == 0 {
+            return false;
+        }
+        let rect = info.rc_monitor;
+        SetWindowPos(
+            raw,
+            (-1isize) as *mut std::ffi::c_void,
+            rect.left,
+            rect.top,
+            rect.right - rect.left,
+            rect.bottom - rect.top,
+            0x0040 | 0x0020,
+        );
+    }
+    true
+}
+
+#[cfg(windows)]
+#[repr(C)]
+struct WinRect {
+    left: i32,
+    top: i32,
+    right: i32,
+    bottom: i32,
+}
+
+#[cfg(windows)]
+#[repr(C)]
+struct MonitorInfo {
+    cb_size: u32,
+    rc_monitor: WinRect,
+    rc_work: WinRect,
+    dw_flags: u32,
+}
+
+#[cfg(windows)]
+#[link(name = "user32")]
+extern "system" {
+    fn MonitorFromWindow(hwnd: *mut std::ffi::c_void, flags: u32) -> *mut std::ffi::c_void;
+    fn GetMonitorInfoW(monitor: *mut std::ffi::c_void, info: *mut MonitorInfo) -> i32;
+    fn SetWindowPos(
+        hwnd: *mut std::ffi::c_void,
+        insert_after: *mut std::ffi::c_void,
+        x: i32,
+        y: i32,
+        cx: i32,
+        cy: i32,
+        flags: u32,
+    ) -> i32;
 }
 
 /// Capture is finished before this runs. The page shows itself after the
@@ -411,6 +479,17 @@ pub(crate) fn screenshot_window() -> Window {
     let window = builder.build().expect("create screenshot window");
     place_screenshot_window(&window);
     window
+}
+
+#[tauri::command]
+pub fn fit_overlay_window() {
+    let Some(window) = APP.get().and_then(|app| app.get_window("screenshot")) else {
+        return;
+    };
+    place_screenshot_window(&window);
+    let _ = window.set_always_on_top(true);
+    #[cfg(target_os = "macos")]
+    crate::capture_macos::cover_monitor(&window);
 }
 
 pub(crate) fn open_frozen_overlay() {
