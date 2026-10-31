@@ -1,19 +1,26 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod annotate;
 mod backup;
+#[cfg(target_os = "macos")]
+mod capture_macos;
 mod clipboard;
 mod cmd;
 mod config;
 mod error;
 mod hotkey;
+mod image_io;
 mod lang_detect;
+mod pin;
 mod screenshot;
 mod server;
+mod smoke;
 mod system_ocr;
 mod tray;
 mod updater;
 mod window;
+mod windows_list;
 
 use backup::*;
 use clipboard::*;
@@ -23,8 +30,8 @@ use hotkey::*;
 use lang_detect::*;
 use log::info;
 use once_cell::sync::OnceCell;
-use screenshot::screenshot;
 use server::*;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use system_ocr::*;
 use tauri::api::notification::Notification;
@@ -37,6 +44,7 @@ use window::updater_window;
 
 // Global AppHandle
 pub static APP: OnceCell<tauri::AppHandle> = OnceCell::new();
+pub static ALLOW_EXIT: AtomicBool = AtomicBool::new(false);
 
 // Text to be translated
 pub struct StringWrapper(pub Mutex<String>);
@@ -45,9 +53,9 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _, cwd| {
             Notification::new(&app.config().tauri.bundle.identifier)
-                .title("The program is already running. Please do not start it again!")
+                .title("Snapshoot is already running. Please do not start it again!")
                 .body(cwd)
-                .icon("pot")
+                .icon("snapshoot")
                 .show()
                 .unwrap();
         }))
@@ -67,7 +75,9 @@ fn main() {
         .setup(|app| {
             info!("============== Start App ==============");
             #[cfg(target_os = "macos")]
-            {
+            if smoke::enabled() {
+                app.set_activation_policy(tauri::ActivationPolicy::Regular);
+            } else {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
                 let trusted =
                     macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
@@ -79,7 +89,7 @@ fn main() {
             info!("Init Config Store");
             init_config(app);
             // Check First Run
-            if is_first_run() {
+            if is_first_run() && !smoke::enabled() {
                 // Open Config Window
                 info!("First Run, opening config window");
                 config_window();
@@ -95,13 +105,16 @@ fn main() {
                 Err(e) => Notification::new(app.config().tauri.bundle.identifier.clone())
                     .title("Failed to register global shortcut")
                     .body(&e)
-                    .icon("pot")
+                    .icon("snapshoot")
                     .show()
                     .unwrap(),
             }
             match get("proxy_enable") {
                 Some(v) => {
-                    if v.as_bool().unwrap() && get("proxy_host").map_or(false, |host| !host.as_str().unwrap().is_empty()) {
+                    if v.as_bool().unwrap()
+                        && get("proxy_host")
+                            .map_or(false, |host| !host.as_str().unwrap().is_empty())
+                    {
                         let _ = set_proxy();
                     }
                 }
@@ -125,6 +138,10 @@ fn main() {
                 clipboard_monitor.to_string(),
             )));
             start_clipboard_monitor(app.handle());
+            pin::cleanup_stale_pins();
+            if smoke::enabled() {
+                std::thread::spawn(|| smoke::run());
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -141,13 +158,30 @@ fn main() {
             register_shortcut_by_frontend,
             update_tray,
             updater_window,
-            screenshot,
+            screenshot::screenshot,
+            screenshot::screenshot_intent,
+            screenshot::read_capture_image,
+            screenshot::list_capture_windows,
+            window::fit_overlay_window,
             lang_detect,
             webdav,
             local,
             install_plugin,
             font_list,
-            aliyun
+            aliyun,
+            annotate::annotate_source_image,
+            annotate::copy_png_base64,
+            annotate::save_png_base64,
+            annotate::open_ocr_from_png_base64,
+            annotate::open_translate_from_png_base64,
+            pin::annotate_pin,
+            pin::pin_png_base64,
+            pin::pin_image_base64,
+            pin::pin_window_info,
+            pin::copy_pin_image,
+            pin::save_pin_image,
+            pin::ocr_pin_image,
+            pin::translate_pin_image
         ])
         .on_system_tray_event(tray_event_handler)
         .build(tauri::generate_context!())
@@ -155,7 +189,9 @@ fn main() {
         // 窗口关闭不退出
         .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
+                if !ALLOW_EXIT.load(Ordering::SeqCst) {
+                    api.prevent_exit();
+                }
             }
         });
 }

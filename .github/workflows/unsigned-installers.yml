@@ -1,0 +1,48 @@
+name: Unsigned installers
+
+# Push builds only the Apple silicon dmg. macOS runners cost 10x minutes.
+# Windows, Intel dmg, and smoke tests are manual: unsigned-optional.yml
+on:
+    workflow_dispatch:
+    push:
+        branches:
+            - 'cursor/**'
+
+permissions:
+    contents: read
+
+jobs:
+    build-macos-aarch64:
+        name: macOS aarch64 dmg
+        runs-on: macos-14
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Nodejs
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 21
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 9
+
+            - name: Install Rust Stable
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: aarch64-apple-darwin
+
+            - name: Install Dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build unsigned dmg
+              run: pnpm tauri build --target aarch64-apple-darwin --bundles dmg
+
+            - name: Upload dmg
+              uses: actions/upload-artifact@v4
+              with:
+                  name: Snapshoot-macos-aarch64-apple-darwin-dmg
+                  path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+                  if-no-files-found: error

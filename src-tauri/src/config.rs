@@ -88,6 +88,7 @@ pub fn check_service_available() -> Result<(), Error> {
         "tencent",
         "transmart",
         "volcengine",
+        "volcengine_free",
         "yandex",
         "youdao",
     ];

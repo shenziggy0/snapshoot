@@ -38,8 +38,8 @@ module.exports = {
                             900: '#e7e7e7',
                         },
                         primary: {
-                            DEFAULT: '#49cee9',
-                            foreground: '#181818',
+                            DEFAULT: '#3B9BFF',
+                            foreground: '#ffffff',
                         },
                     },
                 },
@@ -66,7 +66,7 @@ module.exports = {
                         },
                         primary: {
                             foreground: '#ffffff',
-                            DEFAULT: '#3578e5',
+                            DEFAULT: '#1E63F0',
                         },
                     },
                 },

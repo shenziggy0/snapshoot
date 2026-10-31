@@ -1,4 +1,5 @@
-import { fetch, Body } from '@tauri-apps/api/http';
+import { Body } from '@tauri-apps/api/http';
+import { translateFetch as fetch } from '../../../utils/translate_fetch';
 
 export async function translate(text, _from, _to) {
     const res = await fetch(`https://pot-app.com/api/dict`, {

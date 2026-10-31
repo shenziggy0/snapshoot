@@ -1,4 +1,4 @@
-import { fetch } from '@tauri-apps/api/http';
+import { translateFetch as fetch } from '../../../utils/translate_fetch';
 
 export async function translate(text, from, to) {
     const token_url = 'https://edge.microsoft.com/translate/auth';

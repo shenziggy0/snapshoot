@@ -151,6 +151,8 @@
                 "input_translate": "输入翻译",
                 "ocr_recognize": "文字识别",
                 "ocr_translate": "截图翻译",
+                "screenshot_annotate": "截图标注",
+                "pin_clipboard": "剪贴板贴图",
                 "is_register": "快捷键已被注册",
                 "success": "快捷键注册成功",
                 "set_hotkey": "按下按键设置快捷键"
@@ -211,7 +213,8 @@
                 "qq_channel": "QQ 频道",
                 "qq_group": "QQ 群",
                 "telegram": "Telegram",
-                "discussion": "Github 讨论"
+                "discussion": "Github 讨论",
+                "credit": "基于 Pot（pot-app/pot-desktop），GPL-3.0"
             }
         },
         "updater": {
@@ -338,6 +341,10 @@
                     "appid": "App ID",
                     "secret": "Secret"
                 },
+                "volcengine_free": {
+                    "title": "火山翻译（免密钥）",
+                    "hint": "不需要 API Key。走火山引擎网页公开接口，中国大陆可直接访问。"
+                },
                 "niutrans": {
                     "title": "小牛翻译",
                     "https": "使用 Https",
@@ -458,7 +465,9 @@
             "copy": "复制",
             "retry": "重试",
             "delete_newline": "删除换行",
-            "translate_back": "翻译回原文"
+            "translate_back": "翻译回原文",
+            "request_timeout": "翻译请求在 8 秒后超时。该服务在中国大陆经常无法访问。{{detail}}",
+            "request_network": "网络错误：无法连接该翻译服务。DeepL、必应、谷歌在中国大陆经常被阻断。请使用默认的「火山翻译（免密钥）」，或自行填写国内服务的 API Key。{{detail}}"
         },
         "recognize": {
             "recognize": "重新识别",
@@ -467,6 +476,53 @@
             "copy_text": "复制",
             "delete_newline": "删除换行",
             "delete_space": "删除空格"
+        },
+        "annotate": {
+            "title": "截图标注",
+            "rect": "矩形",
+            "ellipse": "椭圆",
+            "line": "直线",
+            "arrow": "箭头",
+            "pen": "画笔",
+            "highlighter": "荧光笔",
+            "text": "文字",
+            "mosaic": "马赛克",
+            "blur": "模糊",
+            "number": "步骤序号",
+            "undo": "撤销",
+            "redo": "重做",
+            "copy": "复制",
+            "save": "保存",
+            "pin": "贴到屏幕",
+            "ocr": "文字识别",
+            "translate": "翻译",
+            "close": "关闭",
+            "color": "颜色",
+            "stroke": "线宽",
+            "font": "字号",
+            "include_annotations": "包含标注",
+            "raw_image": "使用原图",
+            "text_placeholder": "输入文字",
+            "copied": "已复制",
+            "saved": "已保存",
+            "empty": "截图为空",
+            "load_failed": "截图已读到，但无法显示。请重试截图。"
+        },
+        "pin": {
+            "copy": "复制",
+            "save": "保存",
+            "ocr": "文字识别",
+            "translate": "翻译",
+            "opacity": "不透明度",
+            "close": "关闭",
+            "zoom_in": "放大",
+            "zoom_out": "缩小",
+            "zoom_reset": "重置缩放",
+            "annotate": "标注",
+            "copied": "已复制",
+            "saved": "已保存",
+            "no_image": "剪贴板中没有图片",
+            "load_failed": "无法显示这张贴图。"
         }
     }
 }

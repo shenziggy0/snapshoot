@@ -4,7 +4,7 @@
 
 > A cross-platform translator application ([Telegram Group](https://t.me/pot_app))
 
-![License](https://img.shields.io/github/license/pot-app/pot-desktop.svg)
+![License](https://img.shields.io/github/license/shenziggy0/snapshoot.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-1.6.8-blue?logo=tauri)
 ![JavaScript](https://img.shields.io/badge/-JavaScript-yellow?logo=javascript&logoColor=white)
 ![Rust](https://img.shields.io/badge/-Rust-orange?logo=rust&logoColor=white)
@@ -178,16 +178,16 @@ The [Template](https://pot-app.com/en/plugin.html#template) section in the [Plug
 ### Install via Winget
 
 ```powershell
-winget install Pylogmon.pot
+# Snapshoot is not published on WinGet. Download an installer from https://github.com/shenziggy0/snapshoot/releases
 ```
 
 ### Install Manually
 
-1. Download the installation package ending in `.exe` from the Latest [Release](https://github.com/pot-app/pot-desktop/releases/latest) page.
+1. Download the installation package ending in `.exe` from the Latest [Release](https://github.com/shenziggy0/snapshoot/releases/latest) page.
 
-    - 64-bit machine download `pot_{version}_x64-setup.exe`
-    - 32-bit machine download `pot_{version}_x86-setup.exe`
-    - arm64 machine download `pot_{version}_arm64-setup.exe`
+    - 64-bit machine download `Snapshoot_{version}_x64-setup.exe`
+    - 32-bit machine download `Snapshoot_{version}_x86-setup.exe`
+    - arm64 machine download `Snapshoot_{version}_arm64-setup.exe`
 
 2. Double click the downloaded file to install it.
 
@@ -197,7 +197,7 @@ winget install Pylogmon.pot
 
     Check if WebView2 is uninstalled/disabled, if so, install WebView2 manually or restore it.
 
-    If the enterprise edition system is inconvenient to install or cannot install WebView2, please try to download the fix WebView2 version `pot_{version} at [Release](https://github.com/pot-app/pot-desktop/releases/latest) _{arch}_fix_webview2_runtime-setup.exe`
+    If the enterprise edition system is inconvenient to install or cannot install WebView2, please try to download the fix WebView2 version `Snapshoot_{version}_{arch}_fix_webview2_runtime-setup.exe` from [Release](https://github.com/shenziggy0/snapshoot/releases/latest).
 
     If the issue persists, please try starting in Windows 7 compatibility mode.
 
@@ -205,27 +205,11 @@ winget install Pylogmon.pot
 
 ### Install via Brew
 
-1. Add our tap:
-
-```bash
-brew tap pot-app/homebrew-tap
-```
-
-2. Install pot:
-
-```bash
-brew install --cask pot
-```
-
-3. Upgrade pot
-
-```bash
-brew upgrade --cask pot
-```
+Snapshoot is not published as a Homebrew cask. Download the dmg from [Release](https://github.com/shenziggy0/snapshoot/releases/latest).
 
 ### Install Manually
 
-1. Download the installation package ending in `.dmg` from the Latest [Release](https://github.com/pot-app/pot-desktop/releases/latest) page. (If you are using M1, please download the installation package named `pot_{version}_aarch64.dmg`, otherwise download the installation package named `pot_{version}_x64.dmg`)
+1. Download the installation package ending in `.dmg` from the Latest [Release](https://github.com/shenziggy0/snapshoot/releases/latest) page. (If you are using M1, please download the installation package named `Snapshoot_{version}_aarch64.dmg`, otherwise download the installation package named `Snapshoot_{version}_x64.dmg`)
 2. Double click the downloaded file to install it.
 
 ### Troubleshooting
@@ -342,14 +326,14 @@ rm ~/.cache/com.pot-app.desktop/pot_screenshot_cut.png && flameshot gui -s -p ~/
 ### SnipDo (Windows)
 
 1. Download and install SnipDo in the [Microsoft Store](https://apps.microsoft.com/store/detail/snipdo/9NPZ2TVKJVT7)
-2. Download the SnipDo extension of pot from the Latest [Release](https://github.com/pot-app/pot-desktop/releases/latest) (pot.pbar)
+2. The SnipDo extension (pot.pbar) is still published on upstream Pot [Release](https://github.com/pot-app/pot-desktop/releases/latest). Snapshoot itself: https://github.com/shenziggy0/snapshoot
 3. Double click the downloaded file to install it.
 4. Selection some text, you can see the pot icon in the upper right corner of the selection, click the icon to translate.
 
 ### PopClip (MacOS)
 
 1. Download and install PopClip in the [App Store](https://apps.apple.com/us/app/popclip/id445189367?mt=12)
-2. Download the PopClip extension of pot from the Latest [Release](https://github.com/pot-app/pot-desktop/releases/latest) (pot.popclipextz)
+2. The PopClip extension (pot.popclipextz) is still published on upstream Pot [Release](https://github.com/pot-app/pot-desktop/releases/latest). Snapshoot itself: https://github.com/shenziggy0/snapshoot
 3. Double click the downloaded file to install it.
 4. Enable the pot extension in PopClip settings, and then you can translate by selecting text.
 
@@ -411,7 +395,9 @@ windowrulev2 = move cursor 0 0, class:(pot), title:(Translator|PopClip|Screensho
 
 </div>
 
-<img src="https://github.com/pot-app/.github/blob/master/pot-desktop-contributions.svg?raw=true" width="100%"/>
+Repository: https://github.com/shenziggy0/snapshoot
+
+Upstream Pot: https://github.com/pot-app/pot-desktop (GPL-3.0)
 
 ## Manual compilation
 
@@ -428,13 +414,13 @@ Rust >= 1.80.0
 1. Clone the repository
 
     ```bash
-    git clone https://github.com/pot-app/pot-desktop.git
+    git clone https://github.com/shenziggy0/snapshoot.git
     ```
 
 2. Install dependencies
 
     ```bash
-    cd pot-desktop
+    cd snapshoot
     pnpm install
     ```
 

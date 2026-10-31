@@ -1,4 +1,4 @@
-import { fetch, Body } from '@tauri-apps/api/http';
+import { translateFetch as fetch } from '../../../utils/translate_fetch';
 
 export async function translate(text, from, to) {
     let plain_text = text.replaceAll('/', '@@');

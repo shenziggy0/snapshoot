@@ -151,6 +151,8 @@
                 "input_translate": "Text Translation",
                 "ocr_recognize": "Text Recognition",
                 "ocr_translate": "Screenshot Translation",
+                "screenshot_annotate": "Screenshot & Annotate",
+                "pin_clipboard": "Pin Clipboard Image",
                 "is_register": "The hotkey is already registered",
                 "success": "Hotkey register success",
                 "set_hotkey": "Press to Set Hotkey"
@@ -211,7 +213,8 @@
                 "qq_channel": "QQ Channel",
                 "qq_group": "QQ Group",
                 "telegram": "Telegram",
-                "discussion": "Github Discussion"
+                "discussion": "Github Discussion",
+                "credit": "Based on Pot (pot-app/pot-desktop), GPL-3.0"
             }
         },
         "updater": {
@@ -338,6 +341,10 @@
                     "appid": "App ID",
                     "secret": "Secret"
                 },
+                "volcengine_free": {
+                    "title": "Volcengine (no key)",
+                    "hint": "No API key. Uses Volcengine's public web translator, which is reachable from mainland China."
+                },
                 "niutrans": {
                     "title": "NiuTrans",
                     "https": "Use Https",
@@ -458,7 +465,9 @@
             "copy": "Copy",
             "retry": "Try again",
             "delete_newline": "Delete Newline",
-            "translate_back": "Translation back to the original"
+            "translate_back": "Translation back to the original",
+            "request_timeout": "Request timed out after 8 seconds. This service is often unreachable from mainland China. {{detail}}",
+            "request_network": "Network error. DeepL, Bing, and Google are often blocked in mainland China. Use Volcengine (no key), which is enabled by default, or add a domestic API key. {{detail}}"
         },
         "recognize": {
             "recognize": "Recognize",
@@ -467,6 +476,53 @@
             "copy_text": "Copy",
             "delete_newline": "Delete Newline",
             "delete_space": "Delete Space"
+        },
+        "annotate": {
+            "title": "Annotate",
+            "rect": "Rectangle",
+            "ellipse": "Ellipse",
+            "line": "Line",
+            "arrow": "Arrow",
+            "pen": "Pen",
+            "highlighter": "Highlighter",
+            "text": "Text",
+            "mosaic": "Mosaic",
+            "blur": "Blur",
+            "number": "Step marker",
+            "undo": "Undo",
+            "redo": "Redo",
+            "copy": "Copy",
+            "save": "Save",
+            "pin": "Pin to screen",
+            "ocr": "OCR",
+            "translate": "Translate",
+            "close": "Close",
+            "color": "Color",
+            "stroke": "Stroke width",
+            "font": "Font size",
+            "include_annotations": "Include annotations",
+            "raw_image": "Use original image",
+            "text_placeholder": "Text",
+            "copied": "Copied",
+            "saved": "Saved",
+            "empty": "Screenshot is empty",
+            "load_failed": "Could not display the screenshot. The file was read, but the image failed to decode."
+        },
+        "pin": {
+            "copy": "Copy",
+            "save": "Save",
+            "ocr": "OCR",
+            "translate": "Translate",
+            "opacity": "Opacity",
+            "close": "Close",
+            "zoom_in": "Zoom in",
+            "zoom_out": "Zoom out",
+            "zoom_reset": "Reset zoom",
+            "annotate": "Annotate",
+            "copied": "Copied",
+            "saved": "Saved",
+            "no_image": "No image on the clipboard",
+            "load_failed": "Could not display this pinned image."
         }
     }
 }

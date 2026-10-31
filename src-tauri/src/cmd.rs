@@ -21,7 +21,15 @@ pub fn reload_store() {
 }
 
 #[tauri::command]
-pub fn cut_image(left: u32, top: u32, width: u32, height: u32, app_handle: tauri::AppHandle) {
+pub fn cut_image(
+    left: u32,
+    top: u32,
+    width: u32,
+    height: u32,
+    screen_x: Option<i32>,
+    screen_y: Option<i32>,
+    app_handle: tauri::AppHandle,
+) {
     use dirs::cache_dir;
     use image::GenericImage;
     info!("Cut image: {}x{}+{}+{}", width, height, left, top);
@@ -42,7 +50,9 @@ pub fn cut_image(left: u32, top: u32, width: u32, height: u32, app_handle: tauri
     app_cache_dir_path.pop();
     app_cache_dir_path.push("pot_screenshot_cut.png");
     match img2.to_image().save(&app_cache_dir_path) {
-        Ok(_) => {}
+        Ok(_) => {
+            crate::image_io::remember_capture_origin(screen_x, screen_y);
+        }
         Err(e) => {
             error!("{:?}", e.to_string());
         }

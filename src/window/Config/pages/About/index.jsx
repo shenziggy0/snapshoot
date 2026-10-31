@@ -21,8 +21,9 @@ export default function About() {
                 draggable={false}
             />
             <div className='content-center'>
-                <h1 className='font-bold text-2xl text-center'>Pot</h1>
+                <h1 className='font-bold text-2xl text-center'>Snapshoot</h1>
                 <p className='text-center text-sm text-gray-500 mb-[5px]'>{appVersion}</p>
+                <p className='text-center text-xs text-gray-500 mb-[8px]'>{t('config.about.credit')}</p>
                 <Divider />
                 <div className='flex justify-between'>
                     <Button
@@ -30,7 +31,7 @@ export default function About() {
                         className='my-[5px]'
                         size='sm'
                         onPress={() => {
-                            open('https://pot-app.com');
+                            open('https://github.com/shenziggy0/snapshoot');
                         }}
                     >
                         {t('config.about.website')}
@@ -40,7 +41,7 @@ export default function About() {
                         className='my-[5px]'
                         size='sm'
                         onPress={() => {
-                            open('https://github.com/pot-app/pot-desktop');
+                            open('https://github.com/shenziggy0/snapshoot');
                         }}
                     >
                         {t('config.about.github')}
@@ -65,7 +66,7 @@ export default function About() {
                                     className='my-[5px]'
                                     size='sm'
                                     onPress={() => {
-                                        open('https://github.com/pot-app/pot-desktop/issues');
+                                        open('https://github.com/shenziggy0/snapshoot/issues');
                                     }}
                                 >
                                     {t('config.about.issue')}
@@ -145,7 +146,7 @@ export default function About() {
                                         className='my-[5px]'
                                         size='lg'
                                         onPress={() => {
-                                            open('https://github.com/pot-app/pot-desktop/discussions');
+                                            open('https://github.com/shenziggy0/snapshoot/issues');
                                         }}
                                     >
                                         <BsGithub />
