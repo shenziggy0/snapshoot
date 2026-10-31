@@ -6,8 +6,10 @@ use crate::image_io::{
 use crate::window::screenshot_window;
 use crate::window::{image_translate, monitor_at_mouse, new_overlay_builder, recognize_window};
 use crate::APP;
+use base64::{engine::general_purpose, Engine as _};
 use image::GenericImageView;
 use log::{info, warn};
+use serde::Serialize;
 use tauri::{Manager, PhysicalPosition, PhysicalSize};
 
 /// CSS pixels reserved under the image for the annotation toolbar.
@@ -131,6 +133,34 @@ pub fn open_annotate_window() {
         "Annotate window at ({}, {}) size {}x{} image {}x{}",
         x, y, win_w, win_h, img_w, img_h
     );
+}
+
+#[derive(Serialize)]
+pub struct SourceImage {
+    pub data: String,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[tauri::command]
+pub fn annotate_source_image() -> Result<SourceImage, String> {
+    let path = cut_image_path();
+    let bytes =
+        std::fs::read(&path).map_err(|err| format!("read screenshot {}: {err}", path.display()))?;
+    if bytes.len() < 32 {
+        return Err("screenshot file is empty".into());
+    }
+    let image =
+        image::load_from_memory(&bytes).map_err(|err| format!("decode screenshot: {err}"))?;
+    let (width, height) = image.dimensions();
+    if width == 0 || height == 0 {
+        return Err("screenshot has no pixels".into());
+    }
+    Ok(SourceImage {
+        data: general_purpose::STANDARD.encode(bytes),
+        width,
+        height,
+    })
 }
 
 fn write_cut_from_base64(data: &str) -> Result<(), String> {

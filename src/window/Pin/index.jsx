@@ -1,5 +1,4 @@
 import { appWindow, PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window';
-import { convertFileSrc } from '@tauri-apps/api/tauri';
 import { save } from '@tauri-apps/api/dialog';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
@@ -12,14 +11,25 @@ function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
 }
 
+function base64ToObjectUrl(data) {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+}
+
 export default function Pin() {
     const { t } = useTranslation();
     const toastStyle = useToastStyle();
     const infoRef = useRef(null);
     const zoomRef = useRef(1);
     const [url, setUrl] = useState('');
+    const [loadError, setLoadError] = useState('');
     const [opacity, setOpacity] = useState(1);
     const [menu, setMenu] = useState(null);
+    const blobUrlRef = useRef('');
 
     useEffect(() => {
         document.documentElement.style.borderRadius = '0px';
@@ -37,20 +47,28 @@ export default function Pin() {
         let cancelled = false;
         (async () => {
             const meta = await invoke('pin_window_info');
+            const data = await invoke('pin_image_base64');
             if (cancelled) {
                 return;
             }
             infoRef.current = meta;
             zoomRef.current = meta.zoom || 1;
-            setUrl(convertFileSrc(meta.path));
+            const objectUrl = base64ToObjectUrl(data);
+            blobUrlRef.current = objectUrl;
+            setUrl(objectUrl);
             await appWindow.show();
             await appWindow.setFocus();
             await appWindow.setAlwaysOnTop(true);
-        })().catch((error) => {
+        })().catch(async (error) => {
+            setLoadError(String(error));
             toast.error(String(error), { style: toastStyle });
+            await appWindow.show();
         });
         return () => {
             cancelled = true;
+            if (blobUrlRef.current) {
+                URL.revokeObjectURL(blobUrlRef.current);
+            }
         };
     }, []);
 
@@ -140,13 +158,19 @@ export default function Pin() {
     return (
         <div className='h-screen w-screen bg-transparent'>
             <Toaster />
+            {loadError ? (
+                <div className='fixed inset-0 flex items-center justify-center bg-neutral-900 p-3 text-center text-xs text-red-200'>
+                    {loadError}
+                </div>
+            ) : null}
             <img
                 id='pin-image'
                 alt=''
                 src={url}
                 draggable={false}
                 className='fixed inset-0 h-full w-full select-none'
-                style={{ opacity }}
+                style={{ opacity, display: loadError ? 'none' : 'block' }}
+                onError={() => setLoadError(t('pin.load_failed'))}
                 onMouseDown={(event) => {
                     if (event.button !== 0) {
                         return;

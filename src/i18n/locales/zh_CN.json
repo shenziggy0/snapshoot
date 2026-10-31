@@ -340,6 +340,10 @@
                     "appid": "App ID",
                     "secret": "Secret"
                 },
+                "volcengine_free": {
+                    "title": "火山翻译（免密钥）",
+                    "hint": "不需要 API Key。走火山引擎网页公开接口，中国大陆可直接访问。"
+                },
                 "niutrans": {
                     "title": "小牛翻译",
                     "https": "使用 Https",
@@ -460,7 +464,9 @@
             "copy": "复制",
             "retry": "重试",
             "delete_newline": "删除换行",
-            "translate_back": "翻译回原文"
+            "translate_back": "翻译回原文",
+            "request_timeout": "翻译请求在 8 秒后超时。该服务在中国大陆经常无法访问。{{detail}}",
+            "request_network": "网络错误：无法连接该翻译服务。DeepL、必应、谷歌在中国大陆经常被阻断。请使用默认的「火山翻译（免密钥）」，或自行填写国内服务的 API Key。{{detail}}"
         },
         "recognize": {
             "recognize": "重新识别",
@@ -496,7 +502,8 @@
             "text_placeholder": "输入文字",
             "copied": "已复制",
             "saved": "已保存",
-            "empty": "截图为空"
+            "empty": "截图为空",
+            "load_failed": "截图已读到，但无法显示。请重试截图。"
         },
         "pin": {
             "copy": "复制",
@@ -509,7 +516,8 @@
             "zoom_out": "缩小",
             "copied": "已复制",
             "saved": "已保存",
-            "no_image": "剪贴板中没有图片"
+            "no_image": "剪贴板中没有图片",
+            "load_failed": "无法显示这张贴图。"
         }
     }
 }

@@ -1,4 +1,5 @@
-import { fetch, Body } from '@tauri-apps/api/http';
+import { Body } from '@tauri-apps/api/http';
+import { translateFetch as fetch } from '../../../utils/translate_fetch';
 import { v4 as uuidv4 } from 'uuid';
 
 export async function translate(text, from, to) {

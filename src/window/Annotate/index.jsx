@@ -12,6 +12,37 @@ import Toolbar from './Toolbar';
 
 const TOOLBAR_PX = 108;
 
+function fitDisplay(width, height) {
+    const dpr = window.devicePixelRatio || 1;
+    const maxW = Math.max(1, window.innerWidth);
+    const maxH = Math.max(1, window.innerHeight - TOOLBAR_PX);
+    const cssW = width / dpr;
+    const cssH = height / dpr;
+    const fit = Math.min(maxW / cssW, maxH / cssH, 1);
+    return {
+        w: Math.max(1, Math.round(cssW * fit)),
+        h: Math.max(1, Math.round(cssH * fit)),
+    };
+}
+
+function decodeBase64(data) {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+}
+
+function loadHtmlImage(src) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('decode'));
+        img.src = src;
+    });
+}
+
 function eventPoint(event, canvas) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = rect.width ? canvas.width / rect.width : 1;
@@ -42,7 +73,8 @@ export default function Annotate() {
     const [image, setImage] = useState(null);
     const [box, setBox] = useState({ w: 1, h: 1 });
     const [textDraft, setTextDraft] = useState(null);
-    const [empty, setEmpty] = useState(false);
+    const [loadError, setLoadError] = useState('');
+    const blobUrlRef = useRef('');
 
     useEffect(() => {
         document.documentElement.style.borderRadius = '0px';
@@ -97,33 +129,63 @@ export default function Annotate() {
         });
     };
 
+    const showEditor = async () => {
+        await appWindow.show();
+        await appWindow.setFocus();
+        await appWindow.setAlwaysOnTop(true);
+    };
+
     const loadImage = async () => {
-        const base64 = await invoke('get_base64');
-        if (!base64) {
-            setEmpty(true);
-            await appWindow.show();
+        setLoadError('');
+        if (blobUrlRef.current) {
+            URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = '';
+        }
+        let payload;
+        try {
+            payload = await invoke('annotate_source_image');
+        } catch (error) {
+            setLoadError(String(error));
+            await showEditor();
+            return;
+        }
+        const base64 = payload?.data || '';
+        const width = payload?.width || 0;
+        const height = payload?.height || 0;
+        if (!base64 || width < 1 || height < 1) {
+            setLoadError(t('annotate.empty'));
+            await showEditor();
             return;
         }
         rawRef.current = base64;
-        const next = new Image();
-        next.onload = async () => {
+        try {
+            const bytes = decodeBase64(base64);
+            const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
+            blobUrlRef.current = blobUrl;
+            let next;
+            try {
+                next = await loadHtmlImage(blobUrl);
+            } catch (blobError) {
+                URL.revokeObjectURL(blobUrl);
+                blobUrlRef.current = '';
+                next = await loadHtmlImage(`data:image/png;base64,${base64}`);
+            }
+            if (!next.naturalWidth || !next.naturalHeight) {
+                throw new Error('empty bitmap');
+            }
             imageRef.current = next;
             setImage(next);
-            setEmpty(false);
+            setBox(fitDisplay(next.naturalWidth, next.naturalHeight));
             publish({ shapes: [], redo: [] });
             setDraft(null);
             setTextDraft(null);
-            const canvas = canvasRef.current;
-            if (canvas) {
-                canvas.width = next.naturalWidth || next.width;
-                canvas.height = next.naturalHeight || next.height;
-                renderScene(canvas.getContext('2d'), next, [], null);
-            }
-            await appWindow.show();
-            await appWindow.setFocus();
-            await appWindow.setAlwaysOnTop(true);
-        };
-        next.src = `data:image/png;base64,${base64}`;
+            await showEditor();
+            setBox(fitDisplay(next.naturalWidth, next.naturalHeight));
+        } catch (error) {
+            setImage(null);
+            setLoadError(t('annotate.load_failed'));
+            await showEditor();
+        }
     };
 
     useEffect(() => {
@@ -138,17 +200,11 @@ export default function Annotate() {
 
     useEffect(() => {
         const measure = () => {
-            const stage = stageRef.current;
             const current = imageRef.current;
-            if (!stage || !current) {
+            if (!current) {
                 return;
             }
-            const fit = Math.min(stage.clientWidth / current.width, stage.clientHeight / current.height);
-            const scale = fit > 1 ? 1 : fit;
-            setBox({
-                w: Math.max(1, current.width * scale),
-                h: Math.max(1, current.height * scale),
-            });
+            setBox(fitDisplay(current.naturalWidth || current.width, current.naturalHeight || current.height));
         };
         measure();
         window.addEventListener('resize', measure);
@@ -369,7 +425,7 @@ export default function Annotate() {
     };
 
     return (
-        <div className='flex h-full w-full flex-col bg-neutral-900 text-white'>
+        <div className='fixed inset-0 flex flex-col bg-neutral-900 text-white'>
             <Toaster />
             <div
                 ref={stageRef}
@@ -380,8 +436,8 @@ export default function Annotate() {
                     }
                 }}
             >
-                {empty ? (
-                    <div className='text-sm'>{t('annotate.empty')}</div>
+                {loadError ? (
+                    <div className='max-w-[90%] px-4 text-center text-sm text-red-200'>{loadError}</div>
                 ) : (
                     <div
                         className='relative'
@@ -389,7 +445,10 @@ export default function Annotate() {
                     >
                         <canvas
                             ref={canvasRef}
-                            className='h-full w-full cursor-crosshair'
+                            width={image?.naturalWidth || image?.width || 1}
+                            height={image?.naturalHeight || image?.height || 1}
+                            className='cursor-crosshair'
+                            style={{ width: box.w, height: box.h, display: 'block' }}
                             onMouseDown={onPointerDown}
                             onMouseMove={onPointerMove}
                             onMouseUp={onPointerUp}

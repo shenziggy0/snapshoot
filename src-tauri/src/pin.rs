@@ -7,6 +7,7 @@ use crate::window::{
     recognize_window,
 };
 use crate::APP;
+use base64::{engine::general_purpose, Engine as _};
 use image::RgbaImage;
 use log::{info, warn};
 use serde::Serialize;
@@ -207,6 +208,16 @@ fn notify_no_image() {
 pub fn pin_png_base64(data: String) -> Result<(), String> {
     let image = crate::image_io::decode_base64_image(&data).map_err(|err| err.to_string())?;
     spawn_main(move || open_pin_dynamic(image))
+}
+
+#[tauri::command]
+pub fn pin_image_base64(window: tauri::Window) -> Result<String, String> {
+    let meta = meta_for(&window)?;
+    let bytes = std::fs::read(&meta.path).map_err(|err| format!("read pin image: {err}"))?;
+    if bytes.is_empty() {
+        return Err("pin image is empty".into());
+    }
+    Ok(general_purpose::STANDARD.encode(bytes))
 }
 
 #[tauri::command]

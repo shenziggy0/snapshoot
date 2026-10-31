@@ -340,6 +340,10 @@
                     "appid": "App ID",
                     "secret": "Secret"
                 },
+                "volcengine_free": {
+                    "title": "Volcengine (no key)",
+                    "hint": "No API key. Uses Volcengine's public web translator, which is reachable from mainland China."
+                },
                 "niutrans": {
                     "title": "NiuTrans",
                     "https": "Use Https",
@@ -460,7 +464,9 @@
             "copy": "Copy",
             "retry": "Try again",
             "delete_newline": "Delete Newline",
-            "translate_back": "Translation back to the original"
+            "translate_back": "Translation back to the original",
+            "request_timeout": "Request timed out after 8 seconds. This service is often unreachable from mainland China. {{detail}}",
+            "request_network": "Network error. DeepL, Bing, and Google are often blocked in mainland China. Use Volcengine (no key), which is enabled by default, or add a domestic API key. {{detail}}"
         },
         "recognize": {
             "recognize": "Recognize",
@@ -496,7 +502,8 @@
             "text_placeholder": "Text",
             "copied": "Copied",
             "saved": "Saved",
-            "empty": "Screenshot is empty"
+            "empty": "Screenshot is empty",
+            "load_failed": "Could not display the screenshot. The file was read, but the image failed to decode."
         },
         "pin": {
             "copy": "Copy",
@@ -509,7 +516,8 @@
             "zoom_out": "Zoom out",
             "copied": "Copied",
             "saved": "Saved",
-            "no_image": "No image on the clipboard"
+            "no_image": "No image on the clipboard",
+            "load_failed": "Could not display this pinned image."
         }
     }
 }

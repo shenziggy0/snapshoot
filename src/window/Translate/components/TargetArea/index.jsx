@@ -51,6 +51,17 @@ import {
 
 let translateID = [];
 
+function describeTranslateError(error, t) {
+    const detail = error?.detail || error?.message || String(error ?? '');
+    if (error?.kind === 'timeout') {
+        return t('translate.request_timeout', { detail });
+    }
+    if (error?.kind === 'network') {
+        return t('translate.request_network', { detail });
+    }
+    return typeof error === 'string' ? error : detail;
+}
+
 export default function TargetArea(props) {
     const { index, name, translateServiceInstanceList, pluginList, serviceInstanceConfigMap, ...drag } = props;
 
@@ -233,7 +244,7 @@ export default function TargetArea(props) {
                     (e) => {
                         info(`[${currentTranslateServiceInstanceKey}]reject:` + e);
                         if (translateID[index] !== id) return;
-                        setError(e.toString());
+                        setError(describeTranslateError(e, t));
                         setIsLoading(false);
                     }
                 );
@@ -306,7 +317,7 @@ export default function TargetArea(props) {
                         (e) => {
                             info(`[${currentTranslateServiceInstanceKey}]reject:` + e);
                             if (translateID[index] !== id) return;
-                            setError(e.toString());
+                            setError(describeTranslateError(e, t));
                             setIsLoading(false);
                         }
                     );
@@ -724,7 +735,7 @@ export default function TargetArea(props) {
                                                         }
                                                     },
                                                     (e) => {
-                                                        setError(e.toString());
+                                                        setError(describeTranslateError(e, t));
                                                         setIsLoading(false);
                                                     }
                                                 );
@@ -771,7 +782,7 @@ export default function TargetArea(props) {
                                                             }
                                                         },
                                                         (e) => {
-                                                            setError(e.toString());
+                                                            setError(describeTranslateError(e, t));
                                                             setIsLoading(false);
                                                         }
                                                     );
