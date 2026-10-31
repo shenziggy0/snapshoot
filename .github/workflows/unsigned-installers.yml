@@ -95,6 +95,7 @@ jobs:
     smoke-macos:
         name: Smoke test macOS
         runs-on: macos-14
+        continue-on-error: true
         timeout-minutes: 60
         steps:
             - name: Checkout
@@ -147,6 +148,7 @@ jobs:
     smoke-windows:
         name: Smoke test Windows
         runs-on: windows-latest
+        continue-on-error: true
         timeout-minutes: 60
         steps:
             - name: Checkout

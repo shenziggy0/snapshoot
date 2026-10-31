@@ -45,7 +45,27 @@ pub fn screenshot(x: i32, y: i32) -> Result<(), String> {
     let Some(screen) = screen else {
         return Err(format!("No display at {x},{y}"));
     };
-    let image = screen.capture().map_err(|err| err.to_string())?;
+    // The process is per-monitor DPI aware, so this rect is already in physical
+    // pixels. screenshots multiplies by scale_factor again and the bitmap grows
+    // past the monitor, leaving a black margin in the overlay.
+    let image = {
+        #[cfg(windows)]
+        {
+            let mut info = screen.display_info;
+            let scale = info.scale_factor;
+            if scale > 1.01 {
+                info.width = ((info.width as f32) / scale).round().max(1.0) as u32;
+                info.height = ((info.height as f32) / scale).round().max(1.0) as u32;
+            }
+            screenshots::Screen::new(&info)
+                .capture()
+                .map_err(|err| err.to_string())?
+        }
+        #[cfg(not(windows))]
+        {
+            screen.capture().map_err(|err| err.to_string())?
+        }
+    };
     let buffer = image
         .to_png(Compression::Fast)
         .map_err(|err| err.to_string())?;

@@ -1,11 +1,11 @@
-import { appWindow } from '@tauri-apps/api/window';
+import { appWindow, currentMonitor, PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { save } from '@tauri-apps/api/dialog';
 import { writeText } from '@tauri-apps/api/clipboard';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { drawShape } from '../Annotate/render';
 import { useToastStyle } from '../../hooks';
@@ -207,6 +207,18 @@ export default function Screenshot() {
             await appWindow.show();
             await appWindow.setFocus();
             await appWindow.setAlwaysOnTop(true);
+            if (navigator.userAgent.includes('Windows')) {
+                const monitor = await currentMonitor();
+                if (monitor) {
+                    await appWindow.setPosition(
+                        new PhysicalPosition(monitor.position.x, monitor.position.y)
+                    );
+                    await appWindow.setSize(new PhysicalSize(monitor.size.width, monitor.size.height));
+                    await new Promise((resolve) => requestAnimationFrame(resolve));
+                    const fitted = await appWindow.innerPosition();
+                    originRef.current = { x: fitted.x, y: fitted.y };
+                }
+            }
             const placed = placeImage(next, intentRef.current);
             layoutRef.current = placed.layout;
             setLayout(placed.layout);
@@ -265,30 +277,46 @@ export default function Screenshot() {
         sample.drawImage(current, ix, iy, 1, 1, 0, 0, 1, 1);
         const pixel = sample.getImageData(0, 0, 1, 1).data;
         const hex = `#${[pixel[0], pixel[1], pixel[2]].map((part) => part.toString(16).padStart(2, '0')).join('')}`;
-        const loupeCanvas = loupeRef.current;
-        if (loupeCanvas) {
-            const zoom = 8;
-            const ctx = loupeCanvas.getContext('2d');
-            const src = loupeCanvas.width / zoom;
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(current, point.x - src / 2, point.y - src / 2, src, src, 0, 0, loupeCanvas.width, loupeCanvas.height);
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(loupeCanvas.width / 2, 0);
-            ctx.lineTo(loupeCanvas.width / 2, loupeCanvas.height);
-            ctx.moveTo(0, loupeCanvas.height / 2);
-            ctx.lineTo(loupeCanvas.width, loupeCanvas.height / 2);
-            ctx.stroke();
-        }
         const box = 132;
         let left = clientX + 24;
         let top = clientY + 24;
         if (left + box > window.innerWidth) left = clientX - box - 16;
         if (top + box + 36 > window.innerHeight) top = clientY - box - 40;
-        setLoupe({ left, top, hex, x: ix, y: iy });
+        setLoupe({ left, top, hex, x: ix, y: iy, sx: point.x, sy: point.y });
         setCursor({ x: clientX, y: clientY });
     };
+
+    useLayoutEffect(() => {
+        const current = imageRef.current;
+        const loupeCanvas = loupeRef.current;
+        if (!current || !loupeCanvas || !loupe) {
+            return;
+        }
+        const zoom = 8;
+        const ctx = loupeCanvas.getContext('2d');
+        const src = loupeCanvas.width / zoom;
+        ctx.imageSmoothingEnabled = false;
+        ctx.clearRect(0, 0, loupeCanvas.width, loupeCanvas.height);
+        ctx.drawImage(
+            current,
+            loupe.sx - src / 2,
+            loupe.sy - src / 2,
+            src,
+            src,
+            0,
+            0,
+            loupeCanvas.width,
+            loupeCanvas.height
+        );
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(loupeCanvas.width / 2, 0);
+        ctx.lineTo(loupeCanvas.width / 2, loupeCanvas.height);
+        ctx.moveTo(0, loupeCanvas.height / 2);
+        ctx.lineTo(loupeCanvas.width, loupeCanvas.height / 2);
+        ctx.stroke();
+    }, [loupe]);
 
     const hoverAt = (clientX, clientY) => {
         if (intentRef.current === 'edit' || selectionRef.current || !layoutRef.current) {
