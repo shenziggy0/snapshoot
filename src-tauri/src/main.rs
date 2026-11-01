@@ -12,6 +12,7 @@ mod error;
 mod hotkey;
 mod image_io;
 mod lang_detect;
+mod long_screenshot;
 mod pin;
 mod screenshot;
 mod server;
@@ -95,6 +96,7 @@ fn main() {
                 config_window();
             }
             app.manage(StringWrapper(Mutex::new("".to_string())));
+            app.manage(long_screenshot::LongCaptureManager::default());
             // Update Tray Menu
             update_tray(app.app_handle(), "".to_string(), "".to_string());
             // Start http server
@@ -162,6 +164,11 @@ fn main() {
             screenshot::screenshot_intent,
             screenshot::read_capture_image,
             screenshot::list_capture_windows,
+            long_screenshot::long_capture_start,
+            long_screenshot::long_capture_status,
+            long_screenshot::long_capture_scroll,
+            long_screenshot::long_capture_finish_copy,
+            long_screenshot::long_capture_cancel,
             window::fit_overlay_window,
             lang_detect,
             webdav,

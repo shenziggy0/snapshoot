@@ -2,7 +2,6 @@ use crate::config::{get, set};
 use crate::window::*;
 use log::{info, warn};
 use std::thread;
-use tauri::api::notification;
 use tiny_http::{Request, Response, Server};
 
 pub fn start_server() {
@@ -17,11 +16,14 @@ pub fn start_server() {
         let server = match Server::http(format!("127.0.0.1:{port}")) {
             Ok(v) => v,
             Err(e) => {
-                let _ = notification::Notification::new("com.pot-spp.com")
-                    .title("Server start failed")
-                    .body("Please Change Server Port and restart the application")
-                    .show();
-                warn!("Server start failed: {}", e);
+                // Do not raise a system notification here. When another instance
+                // (or an installed build) already owns the port, the dev binary
+                // has no bundle to attach the notification to and macOS aborts
+                // the whole process inside mac-notification-sys.
+                warn!(
+                    "Server start failed on port {port}: {e}. Another instance may be running; \
+                     change server_port in the config if this is unexpected."
+                );
                 return;
             }
         };

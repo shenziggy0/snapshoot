@@ -12,6 +12,7 @@ import {
     MdGridOn,
     MdHorizontalRule,
     MdPushPin,
+    MdPhotoSizeSelectActual,
     MdRadioButtonUnchecked,
     MdRedo,
     MdSaveAlt,
@@ -77,6 +78,9 @@ export default function CaptureToolbar(props) {
         onRedo,
         onOcr,
         onTranslate,
+        onLongScreenshot,
+        longCaptureActive = false,
+        copyBusy = false,
         onPin,
         onSave,
         onCopy,
@@ -85,7 +89,7 @@ export default function CaptureToolbar(props) {
     const bar = dark
         ? 'border-white/10 bg-neutral-900/95 text-white'
         : 'border-black/10 bg-white/95 text-neutral-800';
-    const showProps = Boolean(tool);
+    const showProps = Boolean(tool) && !longCaptureActive;
 
     return (
         <div className='flex flex-col items-center gap-1'>
@@ -97,6 +101,7 @@ export default function CaptureToolbar(props) {
                             key={item.id}
                             title={t(item.label)}
                             active={tool === item.id}
+                            disabled={longCaptureActive}
                             dark={dark}
                             onClick={() => setTool(tool === item.id ? '' : item.id)}
                         >
@@ -107,7 +112,7 @@ export default function CaptureToolbar(props) {
                 <span className={`mx-1 h-4 w-px ${dark ? 'bg-white/20' : 'bg-black/15'}`} />
                 <IconButton
                     title={t('annotate.undo')}
-                    disabled={!canUndo}
+                    disabled={longCaptureActive || !canUndo}
                     dark={dark}
                     onClick={onUndo}
                 >
@@ -115,15 +120,25 @@ export default function CaptureToolbar(props) {
                 </IconButton>
                 <IconButton
                     title={t('annotate.redo')}
-                    disabled={!canRedo}
+                    disabled={longCaptureActive || !canRedo}
                     dark={dark}
                     onClick={onRedo}
                 >
                     <MdRedo size={16} />
                 </IconButton>
                 <span className={`mx-1 h-4 w-px ${dark ? 'bg-white/20' : 'bg-black/15'}`} />
+                {onLongScreenshot && !longCaptureActive && (
+                    <IconButton
+                        title={t('annotate.long_screenshot')}
+                        dark={dark}
+                        onClick={onLongScreenshot}
+                    >
+                        <MdPhotoSizeSelectActual size={16} />
+                    </IconButton>
+                )}
                 <IconButton
                     title={t('annotate.ocr')}
+                    disabled={longCaptureActive}
                     dark={dark}
                     onClick={onOcr}
                 >
@@ -131,6 +146,7 @@ export default function CaptureToolbar(props) {
                 </IconButton>
                 <IconButton
                     title={t('annotate.translate')}
+                    disabled={longCaptureActive}
                     dark={dark}
                     onClick={onTranslate}
                 >
@@ -138,6 +154,7 @@ export default function CaptureToolbar(props) {
                 </IconButton>
                 <IconButton
                     title={t('annotate.pin')}
+                    disabled={longCaptureActive}
                     dark={dark}
                     onClick={onPin}
                 >
@@ -145,6 +162,7 @@ export default function CaptureToolbar(props) {
                 </IconButton>
                 <IconButton
                     title={t('annotate.save')}
+                    disabled={longCaptureActive}
                     dark={dark}
                     onClick={onSave}
                 >
@@ -152,6 +170,7 @@ export default function CaptureToolbar(props) {
                 </IconButton>
                 <IconButton
                     title={`${t('annotate.copy')} (Enter)`}
+                    disabled={copyBusy}
                     dark={dark}
                     onClick={onCopy}
                 >

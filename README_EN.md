@@ -56,6 +56,12 @@
 | Click the top left icon on any translation panel to start clipboard listening. Copied text will be translated automatically. | Press shortcut, select area to OCR | Press shortcut, select area to translate |
 | <img src="asset/eg4.gif"/>                                                                                                   | <img src="asset/eg5.gif"/>         | <img src="asset/eg6.gif"/>               |
 
+### Scroll capture
+
+After selecting a screenshot area, click **Scroll capture** in the toolbar and scroll down slowly inside the selection. The control window supports pause, resume, finish and cancel. The result opens in the annotation window, where copying, saving, pinning, OCR and translation remain available.
+
+> Scroll capture only supports vertical scrolling on one display. Keep the content stable; fixed overlays, animations and highly repetitive pages may not stitch reliably.
+
 <div align="center">
 
 # Features
@@ -71,6 +77,7 @@
 -   [x] Support Windows, macOS and Linux
 -   [x] Support Wayland (Tested on KDE, Gnome and Hyprland)
 -   [x] Multi-language support
+-   [x] Screenshot annotations and scroll capture
 
 <div align="center">
 

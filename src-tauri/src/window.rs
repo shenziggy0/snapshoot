@@ -479,6 +479,11 @@ pub(crate) fn screenshot_window() -> Window {
         .title_bar_style(tauri::TitleBarStyle::Overlay);
 
     let window = builder.build().expect("create screenshot window");
+    window.on_window_event(move |event| {
+        if let tauri::WindowEvent::Destroyed = event {
+            crate::long_screenshot::abandon_active();
+        }
+    });
     place_screenshot_window(&window);
     reveal_overlay_fallback(window.clone());
     window
@@ -512,6 +517,10 @@ pub fn fit_overlay_window() {
 }
 
 pub(crate) fn open_frozen_overlay() {
+    if crate::long_screenshot::is_active() {
+        warn!("ignoring screenshot request while scroll capture is active");
+        return;
+    }
     use std::sync::atomic::{AtomicBool, Ordering};
     static BUSY: AtomicBool = AtomicBool::new(false);
     if BUSY.swap(true, Ordering::SeqCst) {
@@ -540,7 +549,9 @@ pub(crate) fn open_frozen_overlay() {
     });
 }
 
-fn dismiss_screenshot_window() -> bool {
+/// Hide the frozen screenshot before the long-capture worker starts reading the
+/// live desktop. Returns whether it had been visible.
+pub(crate) fn dismiss_screenshot_window() -> bool {
     let Some(app) = APP.get() else {
         return false;
     };
@@ -549,9 +560,50 @@ fn dismiss_screenshot_window() -> bool {
     };
     let visible = window.is_visible().unwrap_or(false);
     #[cfg(target_os = "macos")]
-    crate::capture_macos::order_out(&window);
+    {
+        // AppKit window messages must be sent on the main thread. The long
+        // capture command runs on Tokio's worker pool.
+        let window_for_main = window.clone();
+        let _ = crate::image_io::spawn_main(move || {
+            crate::capture_macos::order_out(&window_for_main);
+        });
+    }
     let _ = window.hide();
+    let _ = window.set_ignore_cursor_events(false);
     visible
+}
+
+/// Runs on the main thread (the start command is synchronous). Exclude the
+/// overlay from display capture and verify event-forwarding permission without
+/// blocking on a system prompt.
+pub(crate) fn enter_long_screenshot_mode() -> Result<(), String> {
+    let window = APP
+        .get()
+        .and_then(|app| app.get_window("screenshot"))
+        .ok_or_else(|| "screenshot window is not available".to_string())?;
+    #[cfg(target_os = "macos")]
+    {
+        crate::capture_macos::prepare_scroll_capture(&window)?;
+    }
+    Ok(())
+}
+
+/// This command is synchronous, so Tauri invokes it on the main thread. Keep
+/// all NSWindow messages and event posting here to avoid AppKit thread crashes.
+pub(crate) fn forward_long_capture_scroll(delta_y: i32, center_x: f64, center_y: f64) -> Result<(), String> {
+    let window = APP
+        .get()
+        .and_then(|app| app.get_window("screenshot"))
+        .ok_or_else(|| "screenshot window is not available".to_string())?;
+    #[cfg(target_os = "macos")]
+    {
+        return crate::capture_macos::forward_scroll(&window, delta_y, center_x, center_y);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (window, delta_y, center_x, center_y);
+        Err("long_screenshot.unsupported_platform".into())
+    }
 }
 
 pub fn ocr_recognize() {

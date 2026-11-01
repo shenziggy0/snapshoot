@@ -5,9 +5,9 @@ use base64::{engine::general_purpose, Engine as _};
 use image::GenericImageView;
 use log::{info, warn};
 use serde::Serialize;
-use tauri::Manager;
 use std::path::Path;
 use std::sync::Mutex;
+use tauri::Manager;
 
 static INTENT: Mutex<String> = Mutex::new(String::new());
 static EDIT_IMAGE: Mutex<String> = Mutex::new(String::new());
@@ -33,8 +33,64 @@ pub struct CapturedImage {
     pub height: u32,
 }
 
+#[derive(Clone, Debug)]
+pub struct CaptureTarget {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    #[cfg(target_os = "macos")]
+    pub display_id: u32,
+    #[cfg(target_os = "macos")]
+    pub scale: f64,
+}
+
+pub fn capture_target_at_mouse() -> Result<CaptureTarget, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let target = crate::capture_macos::capture_target_at_mouse()?;
+        return Ok(CaptureTarget {
+            x: target.x,
+            y: target.y,
+            width: target.width,
+            height: target.height,
+            display_id: target.id,
+            scale: target.scale,
+        });
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let monitor = crate::window::monitor_at_mouse();
+        let position = monitor.position();
+        let size = monitor.size();
+        Ok(CaptureTarget {
+            x: position.x,
+            y: position.y,
+            width: size.width,
+            height: size.height,
+        })
+    }
+}
+
+pub fn capture_target_to(target: &CaptureTarget, path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        crate::capture_macos::capture_id_to(target.display_id, path)?;
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        capture_screen_to(target.x, target.y, path)?;
+        reject_blank(path)
+    }
+}
+
 #[tauri::command]
 pub fn screenshot(x: i32, y: i32) -> Result<(), String> {
+    capture_screen_to(x, y, &full_screenshot_path())
+}
+
+fn capture_screen_to(x: i32, y: i32, path: &Path) -> Result<(), String> {
     use screenshots::{Compression, Screen};
     info!("Screenshot screen with position: x={}, y={}", x, y);
     let screens = Screen::all().map_err(|err| err.to_string())?;
@@ -69,8 +125,7 @@ pub fn screenshot(x: i32, y: i32) -> Result<(), String> {
     let buffer = image
         .to_png(Compression::Fast)
         .map_err(|err| err.to_string())?;
-    let path = full_screenshot_path();
-    std::fs::write(&path, buffer).map_err(|err| format!("write screenshot: {err}"))?;
+    std::fs::write(path, buffer).map_err(|err| format!("write screenshot: {err}"))?;
     Ok(())
 }
 

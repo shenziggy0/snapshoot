@@ -108,8 +108,15 @@ export default function Screenshot() {
     const strokeRef = useRef(4);
     const fontRef = useRef(24);
     const toolRef = useRef('');
+    const longCaptureRef = useRef(false);
+    const longCaptureBusyRef = useRef(false);
+    const longCaptureMessageRef = useRef('');
+    const longCaptureWheelDeltaRef = useRef(0);
 
     const [image, setImage] = useState(null);
+    const [longCaptureActive, setLongCaptureActive] = useState(false);
+    const [longCaptureBusy, setLongCaptureBusy] = useState(false);
+    const [longCaptureStatus, setLongCaptureStatus] = useState(null);
     const [layout, setLayout] = useState(null);
     const [selection, setSelection] = useState(null);
     const [hover, setHover] = useState(null);
@@ -134,6 +141,16 @@ export default function Screenshot() {
     fontRef.current = fontSize;
     toolRef.current = tool;
     layoutRef.current = layout;
+
+    const setLongCaptureMode = (active) => {
+        longCaptureRef.current = active;
+        setLongCaptureActive(active);
+    };
+
+    const showLongCaptureError = (error) => {
+        const value = String(error);
+        toast.error(value.startsWith('long_screenshot.') ? t(value) : value, { style: toastStyle });
+    };
 
     useEffect(() => {
         document.documentElement.style.borderRadius = '0px';
@@ -186,6 +203,8 @@ export default function Screenshot() {
         setTool('');
         publish([], []);
         setDraft(null);
+        setLongCaptureMode(false);
+        setLongCaptureStatus(null);
         if (blobRef.current) {
             URL.revokeObjectURL(blobRef.current);
             blobRef.current = '';
@@ -473,26 +492,106 @@ export default function Screenshot() {
         return { x: current.left, y: current.top, w: current.width, h: current.height };
     };
 
-    const exportBase64 = (rect) => {
+    const selectionImageRect = (rect) => {
         const canvas = canvasRef.current;
         if (!canvas || !rect) {
-            return '';
+            return null;
         }
         const bounds = canvas.getBoundingClientRect();
         const scaleX = bounds.width ? canvas.width / bounds.width : 1;
         const scaleY = bounds.height ? canvas.height / bounds.height : 1;
-        const sx = clamp((rect.x - bounds.left) * scaleX, 0, canvas.width - 1);
-        const sy = clamp((rect.y - bounds.top) * scaleY, 0, canvas.height - 1);
-        const sw = clamp(Math.round(rect.w * scaleX), 1, canvas.width - sx);
-        const sh = clamp(Math.round(rect.h * scaleY), 1, canvas.height - sy);
+        const x = clamp(Math.round((rect.x - bounds.left) * scaleX), 0, canvas.width - 1);
+        const y = clamp(Math.round((rect.y - bounds.top) * scaleY), 0, canvas.height - 1);
+        return {
+            x,
+            y,
+            width: clamp(Math.round(rect.w * scaleX), 1, canvas.width - x),
+            height: clamp(Math.round(rect.h * scaleY), 1, canvas.height - y),
+        };
+    };
+
+    const exportBase64 = (rect) => {
+        const canvas = canvasRef.current;
+        const region = selectionImageRect(rect);
+        if (!canvas || !region) {
+            return '';
+        }
         const out = document.createElement('canvas');
-        out.width = sw;
-        out.height = sh;
-        out.getContext('2d').drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+        out.width = region.width;
+        out.height = region.height;
+        out.getContext('2d').drawImage(
+            canvas,
+            region.x,
+            region.y,
+            region.width,
+            region.height,
+            0,
+            0,
+            region.width,
+            region.height
+        );
         return out.toDataURL('image/png').split(',')[1];
     };
 
+    const startLongScreenshot = async () => {
+        const region = selectionImageRect(selectionRef.current);
+        if (!region) {
+            console.error('[long-capture] no selection rect');
+            toast.error('no selection', { style: toastStyle });
+            return;
+        }
+        console.log('[long-capture] invoking start with region', region);
+        try {
+            const status = await invoke('long_capture_start', { region });
+            console.log('[long-capture] start ok', status);
+            setLongCaptureMode(true);
+            setLongCaptureStatus(status);
+            // Re-assert focus so macOS keeps routing wheel events to this
+            // overlay instead of the application underneath it.
+            await appWindow.setFocus();
+            toast.success(t('long_screenshot.scroll_hint'), { style: toastStyle });
+        } catch (error) {
+            console.error('[long-capture] start failed', error);
+            showLongCaptureError(error);
+        }
+    };
+
+    const finishLongCapture = async () => {
+        if (longCaptureBusyRef.current) {
+            return;
+        }
+        longCaptureBusyRef.current = true;
+        setLongCaptureBusy(true);
+        try {
+            await invoke('long_capture_finish_copy');
+            toast.success(t('annotate.copied'), { style: toastStyle });
+            await appWindow.close();
+        } catch (error) {
+            showLongCaptureError(error);
+        } finally {
+            longCaptureBusyRef.current = false;
+            setLongCaptureBusy(false);
+        }
+    };
+
+    const cancelLongCapture = async () => {
+        if (!longCaptureRef.current) {
+            return;
+        }
+        try {
+            await invoke('long_capture_cancel');
+        } catch {
+            // No active session left to cancel.
+        }
+        setLongCaptureMode(false);
+        setLongCaptureStatus(null);
+    };
+
     const finish = async (action, rect) => {
+        if (longCaptureRef.current) {
+            await finishLongCapture();
+            return;
+        }
         const data = exportBase64(rect || selectionRef.current);
         if (!data) {
             return;
@@ -532,10 +631,21 @@ export default function Screenshot() {
             if (event.key === 'Enter' && selectionRef.current) {
                 event.preventDefault();
                 await finish('copy');
+            } else if (event.key === 'Escape' && longCaptureRef.current) {
+                event.preventDefault();
+                await cancelLongCapture();
             } else if (event.key.toLowerCase() === 'c' && loupe && !event.metaKey && !event.ctrlKey) {
                 event.preventDefault();
                 await writeText(loupe.hex);
                 toast.success(loupe.hex, { style: toastStyle });
+            } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
+                event.preventDefault();
+                event.stopPropagation();
+                if (event.shiftKey) {
+                    redo();
+                } else {
+                    undo();
+                }
             } else if (event.key.startsWith('Arrow') && selectionRef.current) {
                 event.preventDefault();
                 const step = event.shiftKey ? 10 : 1;
@@ -549,14 +659,6 @@ export default function Screenshot() {
                     x: clamp(current.x + delta[0], limit.x, limit.x + limit.w - current.w),
                     y: clamp(current.y + delta[1], limit.y, limit.y + limit.h - current.h),
                 });
-            } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
-                event.preventDefault();
-                event.stopPropagation();
-                if (event.shiftKey) {
-                    redo();
-                } else {
-                    undo();
-                }
             }
         };
         window.addEventListener('keydown', onKey, true);
@@ -707,10 +809,70 @@ export default function Screenshot() {
 
     const editing = Boolean(selection) && intentRef.current !== 'ocr' && intentRef.current !== 'translate';
 
+    useEffect(() => {
+        console.log('[long-capture] wheel effect, longCaptureActive =', longCaptureActive);
+        if (!longCaptureActive) {
+            longCaptureWheelDeltaRef.current = 0;
+            return undefined;
+        }
+        const onWheel = (event) => {
+            event.preventDefault();
+            console.log('[long-capture] wheel received, deltaY =', event.deltaY, 'target =', event.target?.tagName);
+            // Trackpads commonly emit fractional pixel deltas. Rounding each
+            // event independently drops most of those events, making the
+            // user swipe unusually hard before the page moves at all. Keep
+            // the remainder and forward every whole pixel to the native
+            // scroll injector.
+            longCaptureWheelDeltaRef.current += event.deltaY;
+            const deltaY = Math.trunc(longCaptureWheelDeltaRef.current);
+            longCaptureWheelDeltaRef.current -= deltaY;
+            if (deltaY === 0) {
+                return;
+            }
+            invoke('long_capture_scroll', { deltaY }).catch((error) => {
+                console.error('[long-capture] scroll invoke failed', error);
+            });
+        };
+        window.addEventListener('wheel', onWheel, { passive: false });
+        return () => window.removeEventListener('wheel', onWheel);
+    }, [longCaptureActive]);
+
+    useEffect(() => {
+        let active = true;
+        let unlisten = () => {};
+        (async () => {
+            try {
+                unlisten = await listen('long-capture-status', (event) => {
+                    if (active && longCaptureRef.current) {
+                        setLongCaptureStatus(event.payload);
+                    }
+                });
+                const current = await invoke('long_capture_status');
+                if (active && longCaptureRef.current) {
+                    setLongCaptureStatus(current);
+                }
+            } catch {
+                // No active session; the mode is already off.
+            }
+        })();
+        return () => {
+            active = false;
+            unlisten();
+        };
+    }, []);
+
+    const onRootWheel = (event) => {
+        if (!longCaptureRef.current) {
+            return;
+        }
+        console.log('[long-capture] root onWheel, deltaY =', event.deltaY);
+    };
+
     return (
         <div
             className='snap-capture fixed inset-0 overflow-hidden bg-transparent text-white'
             onMouseDown={(event) => event.preventDefault()}
+            onWheel={onRootWheel}
         >
             <Toaster />
             <canvas
@@ -731,11 +893,11 @@ export default function Screenshot() {
                 className='absolute'
                 style={
                     layout && intentRef.current === 'edit'
-                        ? { left: layout.left, top: layout.top, width: layout.width, height: layout.height }
-                        : { left: 0, top: 0, width: '100%', height: '100%' }
+                        ? { left: layout.left, top: layout.top, width: layout.width, height: layout.height, opacity: longCaptureActive ? 0 : 1 }
+                        : { left: 0, top: 0, width: '100%', height: '100%', opacity: longCaptureActive ? 0 : 1 }
                 }
             />
-            {layout && !(selection || hover) && (
+            {layout && !longCaptureActive && !(selection || hover) && (
                 <div className='pointer-events-none absolute inset-0 bg-black/45' />
             )}
             {(selection || hover) && (
@@ -766,7 +928,7 @@ export default function Screenshot() {
                     {scaleLabel()}
                 </div>
             )}
-            {selection && editing && (
+            {selection && editing && !longCaptureActive && (
                 <div
                     className='absolute z-30'
                     style={{ left: selection.x, top: selection.y, width: selection.w, height: selection.h }}
@@ -858,11 +1020,23 @@ export default function Screenshot() {
                         onRedo={redo}
                         onOcr={() => finish('ocr')}
                         onTranslate={() => finish('translate')}
+                        onLongScreenshot={intentRef.current === 'edit' ? undefined : startLongScreenshot}
+                        longCaptureActive={longCaptureActive}
+                        copyBusy={longCaptureBusy}
                         onPin={() => finish('pin')}
                         onSave={() => finish('save')}
                         onCopy={() => finish('copy')}
                         onClose={() => appWindow.close()}
                     />
+                </div>
+            )}
+            {longCaptureActive && (
+                <div className='pointer-events-none absolute inset-x-0 bottom-6 z-50 flex justify-center'>
+                    <div className='rounded-full bg-black/70 px-4 py-1.5 text-[12px] text-white'>
+                        {longCaptureStatus?.message
+                            ? t(longCaptureStatus.message)
+                            : t('long_screenshot.scroll_hint')}
+                    </div>
                 </div>
             )}
             {loupe && !selection && (

@@ -496,6 +496,7 @@
             "pin": "Pin to screen",
             "ocr": "OCR",
             "translate": "Translate",
+            "long_screenshot": "Scroll capture",
             "close": "Close",
             "color": "Color",
             "stroke": "Stroke width",
@@ -507,6 +508,24 @@
             "saved": "Saved",
             "empty": "Screenshot is empty",
             "load_failed": "Could not display the screenshot. The file was read, but the image failed to decode."
+        },
+        "long_screenshot": {
+            "title": "Scroll capture",
+            "hint": "Scroll inside the selected area",
+            "scroll_hint": "Scroll down slowly. Overlapping content is stitched automatically.",
+            "pause": "Pause",
+            "resume": "Resume",
+            "finish": "Finish",
+            "paused": "Paused",
+            "capturing": "Capturing",
+            "needs_attention": "Adjust and continue",
+            "capture_failed": "Could not read the screen. Check screen recording permission.",
+            "size_changed": "The display size changed. Finish this capture or start again.",
+            "no_overlap": "No reliable overlap was found. Scroll a smaller amount and try again.",
+            "ambiguous": "The overlap is ambiguous. Avoid repeated content or scroll a smaller amount.",
+            "limit": "The image size limit has been reached. Finish to keep the current result.",
+            "accessibility": "Accessibility permission is required to forward scroll events. Grant it in System Settings and try again.",
+            "unsupported_platform": "In-page scroll capture is not supported on this platform yet."
         },
         "pin": {
             "copy": "Copy",

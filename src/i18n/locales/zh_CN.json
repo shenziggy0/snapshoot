@@ -496,6 +496,7 @@
             "pin": "贴到屏幕",
             "ocr": "文字识别",
             "translate": "翻译",
+            "long_screenshot": "截长图",
             "close": "关闭",
             "color": "颜色",
             "stroke": "线宽",
@@ -507,6 +508,24 @@
             "saved": "已保存",
             "empty": "截图为空",
             "load_failed": "截图已读到，但无法显示。请重试截图。"
+        },
+        "long_screenshot": {
+            "title": "截长图",
+            "hint": "在选区内滚动页面",
+            "scroll_hint": "请缓慢向下滚动，重叠内容会自动拼接。",
+            "pause": "暂停",
+            "resume": "继续",
+            "finish": "完成",
+            "paused": "已暂停",
+            "capturing": "正在采集",
+            "needs_attention": "请调整后继续",
+            "capture_failed": "无法读取屏幕，请检查屏幕录制权限。",
+            "size_changed": "显示器尺寸已变化，请完成当前结果或重新开始。",
+            "no_overlap": "没有识别到可靠的重叠区域，请减小滚动幅度后重试。",
+            "ambiguous": "重叠区域存在歧义，请避开重复内容或减小滚动幅度。",
+            "limit": "已达到图片尺寸上限，请完成以保留当前结果。",
+            "accessibility": "需要「辅助功能」权限才能转发滚轮事件，请在系统设置中授权后重试。",
+            "unsupported_platform": "当前平台暂不支持原页面内长截图。"
         },
         "pin": {
             "copy": "复制",

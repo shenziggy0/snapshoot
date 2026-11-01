@@ -44,8 +44,9 @@ image = "0.25.4"
 [target.'cfg(target_os = "macos")'.dependencies]
 macos-accessibility-client = "0.0.1"
 window-shadows = "0.2"
-core-graphics = "0.23.2"
+core-graphics = { version = "0.23.2", features = ["highsierra"] }
 core-foundation = "0.9.4"
+foreign-types = "0.5"
 objc = "0.2"
 libc = "0.2"
 
