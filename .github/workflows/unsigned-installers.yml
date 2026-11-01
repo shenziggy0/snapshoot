@@ -1,12 +1,16 @@
 name: Unsigned installers
 
-# Push builds only the Apple silicon dmg. macOS runners cost 10x minutes.
-# Windows, Intel dmg, and smoke tests are manual: unsigned-optional.yml
+# Manual only. Does not run on push (including cursor/**).
+# macOS runners cost 10x minutes. Dispatch this workflow to build only the
+# Apple silicon dmg. Windows, Intel dmg, and smoke tests stay in
+# unsigned-optional.yml.
 on:
     workflow_dispatch:
-    push:
-        branches:
-            - 'cursor/**'
+        inputs:
+            macos_aarch64:
+                description: Build only the Apple silicon dmg
+                type: boolean
+                default: true
 
 permissions:
     contents: read
@@ -14,6 +18,7 @@ permissions:
 jobs:
     build-macos-aarch64:
         name: macOS aarch64 dmg
+        if: inputs.macos_aarch64 == true
         runs-on: macos-14
         steps:
             - name: Checkout

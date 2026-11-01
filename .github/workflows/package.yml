@@ -1,11 +1,12 @@
 name: Package
-# Release publishing, Homebrew, WinGet, and the updater signing key are disabled.
+# Manual only. Do not run on push: macOS runners cost 10x minutes.
+# Release publishing, Homebrew, WinGet, pot-docs, and the updater job stay disabled.
 # Unsigned installers for this fork are built by unsigned-installers.yml.
 on:
-    push:
-        branches: [master]
-        tags-ignore: [updater]
-permissions: write-all
+    workflow_dispatch:
+
+permissions:
+    contents: read
 
 jobs:
     change-version:
