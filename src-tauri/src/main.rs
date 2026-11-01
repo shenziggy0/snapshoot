@@ -167,6 +167,7 @@ fn main() {
             long_screenshot::long_capture_start,
             long_screenshot::long_capture_status,
             long_screenshot::long_capture_scroll,
+            long_screenshot::long_capture_set_hit_rects,
             long_screenshot::long_capture_finish_copy,
             long_screenshot::long_capture_cancel,
             window::fit_overlay_window,

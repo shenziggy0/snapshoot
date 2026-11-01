@@ -72,6 +72,42 @@ pub fn capture_target_at_mouse() -> Result<CaptureTarget, String> {
     }
 }
 
+/// Grab one monitor into memory. Long capture calls this many times a second,
+/// so it must not encode a PNG on the way through.
+pub fn capture_target_region(
+    target: &CaptureTarget,
+    full_width: u32,
+    full_height: u32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+) -> Result<image::RgbaImage, String> {
+    #[cfg(target_os = "macos")]
+    {
+        return crate::capture_macos::capture_region_rgba(
+            target.display_id,
+            full_width,
+            full_height,
+            x,
+            y,
+            width,
+            height,
+        );
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let image = capture_monitor_rgba(target.x, target.y)?;
+        if image.width() != full_width || image.height() != full_height {
+            return Err("size_changed".into());
+        }
+        if x.saturating_add(width) > image.width() || y.saturating_add(height) > image.height() {
+            return Err("selected region is outside the captured screen".into());
+        }
+        Ok(image::imageops::crop_imm(&image, x, y, width, height).to_image())
+    }
+}
+
 pub fn capture_target_to(target: &CaptureTarget, path: &Path) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -88,6 +124,41 @@ pub fn capture_target_to(target: &CaptureTarget, path: &Path) -> Result<(), Stri
 #[tauri::command]
 pub fn screenshot(x: i32, y: i32) -> Result<(), String> {
     capture_screen_to(x, y, &full_screenshot_path())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn capture_monitor_rgba(x: i32, y: i32) -> Result<image::RgbaImage, String> {
+    use screenshots::Screen;
+    let screens = Screen::all().map_err(|err| err.to_string())?;
+    let screen = screens.into_iter().find(|screen| {
+        let info = screen.display_info;
+        info.x == x && info.y == y
+    });
+    let Some(screen) = screen else {
+        return Err(format!("No display at {x},{y}"));
+    };
+    // Same DPI adjustment as `capture_screen_to`: the process is per-monitor
+    // aware, and `screenshots` would otherwise scale the bitmap a second time.
+    let image = {
+        #[cfg(windows)]
+        {
+            let mut info = screen.display_info;
+            let scale = info.scale_factor;
+            if scale > 1.01 {
+                info.width = ((info.width as f32) / scale).round().max(1.0) as u32;
+                info.height = ((info.height as f32) / scale).round().max(1.0) as u32;
+            }
+            screenshots::Screen::new(&info)
+                .capture()
+                .map_err(|err| err.to_string())?
+        }
+        #[cfg(not(windows))]
+        {
+            screen.capture().map_err(|err| err.to_string())?
+        }
+    };
+    image::RgbaImage::from_raw(image.width(), image.height(), image.rgba().clone())
+        .ok_or_else(|| "rgba buffer".to_string())
 }
 
 fn capture_screen_to(x: i32, y: i32, path: &Path) -> Result<(), String> {
@@ -216,9 +287,7 @@ pub(crate) fn rgba_spread(rgba: &[u8], width: u32, height: u32) -> u8 {
 pub fn report_capture_failure(detail: &str) {
     warn!("screen capture failed: {detail}");
     let app = APP.get().unwrap();
-    let parent = app
-        .get_window("config")
-        .or_else(|| app.get_window("main"));
+    let parent = app.get_window("config").or_else(|| app.get_window("main"));
     let text = if cfg!(target_os = "macos") {
         "没有获取到桌面画面。请打开「系统设置 → 隐私与安全性 → 屏幕录制」，允许 Snapshoot，然后完全退出并重新打开。"
             .to_string()

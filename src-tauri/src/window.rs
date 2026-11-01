@@ -573,37 +573,276 @@ pub(crate) fn dismiss_screenshot_window() -> bool {
     visible
 }
 
-/// Runs on the main thread (the start command is synchronous). Exclude the
-/// overlay from display capture and verify event-forwarding permission without
-/// blocking on a system prompt.
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// CSS-pixel rectangles that must keep receiving clicks (the toolbar) while
+/// the rest of the overlay lets the page underneath handle the wheel.
+static LONG_CAPTURE_HIT_RECTS: std::sync::Mutex<Vec<(f64, f64, f64, f64)>> =
+    std::sync::Mutex::new(Vec::new());
+static LONG_CAPTURE_PASS_STOP: AtomicBool = AtomicBool::new(true);
+static LONG_CAPTURE_POLLER: AtomicBool = AtomicBool::new(false);
+static LONG_CAPTURE_POLL_QUEUED: AtomicBool = AtomicBool::new(false);
+static LONG_CAPTURE_CLICK_THROUGH: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn set_long_capture_hit_rects(rects: &[(f64, f64, f64, f64)]) {
+    *LONG_CAPTURE_HIT_RECTS.lock().unwrap() = rects.to_vec();
+}
+
+pub(crate) fn long_capture_click_through() -> bool {
+    LONG_CAPTURE_CLICK_THROUGH.load(Ordering::SeqCst)
+}
+
+fn screenshot_handle() -> Option<Window> {
+    APP.get()?.get_window("screenshot")
+}
+
+fn apply_click_through(window: &Window, click_through: bool) {
+    LONG_CAPTURE_CLICK_THROUGH.store(click_through, Ordering::SeqCst);
+    // Tauri's Windows implementation applies this on a later turn of the UI
+    // thread. Set the extended style here so a wheel replay in the same call
+    // already falls through to the window underneath.
+    #[cfg(windows)]
+    set_click_through_style(window, click_through);
+    let _ = window.set_ignore_cursor_events(click_through);
+}
+
+#[cfg(windows)]
+fn set_click_through_style(window: &Window, click_through: bool) {
+    #[link(name = "user32")]
+    extern "system" {
+        fn GetWindowLongPtrW(hwnd: *mut std::ffi::c_void, index: i32) -> isize;
+        fn SetWindowLongPtrW(hwnd: *mut std::ffi::c_void, index: i32, value: isize) -> isize;
+        fn SetWindowPos(
+            hwnd: *mut std::ffi::c_void,
+            insert_after: *mut std::ffi::c_void,
+            x: i32,
+            y: i32,
+            cx: i32,
+            cy: i32,
+            flags: u32,
+        ) -> i32;
+    }
+    const GWL_EXSTYLE: i32 = -20;
+    const WS_EX_LAYERED: isize = 0x0008_0000;
+    const WS_EX_TRANSPARENT: isize = 0x0000_0020;
+    const SWP_NOMOVE: u32 = 0x0002;
+    const SWP_NOSIZE: u32 = 0x0001;
+    const SWP_NOZORDER: u32 = 0x0004;
+    const SWP_FRAMECHANGED: u32 = 0x0020;
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    let hwnd = hwnd.0 as *mut std::ffi::c_void;
+    unsafe {
+        let mut style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        if click_through {
+            style |= WS_EX_LAYERED | WS_EX_TRANSPARENT;
+        } else {
+            style &= !WS_EX_TRANSPARENT;
+        }
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style);
+        let _ = SetWindowPos(
+            hwnd,
+            std::ptr::null_mut(),
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED,
+        );
+    }
+}
+
+fn cursor_over_controls(window: &Window) -> bool {
+    let rects = LONG_CAPTURE_HIT_RECTS.lock().unwrap().clone();
+    if rects.is_empty() {
+        return false;
+    }
+    let (cursor_x, cursor_y) = mouse_physical_position();
+    let Ok(origin) = window.inner_position() else {
+        return false;
+    };
+    let scale = window.scale_factor().unwrap_or(1.0).max(0.5);
+    // `mouse_position` reports Quartz points on macOS and physical pixels on
+    // Windows. The window origin and the CSS rects are converted into the
+    // same space as the cursor.
+    #[cfg(target_os = "macos")]
+    let (cursor_x, cursor_y, origin_x, origin_y, scale) = (
+        cursor_x as f64,
+        cursor_y as f64,
+        origin.x as f64 / scale,
+        origin.y as f64 / scale,
+        1.0,
+    );
+    #[cfg(not(target_os = "macos"))]
+    let (cursor_x, cursor_y, origin_x, origin_y) = (
+        cursor_x as f64,
+        cursor_y as f64,
+        origin.x as f64,
+        origin.y as f64,
+    );
+    let pad = 12.0 * scale;
+    rects.iter().any(|(x, y, width, height)| {
+        let left = origin_x + x * scale - pad;
+        let top = origin_y + y * scale - pad;
+        let right = left + width * scale + pad * 2.0;
+        let bottom = top + height * scale + pad * 2.0;
+        cursor_x >= left && cursor_x <= right && cursor_y >= top && cursor_y <= bottom
+    })
+}
+
+fn refresh_click_through(window: Window) {
+    if LONG_CAPTURE_PASS_STOP.load(Ordering::SeqCst) {
+        apply_click_through(&window, false);
+        return;
+    }
+    let click_through = !cursor_over_controls(&window);
+    if click_through != LONG_CAPTURE_CLICK_THROUGH.load(Ordering::SeqCst) {
+        apply_click_through(&window, click_through);
+    }
+}
+
+fn ensure_click_through_poller() {
+    if LONG_CAPTURE_POLLER
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+    std::thread::spawn(|| loop {
+        let stopping = LONG_CAPTURE_PASS_STOP.load(Ordering::SeqCst);
+        std::thread::sleep(std::time::Duration::from_millis(if stopping {
+            40
+        } else {
+            16
+        }));
+        if LONG_CAPTURE_PASS_STOP.load(Ordering::SeqCst) {
+            if LONG_CAPTURE_CLICK_THROUGH.load(Ordering::SeqCst) {
+                if let Some(window) = screenshot_handle() {
+                    let _ = window.run_on_main_thread(move || apply_click_through(&window, false));
+                }
+            }
+            continue;
+        }
+        let Some(window) = screenshot_handle() else {
+            continue;
+        };
+        if LONG_CAPTURE_POLL_QUEUED.swap(true, Ordering::SeqCst) {
+            continue;
+        }
+        let queued = window.run_on_main_thread(move || {
+            LONG_CAPTURE_POLL_QUEUED.store(false, Ordering::SeqCst);
+            refresh_click_through(window);
+        });
+        if queued.is_err() {
+            LONG_CAPTURE_POLL_QUEUED.store(false, Ordering::SeqCst);
+        }
+    });
+}
+
+/// Runs on the main thread (the start command is synchronous). Keep the
+/// overlay on screen, drop it out of the hit test, and exclude it from grabs.
 pub(crate) fn enter_long_screenshot_mode() -> Result<(), String> {
-    let window = APP
-        .get()
-        .and_then(|app| app.get_window("screenshot"))
-        .ok_or_else(|| "screenshot window is not available".to_string())?;
+    let window =
+        screenshot_handle().ok_or_else(|| "screenshot window is not available".to_string())?;
     #[cfg(target_os = "macos")]
     {
         crate::capture_macos::prepare_scroll_capture(&window)?;
     }
+    #[cfg(windows)]
+    set_excluded_from_capture(&window, true);
+    LONG_CAPTURE_PASS_STOP.store(false, Ordering::SeqCst);
+    apply_click_through(&window, true);
+    ensure_click_through_poller();
     Ok(())
+}
+
+pub(crate) fn leave_long_screenshot_mode() {
+    LONG_CAPTURE_PASS_STOP.store(true, Ordering::SeqCst);
+    LONG_CAPTURE_HIT_RECTS.lock().unwrap().clear();
+    let _ = crate::image_io::spawn_main(|| {
+        #[cfg(target_os = "macos")]
+        crate::capture_macos::clear_scroll_overlay_window();
+        if let Some(window) = screenshot_handle() {
+            #[cfg(windows)]
+            set_excluded_from_capture(&window, false);
+            apply_click_through(&window, false);
+        }
+    });
+}
+
+#[cfg(windows)]
+fn set_excluded_from_capture(window: &Window, exclude: bool) {
+    // Tauri's `hwnd()` is `windows 0.39`, which is a different type from the
+    // `windows 0.58` dependency used here. The handle is a pointer either way.
+    #[link(name = "user32")]
+    extern "system" {
+        fn SetWindowDisplayAffinity(hwnd: *mut std::ffi::c_void, affinity: u32) -> i32;
+    }
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    let affinity = if exclude { 0x11 } else { 0 };
+    unsafe {
+        let _ = SetWindowDisplayAffinity(hwnd.0 as *mut std::ffi::c_void, affinity);
+    }
 }
 
 /// This command is synchronous, so Tauri invokes it on the main thread. Keep
 /// all NSWindow messages and event posting here to avoid AppKit thread crashes.
-pub(crate) fn forward_long_capture_scroll(delta_y: i32, center_x: f64, center_y: f64) -> Result<(), String> {
-    let window = APP
-        .get()
-        .and_then(|app| app.get_window("screenshot"))
-        .ok_or_else(|| "screenshot window is not available".to_string())?;
+pub(crate) fn forward_long_capture_scroll(
+    delta_y: i32,
+    center_x: f64,
+    center_y: f64,
+) -> Result<(), String> {
+    let window =
+        screenshot_handle().ok_or_else(|| "screenshot window is not available".to_string())?;
     #[cfg(target_os = "macos")]
     {
         return crate::capture_macos::forward_scroll(&window, delta_y, center_x, center_y);
     }
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(windows)]
+    {
+        let _ = (center_x, center_y);
+        return forward_scroll_windows(&window, delta_y);
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
         let _ = (window, delta_y, center_x, center_y);
         Err("long_screenshot.unsupported_platform".into())
     }
+}
+
+#[cfg(windows)]
+fn forward_scroll_windows(window: &Window, delta_y: i32) -> Result<(), String> {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_WHEEL, MOUSEINPUT,
+    };
+    if delta_y == 0 {
+        return Ok(());
+    }
+    // The overlay consumed this wheel event. Let the next hit test fall
+    // through, then replay the same distance. DOM deltaY is positive when
+    // content moves down; WM_MOUSEWHEEL is positive for the opposite direction.
+    apply_click_through(window, true);
+    let input = INPUT {
+        r#type: INPUT_MOUSE,
+        Anonymous: INPUT_0 {
+            mi: MOUSEINPUT {
+                dx: 0,
+                dy: 0,
+                mouseData: (-delta_y) as u32,
+                dwFlags: MOUSEEVENTF_WHEEL,
+                time: 0,
+                dwExtraInfo: 0,
+            },
+        },
+    };
+    let sent = unsafe { SendInput(&[input], std::mem::size_of::<INPUT>() as i32) };
+    if sent == 0 {
+        return Err("scroll input was not delivered".into());
+    }
+    Ok(())
 }
 
 pub fn ocr_recognize() {
