@@ -1,8 +1,10 @@
 <img width="200px" src="public/icon.svg" align="left"/>
 
-# Pot (간편 번역기)
+# Snapshoot
 
-> A cross-platform translator application ([Telegram Group](https://t.me/pot_app))
+> A cross-platform screenshot, pin, OCR and translation tool. Based on Pot (pot-app/pot-desktop), GPL-3.0.
+>
+> Note: Snapshoot has not published an official Release yet. The download instructions below apply after a Release is published; for now, please build from source following the manual build instructions at the end of this document.
 
 ![License](https://img.shields.io/github/license/shenziggy0/snapshoot.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-1.6.8-blue?logo=tauri)

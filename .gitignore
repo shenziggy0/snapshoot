@@ -22,3 +22,9 @@ smoke-artifacts
 *.njsproj
 *.sln
 *.sw?
+
+# Local env and secrets (never commit)
+.env
+.env.*
+*.pem
+*.key

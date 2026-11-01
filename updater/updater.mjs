@@ -1,3 +1,6 @@
+// Snapshoot 注意：本脚本目前已停用（tauri.conf.json 里 updater.active=false）。
+// 下面的链接仍指向上游 Pot 的 release 和 Pot 的包名格式，仅作历史参考，
+// 不要直接用它给 Snapshoot 生成 update.json；启用自动更新前，需按 Snapshoot 自己的 release 命名和签名密钥完整重写。
 import fetch from 'node-fetch';
 import fs from 'fs';
 

@@ -1,3 +1,6 @@
+// Snapshoot 注意：本脚本目前已停用，见 updater.mjs 顶部的说明。
+// 下面的链接仍指向上游 Pot 的 release 和 Pot 的包名格式，仅作历史参考，
+// 不要直接用它给 Snapshoot 生成更新文件；启用前需按 Snapshoot 自己的 release 命名完整重写。
 import fetch from 'node-fetch';
 import fs from 'fs';
 

@@ -1,8 +1,10 @@
 <img width="200px" src="public/icon.svg" align="left"/>
 
-# Pot (A cute translator)
+# Snapshoot
 
-> A cross-platform translator application ([Telegram Group](https://t.me/pot_app))
+> A cross-platform screenshot, pin, OCR and translation tool. Based on Pot (pot-app/pot-desktop), GPL-3.0.
+>
+> Note: Snapshoot has not published an official Release yet. The download instructions below apply after a Release is published; for now, please build from source following the manual build instructions at the end of this document.
 
 ![License](https://img.shields.io/github/license/shenziggy0/snapshoot.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-1.6.8-blue?logo=tauri)
@@ -185,7 +187,7 @@ The [Template](https://pot-app.com/en/plugin.html#template) section in the [Plug
 ### Install via Winget
 
 ```powershell
-# Snapshoot is not published on WinGet. Download an installer from https://github.com/shenziggy0/snapshoot/releases
+# Snapshoot is not published on WinGet, and no official Release has been published yet. Please build from source for now; after a Release is published, download an installer from https://github.com/shenziggy0/snapshoot/releases
 ```
 
 ### Install Manually
@@ -212,7 +214,7 @@ The [Template](https://pot-app.com/en/plugin.html#template) section in the [Plug
 
 ### Install via Brew
 
-Snapshoot is not published as a Homebrew cask. Download the dmg from [Release](https://github.com/shenziggy0/snapshoot/releases/latest).
+Snapshoot is not published as a Homebrew cask, and no official Release has been published yet. Please build from source for now; after a Release is published, download the dmg from [Release](https://github.com/shenziggy0/snapshoot/releases/latest).
 
 ### Install Manually
 

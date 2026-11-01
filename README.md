@@ -3,6 +3,8 @@
 # Snapshoot
 
 > 跨平台截图、贴图、文字识别和翻译工具。基于 Pot（pot-app/pot-desktop），GPL-3.0。
+>
+> 注意：Snapshoot 目前尚未发布正式 Release，安装指南里的下载方式是 Release 发布后的方式，现阶段请按文末“手动编译”从源码构建。
 
 ![License](https://img.shields.io/github/license/shenziggy0/snapshoot.svg)
 ![Tauri](https://img.shields.io/badge/Tauri-1.6.8-blue?logo=tauri)
@@ -158,9 +160,9 @@
 
 ## 插件安装
 
-你可以在 [Plugin List](https://pot-app.com/plugin.html) 查找你需要的插件，然后前往插件仓库下载插件。
+你可以在上游 Pot 的 [Plugin List](https://pot-app.com/plugin.html) 查找你需要的插件，然后前往插件仓库下载插件。Snapshoot 沿用 Pot 的插件格式，但请先在 Snapshoot 上实测后再用。
 
-pot 插件的扩展名为 `.potext`, 下载得到`.potext`文件之后， 在 偏好设置-服务设置-添加外部插件-安装外部插件 选择对应的 `.potext` 即可安装成功，添加到服务列表中即可像内置服务一样正常使用了。
+Snapshoot / Pot 插件的扩展名为 `.potext`, 下载得到`.potext`文件之后， 在 偏好设置-服务设置-添加外部插件-安装外部插件 选择对应的 `.potext` 即可安装成功，添加到服务列表中即可像内置服务一样正常使用了。
 
 ### 故障排除
 
@@ -174,7 +176,7 @@ pot 插件的扩展名为 `.potext`, 下载得到`.potext`文件之后， 在 �
 
 ## 插件开发
 
-在 [Plugin List](https://pot-app.com/plugin.html) 中的 [模板](https://pot-app.com/plugin.html#%E6%A8%A1%E6%9D%BF) 章节提供了各种插件的开发模板，具体的开发文档请查看对应的模板仓库。
+在上游 Pot 的 [Plugin List](https://pot-app.com/plugin.html) 中的 [模板](https://pot-app.com/plugin.html#%E6%A8%A1%E6%9D%BF) 章节提供了各种插件的开发模板，具体的开发文档请查看对应的模板仓库。
 
 <div align="center">
 
@@ -187,10 +189,13 @@ pot 插件的扩展名为 `.potext`, 下载得到`.potext`文件之后， 在 �
 ### 通过 Winget 安装
 
 ```powershell
-# Snapshoot 尚未发布到 WinGet。请从 https://github.com/shenziggy0/snapshoot/releases 下载安装包。
+# Snapshoot 尚未发布到 WinGet，也尚未发布正式 Release。
+# 目前请按文末“手动编译”从源码构建，Release 发布后再从 https://github.com/shenziggy0/snapshoot/releases 下载安装包。
 ```
 
 ### 手动安装
+
+> 注意：下面是 Release 发布后的安装方式。Snapshoot 目前尚未发布正式 Release，请先按文末“手动编译”从源码构建。
 
 1. 在 [Release](https://github.com/shenziggy0/snapshoot/releases/latest) 页面下载最新 `exe` 安装包。
 
@@ -216,9 +221,11 @@ pot 插件的扩展名为 `.potext`, 下载得到`.potext`文件之后， 在 �
 
 1. 添加我们的 tap:
 
-Snapshoot 尚未发布 Homebrew cask。请从 [Release](https://github.com/shenziggy0/snapshoot/releases/latest) 下载 dmg。
+Snapshoot 尚未发布 Homebrew cask，也尚未发布正式 Release。请先按文末“手动编译”从源码构建，Release 发布后再从 [Release](https://github.com/shenziggy0/snapshoot/releases/latest) 下载 dmg。
 
 ### 手动安装
+
+> 注意：下面是 Release 发布后的安装方式。Snapshoot 目前尚未发布正式 Release，请先按文末“手动编译”从源码构建。
 
 1. 下载 `dmg` 安装包。（Apple 芯片请下载 `Snapshoot_{version}_aarch64.dmg`，Intel 芯片请下载 `Snapshoot_{version}_x64.dmg`）
 2. 双击下载的文件后将 Snapshoot 拖入 Applications 文件夹即可完成安装。
@@ -241,6 +248,8 @@ Snapshoot 尚未发布 Homebrew cask。请从 [Release](https://github.com/shenz
 
 ### Debian/Ubuntu
 
+> 注意：下面是 Release 发布后的安装方式。Snapshoot 目前尚未发布正式 Release，请先按文末“手动编译”从源码构建。
+
 1. 从 [Release](https://github.com/shenziggy0/snapshoot/releases/latest) 页面下载最新的对应架构的 `deb` 安装包。
 
 2. 使用 `apt-get` 进行安装
@@ -250,6 +259,8 @@ Snapshoot 尚未发布 Homebrew cask。请从 [Release](https://github.com/shenz
     ```
 
 ### Arch/Manjaro
+
+> 注意：下面是上游 Pot 的 AUR 包，不是 Snapshoot 的包，Snapshoot 目前没有自己的 AUR 包。
 
 > [!WARNING]
 > 在最新版本的 [Webkit2Gtk](https://archlinux.org/packages/extra/x86_64/webkit2gtk) (2.42.0) 中，由于 Nvidia 专有驱动未完全实现 DMABUF，将导致无法启动和崩溃的情况发生。<br>
@@ -272,6 +283,8 @@ sudo pacman -S pot-translation
 ```
 
 ### Flatpak
+
+> 注意：下面是上游 Pot 的 Flathub 页面，不是 Snapshoot 的，Snapshoot 目前没有自己的 Flatpak 包。
 
 > [!WARNING]
 > Flatpak 版本缺失托盘图标。
@@ -308,7 +321,7 @@ GET "/ocr_translate?screenshot=true" => 截图翻译,
 
 -   调用划词翻译：
 
-    如果想要调用 pot 划词翻译，只需向`127.0.0.1:port`发送请求即可。
+    如果想要调用 Snapshoot 划词翻译，只需向`127.0.0.1:port`发送请求即可。
 
     例如通过 curl 发送请求：
 
@@ -318,7 +331,7 @@ GET "/ocr_translate?screenshot=true" => 截图翻译,
 
 ## 不使用软件内截图
 
-这一功能可以让您在不使用软件内截图的情况下调用截图 OCR/截图翻译功能，这样您就可以使用您喜欢的截图工具来截图了，也可以解决在某些平台下 pot 自带的截图无法使用的问题。
+这一功能可以让您在不使用软件内截图的情况下调用截图 OCR/截图翻译功能，这样您就可以使用您喜欢的截图工具来截图了，也可以解决在某些平台下 Snapshoot 自带的截图无法使用的问题。
 
 ### 调用流程
 
@@ -350,7 +363,7 @@ rm ~/.cache/top.shenziggy.snapshoot/pot_screenshot_cut.png && flameshot gui -s -
 1. 从 [App Store](https://apps.apple.com/us/app/popclip/id445189367?mt=12) 下载安装 PopClip
 2. PopClip 扩展 (pot.popclipextz) 仍发布在上游 Pot 的 [Release](https://github.com/pot-app/pot-desktop/releases/latest)。Snapshoot 本体见 https://github.com/shenziggy0/snapshoot
 3. 双击下载的扩展文件完成安装。
-4. 在 PopClip 的扩展中启用 pot 扩展，选中文本即可点击翻译。
+4. 在 PopClip 的扩展中启用该 Pot 扩展（上游 Pot 的扩展），选中文本即可点击翻译。
 
 ### Starry (Linux)
 
@@ -364,15 +377,15 @@ Github: [ccslykx/Starry](https://github.com/ccslykx/Starry)
 
 </div>
 
-由于各大发行版对于 Wayland 的支持程度不同，所以 pot 本身没法做到特别完美的支持，这里可以提供一些常见问题的解决方案，通过合理的设置之后，pot 也可以在 Wayland 下完美运行。
+由于各大发行版对于 Wayland 的支持程度不同，所以 Snapshoot 本身没法做到特别完美的支持，这里可以提供一些常见问题的解决方案，通过合理的设置之后，Snapshoot 也可以在 Wayland 下完美运行。
 
 ## 快捷键无法使用
 
-由于 Tauri 的快捷键方案并没有支持 Wayland，所以 pot 应用内的快捷键设置在 Wayland 下无法使用。 您可以设置系统快捷用 curl 发送请求来触发 pot，详见[外部调用](#外部调用)
+由于 Tauri 的快捷键方案并没有支持 Wayland，所以 Snapshoot 应用内的快捷键设置在 Wayland 下无法使用。 您可以设置系统快捷用 curl 发送请求来触发 Snapshoot，详见[外部调用](#外部调用)
 
 ## 截图无法使用
 
-在一些纯 Wayland 桌面环境/窗口管理器(如 Hyprland)上，pot 内置的截图无法使用，这时可以通过使用其他截图工具代替，详见 [不使用软件内截图](#不使用软件内截图)
+在一些纯 Wayland 桌面环境/窗口管理器(如 Hyprland)上，Snapshoot 内置的截图无法使用，这时可以通过使用其他截图工具代替，详见 [不使用软件内截图](#不使用软件内截图)
 
 下面给出在 Hyprland 下的配置示例(通过 grim 和 slurp 实现截图)：
 
@@ -385,7 +398,7 @@ bind = ALT, C, exec, grim -g "$(slurp)" ~/.cache/top.shenziggy.snapshoot/pot_scr
 
 ## 划词翻译窗口跟随鼠标位置
 
-由于目前 pot 在 Wayland 下还无法获取到正确的鼠标坐标，所以内部的实现无法工作。 对于某些桌面环境/窗口管理器，可以通过设置窗口规则来实现窗口跟随鼠标位置，这里以 Hyprland 为例：
+由于目前 Snapshoot 在 Wayland 下还无法获取到正确的鼠标坐标，所以内部的实现无法工作。 对于某些桌面环境/窗口管理器，可以通过设置窗口规则来实现窗口跟随鼠标位置，这里以 Hyprland 为例：
 
 ```conf
 windowrulev2 = float, class:(pot), title:(Translator|OCR|PopClip|Screenshot Translate) # Translation window floating
@@ -394,7 +407,7 @@ windowrulev2 = move cursor 0 0, class:(pot), title:(Translator|PopClip|Screensho
 
 <div align="center">
 
-# 国际化([Weblate](https://hosted.weblate.org/engage/pot-app/))
+# 国际化（上游 Pot 的 Weblate，Snapshoot 目前没有自己的翻译平台：[Weblate](https://hosted.weblate.org/engage/pot-app/)）
 
 [![](https://hosted.weblate.org/widget/pot-app/pot-desktop/svg-badge.svg)](https://hosted.weblate.org/engage/pot-app/)
 
