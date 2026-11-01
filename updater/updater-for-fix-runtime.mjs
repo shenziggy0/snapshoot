@@ -4,6 +4,10 @@
 import fetch from 'node-fetch';
 import fs from 'fs';
 
+// Snapshoot 已停用：直接退出，不发任何请求、不生成更新文件。
+console.log('Snapshoot updater is disabled; exiting without fetching anything.');
+process.exit(0);
+
 async function resolveUpdater() {
     if (process.env.GITHUB_TOKEN === undefined) {
         throw new Error('GITHUB_TOKEN is required');

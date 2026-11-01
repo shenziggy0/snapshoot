@@ -4,9 +4,9 @@ resolver = "2"
 
 [package]
 name = "snapshoot"
-version = "0.0.0"
+version = "1.0.0"
 description = "Snapshoot"
-authors = ["shenziggy0"]
+authors = ["shenziggy0", "pot-app"]
 license = "GPL-3.0-only"
 repository = "https://github.com/shenziggy0/snapshoot"
 edition = "2021"
