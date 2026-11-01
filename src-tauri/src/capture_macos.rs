@@ -32,7 +32,7 @@ struct NsRect {
 }
 use std::path::Path;
 use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 pub struct CaptureGeometry {
     pub x: i32,
@@ -330,11 +330,11 @@ fn pid_under_point(point: CGPoint, skip_window: u32) -> Option<i32> {
     let our_pid = i64::from(std::process::id());
 
     unsafe {
-        let cf_key = |name: &str| unsafe {
+        let cf_key = |name: &str| {
             let c_string = CString::new(name).unwrap_or_else(|_| CString::new("").unwrap());
             CFStringCreateWithCString(std::ptr::null(), c_string.as_ptr(), UTF8)
         };
-        let cf_f64 = |dict: *const c_void, key: *const c_void| unsafe {
+        let cf_f64 = |dict: *const c_void, key: *const c_void| {
             let number = CFDictionaryGetValue(dict, key);
             if number.is_null() {
                 return 0.0;
@@ -343,7 +343,7 @@ fn pid_under_point(point: CGPoint, skip_window: u32) -> Option<i32> {
             CFNumberGetValue(number, FLOAT64, &mut value as *mut f64 as *mut c_void);
             value
         };
-        let cf_i64 = |dict: *const c_void, key: *const c_void| unsafe {
+        let cf_i64 = |dict: *const c_void, key: *const c_void| {
             let number = CFDictionaryGetValue(dict, key);
             if number.is_null() {
                 return 0;

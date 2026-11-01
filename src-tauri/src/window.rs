@@ -719,7 +719,8 @@ fn ensure_click_through_poller() {
         if LONG_CAPTURE_PASS_STOP.load(Ordering::SeqCst) {
             if LONG_CAPTURE_CLICK_THROUGH.load(Ordering::SeqCst) {
                 if let Some(window) = screenshot_handle() {
-                    let _ = window.run_on_main_thread(move || apply_click_through(&window, false));
+                    let posted = window.clone();
+                    let _ = posted.run_on_main_thread(move || apply_click_through(&window, false));
                 }
             }
             continue;
@@ -730,7 +731,7 @@ fn ensure_click_through_poller() {
         if LONG_CAPTURE_POLL_QUEUED.swap(true, Ordering::SeqCst) {
             continue;
         }
-        let queued = window.run_on_main_thread(move || {
+        let queued = window.clone().run_on_main_thread(move || {
             LONG_CAPTURE_POLL_QUEUED.store(false, Ordering::SeqCst);
             refresh_click_through(window);
         });
