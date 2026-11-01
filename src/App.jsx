@@ -55,6 +55,9 @@ export default function App() {
                     e.preventDefault();
                 }
                 if (e.key === 'Escape') {
+                    if (appWindow.label === 'screenshot') {
+                        await invoke('long_capture_cancel');
+                    }
                     await appWindow.close();
                 }
             });
@@ -68,6 +71,9 @@ export default function App() {
                     e.preventDefault();
                 }
                 if (e.key === 'Escape') {
+                    if (appWindow.label === 'screenshot') {
+                        await invoke('long_capture_cancel');
+                    }
                     await appWindow.close();
                 }
             });
