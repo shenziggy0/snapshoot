@@ -4,6 +4,11 @@
 import fetch from 'node-fetch';
 import fs from 'fs';
 
+// Snapshoot 已停用：直接退出，不发任何请求、不生成 update.json。
+// 下面是上游 Pot 的旧代码，仅作历史参考，启用自动更新前必须完整重写。
+console.log('Snapshoot updater is disabled; exiting without fetching anything.');
+process.exit(0);
+
 async function resolveUpdater() {
     if (process.env.GITHUB_TOKEN === undefined) {
         throw new Error('GITHUB_TOKEN is required');

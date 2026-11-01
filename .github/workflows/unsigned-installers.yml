@@ -1,12 +1,9 @@
 name: Unsigned installers
 
-# Push builds only the Apple silicon dmg. macOS runners cost 10x minutes.
-# Windows, Intel dmg, and smoke tests are manual: unsigned-optional.yml
+# Manual only. Do not auto-build on push, including cursor/** branches.
+# macOS runners cost 10x minutes. The v1.0.0 release build is package.yml.
 on:
     workflow_dispatch:
-    push:
-        branches:
-            - 'cursor/**'
 
 permissions:
     contents: read

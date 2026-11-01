@@ -1,6 +1,6 @@
 [package]
 name = "long-stitch"
-version = "0.0.0"
+version = "1.0.0"
 description = "Vertical overlap stitching for Snapshoot long screenshots"
 license = "GPL-3.0-only"
 edition = "2021"
