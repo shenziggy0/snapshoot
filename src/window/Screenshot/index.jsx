@@ -111,7 +111,6 @@ export default function Screenshot() {
     const longCaptureRef = useRef(false);
     const longCaptureBusyRef = useRef(false);
     const longCaptureMessageRef = useRef('');
-    const longCaptureWheelDeltaRef = useRef(0);
 
     const [image, setImage] = useState(null);
     const [longCaptureActive, setLongCaptureActive] = useState(false);
@@ -810,22 +809,18 @@ export default function Screenshot() {
     const editing = Boolean(selection) && intentRef.current !== 'ocr' && intentRef.current !== 'translate';
 
     useEffect(() => {
-        console.log('[long-capture] wheel effect, longCaptureActive =', longCaptureActive);
         if (!longCaptureActive) {
-            longCaptureWheelDeltaRef.current = 0;
             return undefined;
         }
-        const onWheel = (event) => {
-            event.preventDefault();
-            console.log('[long-capture] wheel received, deltaY =', event.deltaY, 'target =', event.target?.tagName);
-            // Trackpads commonly emit fractional pixel deltas. Rounding each
-            // event independently drops most of those events, making the
-            // user swipe unusually hard before the page moves at all. Keep
-            // the remainder and forward every whole pixel to the native
-            // scroll injector.
-            longCaptureWheelDeltaRef.current += event.deltaY;
-            const deltaY = Math.trunc(longCaptureWheelDeltaRef.current);
-            longCaptureWheelDeltaRef.current -= deltaY;
+        // The selection is click-through, so these events only arrive when the
+        // pointer is over the toolbar. Coalesce one gesture frame into a
+        // single pixel delta instead of forwarding every trackpad tick.
+        let pending = 0;
+        let scheduled = false;
+        const flush = () => {
+            scheduled = false;
+            const deltaY = Math.trunc(pending);
+            pending -= deltaY;
             if (deltaY === 0) {
                 return;
             }
@@ -833,8 +828,48 @@ export default function Screenshot() {
                 console.error('[long-capture] scroll invoke failed', error);
             });
         };
+        const onWheel = (event) => {
+            if (!longCaptureRef.current) {
+                return;
+            }
+            event.preventDefault();
+            const unit = event.deltaMode === 1 ? 48 : event.deltaMode === 2 ? window.innerHeight : 1;
+            pending += event.deltaY * unit;
+            if (!scheduled) {
+                scheduled = true;
+                requestAnimationFrame(flush);
+            }
+        };
         window.addEventListener('wheel', onWheel, { passive: false });
         return () => window.removeEventListener('wheel', onWheel);
+    }, [longCaptureActive]);
+
+    useEffect(() => {
+        if (!longCaptureActive) {
+            return undefined;
+        }
+        let alive = true;
+        const publish = () => {
+            const rects = Array.from(document.querySelectorAll('[data-long-capture-hit]')).map((node) => {
+                const rect = node.getBoundingClientRect();
+                return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
+            });
+            invoke('long_capture_set_hit_rects', { rects }).catch(() => {
+                // The session can end while this timer is still in flight.
+            });
+        };
+        publish();
+        const timer = setInterval(() => {
+            if (alive) {
+                publish();
+            }
+        }, 200);
+        window.addEventListener('resize', publish);
+        return () => {
+            alive = false;
+            clearInterval(timer);
+            window.removeEventListener('resize', publish);
+        };
     }, [longCaptureActive]);
 
     useEffect(() => {
@@ -865,7 +900,7 @@ export default function Screenshot() {
         if (!longCaptureRef.current) {
             return;
         }
-        console.log('[long-capture] root onWheel, deltaY =', event.deltaY);
+        event.preventDefault();
     };
 
     return (
@@ -997,6 +1032,7 @@ export default function Screenshot() {
             )}
             {selection && editing && (
                 <div
+                    data-long-capture-hit=''
                     className='absolute z-40'
                     style={{
                         left: clamp(selection.x + selection.w / 2, 180, window.innerWidth - 180),

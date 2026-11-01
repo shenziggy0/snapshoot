@@ -1,8 +1,9 @@
 use crate::screenshot::{rgba_is_blank, rgba_spread};
 use core_graphics::display::CGDisplay;
-use core_graphics::event::{CGEvent, CGEventTapLocation, ScrollEventUnit};
+use core_graphics::event::{CGEvent, CGEventTapLocation, EventField, ScrollEventUnit};
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
-use core_graphics::geometry::{CGRect, CGPoint};
+use core_graphics::geometry::{CGPoint, CGRect, CGSize};
+use core_graphics::image::CGImage;
 use foreign_types::ForeignType;
 use image::RgbaImage;
 use log::{info, warn};
@@ -31,7 +32,7 @@ struct NsRect {
 }
 use std::path::Path;
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 pub struct CaptureGeometry {
     pub x: i32,
@@ -201,31 +202,34 @@ pub fn order_out(window: &tauri::Window) {
     }
 }
 
+/// Window number of the capture overlay, so frame grabs can omit it.
+static SCROLL_OVERLAY_WINDOW: AtomicU32 = AtomicU32::new(0);
+/// Drops the echo of a scroll event we just posted.
+static SUPPRESS_FORWARD_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
+
+pub fn clear_scroll_overlay_window() {
+    SCROLL_OVERLAY_WINDOW.store(0, Ordering::SeqCst);
+}
+
 pub fn prepare_scroll_capture(window: &tauri::Window) -> Result<(), String> {
-    if !macos_accessibility_client::accessibility::application_is_trusted() {
-        return Err("long_screenshot.accessibility".into());
-    }
     exclude_from_capture(window);
-    // Make the overlay the key window so macOS routes wheel events to its
-    // WKWebView instead of the application underneath it. Without this the
-    // transparent overlay may never see the user's scroll gestures.
+    // Stay visible, but leave the hit test to the window underneath so a
+    // trackpad gesture scrolls that window directly. Re-injecting the gesture
+    // as a few mouse-wheel lines was both late and coarse.
     let Some(ns_window) = ns_window(window) else {
         return Ok(());
     };
     unsafe {
-        let _: () = msg_send![ns_window, makeKeyAndOrderFront: std::ptr::null::<Object>()];
-        let _: () = msg_send![ns_window, setAcceptsMouseMovedEvents: YES];
+        let number: isize = msg_send![ns_window, windowNumber];
+        if number > 0 {
+            SCROLL_OVERLAY_WINDOW.store(number as u32, Ordering::SeqCst);
+        }
+        let _: () = msg_send![ns_window, orderFrontRegardless];
+        let _: () = msg_send![ns_window, setIgnoresMouseEvents: YES];
+        let _: () = msg_send![ns_window, setHidesOnDeactivate: NO];
     }
-    let _ = window.set_focus();
     Ok(())
 }
-
-/// Tracks whether the overlay is currently ordered out for scroll forwarding,
-/// and the timestamp of the most recent forwarded scroll. While the user keeps
-/// scrolling the overlay stays hidden (no flicker); a background watcher
-/// restores it once scrolling has been quiet for a moment.
-static OVERLAY_HIDDEN: AtomicBool = AtomicBool::new(false);
-static LAST_SCROLL_MS: AtomicU64 = AtomicU64::new(0);
 
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
@@ -234,107 +238,280 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// Forward the overlay's wheel gesture to the application underneath it. The
-/// caller runs on the main thread.
+/// Replay a wheel gesture the overlay swallowed (pointer over the toolbar).
+/// The selection itself is click-through, so this is not on the path that
+/// scrolls the page during a normal long capture.
 ///
-/// `center_x`/`center_y` are the selection center in global display *points*.
-/// A scroll event created by `CGEventCreateScrollWheelEvent2` carries no
-/// location (defaults to (0,0)), so posting it would route it to the menu bar.
-/// We stamp the point-space location onto the event and inject it at the HID
-/// tap so the WindowServer delivers it to whatever window is under that point.
-///
-/// To guarantee the injected event never lands back on our own overlay (which
-/// would re-enter the frontend wheel handler and create a feedback loop of
-/// ever-growing synthetic deltas), the overlay is ordered out while the user
-/// is actively scrolling. While it is ordered out the WindowServer hit-tests
-/// straight through to the application underneath. A background watcher brings
-/// it back once scrolling has been quiet for 150ms, so a scroll burst causes
-/// a single hide/show transition instead of one per wheel tick.
+/// The delta is in CSS pixels, the same unit as a DOM `wheel` event, and is
+/// posted as a continuous pixel scroll to the process under the pointer.
+/// Posting at the HID tap while our window is still hit-testable feeds the
+/// event back into the page and multiplies the delta.
 pub fn forward_scroll(
-    window: &tauri::Window,
+    _window: &tauri::Window,
     delta_y: i32,
     _center_x: f64,
     _center_y: f64,
 ) -> Result<(), String> {
+    if delta_y == 0 {
+        return Ok(());
+    }
+    let now = now_ms();
+    if now < SUPPRESS_FORWARD_UNTIL_MS.load(Ordering::SeqCst) {
+        return Ok(());
+    }
     if !macos_accessibility_client::accessibility::application_is_trusted() {
         return Err("long_screenshot.accessibility".into());
     }
-    crate::image_io::diag_log(
-        "forward_enter",
-        &format!("delta={delta_y} at current pointer"),
-    );
     let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState)
         .map_err(|_| "scroll event source".to_string())?;
-    // Keep the user's pointer as the event location. Do not teleport the
-    // pointer to the selection center: the selection may be in screenshot
-    // pixels while the WindowServer expects screen points, and injecting an
-    // off-screen location makes scrolling appear broken and causes the
-    // pointer to jump. The user is already pointing at the content to scroll.
     let pointer = CGEvent::new(source.clone())
         .map_err(|_| "mouse event".to_string())?
         .location();
-    // The line event direction is aligned with the DOM delta used by the
-    // frontend so a downward gesture produces a downward capture sequence.
-    // Line-based events are handled consistently by browsers and native
-    // scroll views. Pixel/continuous events are frequently coalesced or
-    // ignored when injected through the HID tap, which leaves the captured
-    // frames unchanged until the user swipes very hard.
-    let event = CGEvent::new_scroll_event(
-        source,
-        ScrollEventUnit::LINE,
-        1,
-        delta_y,
-        0,
-        0,
-    )
-    .map_err(|_| "create scroll event".to_string())?;
+    let event = CGEvent::new_scroll_event(source, ScrollEventUnit::PIXEL, 1, delta_y, 0, 0)
+        .map_err(|_| "create scroll event".to_string())?;
+    event.set_integer_value_field(EventField::SCROLL_WHEEL_EVENT_IS_CONTINUOUS, 1);
+    event.set_integer_value_field(
+        EventField::SCROLL_WHEEL_EVENT_POINT_DELTA_AXIS_1,
+        i64::from(delta_y),
+    );
+    event.set_double_value_field(
+        EventField::SCROLL_WHEEL_EVENT_FIXED_POINT_DELTA_AXIS_1,
+        f64::from(delta_y),
+    );
     unsafe {
         CGEventSetLocation(event.as_ptr(), pointer);
     }
-
-    // Keep the overlay hidden while scrolling is active; the watcher thread
-    // below restores it after the burst ends.
-    LAST_SCROLL_MS.store(now_ms(), Ordering::SeqCst);
-    if !OVERLAY_HIDDEN.swap(true, Ordering::SeqCst) {
-        if let Some(ns_window) = ns_window(window) {
-            unsafe {
-                let _: () = msg_send![ns_window, orderOut: std::ptr::null::<Object>()];
-            }
+    let skip = SCROLL_OVERLAY_WINDOW.load(Ordering::SeqCst);
+    if let Some(pid) = pid_under_point(pointer, skip) {
+        unsafe {
+            CGEventPostToPid(pid, event.as_ptr());
         }
+    } else {
+        // No target process: post into the session and ignore the echo.
+        SUPPRESS_FORWARD_UNTIL_MS.store(now.saturating_add(40), Ordering::SeqCst);
+        event.post(CGEventTapLocation::Session);
     }
-    event.post(CGEventTapLocation::HID);
-
-    let watcher = window.clone();
-    std::thread::spawn(move || loop {
-        std::thread::sleep(std::time::Duration::from_millis(60));
-        let last = LAST_SCROLL_MS.load(Ordering::SeqCst);
-        if now_ms().saturating_sub(last) < QUIET_RESTORE_MS {
-            continue;
-        }
-        let restore_window = watcher.clone();
-        let _ = watcher.run_on_main_thread(move || {
-            if OVERLAY_HIDDEN.swap(false, Ordering::SeqCst) {
-                if let Some(ns_window) = ns_window(&restore_window) {
-                    unsafe {
-                        let _: () =
-                            msg_send![ns_window, makeKeyAndOrderFront: std::ptr::null::<Object>()];
-                    }
-                }
-            }
-        });
-        break;
-    });
-    crate::image_io::diag_log("forward_posted", &format!("delta={delta_y}"));
-    info!("forwarded scroll delta={delta_y} at pointer {:.0},{:.0}", pointer.x, pointer.y);
+    info!(
+        "forwarded scroll delta={delta_y} at pointer {:.0},{:.0}",
+        pointer.x, pointer.y
+    );
     Ok(())
 }
 
-const QUIET_RESTORE_MS: u64 = 150;
+fn pid_under_point(point: CGPoint, skip_window: u32) -> Option<i32> {
+    use std::ffi::CString;
+    use std::os::raw::{c_char, c_void};
+
+    #[link(name = "CoreFoundation", kind = "framework")]
+    extern "C" {
+        fn CFArrayGetCount(array: *const c_void) -> isize;
+        fn CFArrayGetValueAtIndex(array: *const c_void, index: isize) -> *const c_void;
+        fn CFDictionaryGetValue(dict: *const c_void, key: *const c_void) -> *const c_void;
+        fn CFRelease(cf: *const c_void);
+        fn CFStringCreateWithCString(
+            alloc: *const c_void,
+            c_str: *const c_char,
+            encoding: u32,
+        ) -> *const c_void;
+        fn CFNumberGetValue(number: *const c_void, the_type: i32, value: *mut c_void) -> u8;
+    }
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGWindowListCopyWindowInfo(option: u32, relative: u32) -> *const c_void;
+        static kCGWindowOwnerPID: *const c_void;
+        static kCGWindowNumber: *const c_void;
+        static kCGWindowBounds: *const c_void;
+    }
+
+    const UTF8: u32 = 0x0800_0100;
+    const SINT32: i32 = 3;
+    const SINT64: i32 = 4;
+    const FLOAT64: i32 = 6;
+    let our_pid = i64::from(std::process::id());
+
+    unsafe {
+        let cf_key = |name: &str| {
+            let c_string = CString::new(name).unwrap_or_else(|_| CString::new("").unwrap());
+            CFStringCreateWithCString(std::ptr::null(), c_string.as_ptr(), UTF8)
+        };
+        let cf_f64 = |dict: *const c_void, key: *const c_void| {
+            let number = CFDictionaryGetValue(dict, key);
+            if number.is_null() {
+                return 0.0;
+            }
+            let mut value = 0.0f64;
+            CFNumberGetValue(number, FLOAT64, &mut value as *mut f64 as *mut c_void);
+            value
+        };
+        let cf_i64 = |dict: *const c_void, key: *const c_void| {
+            let number = CFDictionaryGetValue(dict, key);
+            if number.is_null() {
+                return 0;
+            }
+            let mut value = 0i64;
+            if CFNumberGetValue(number, SINT64, &mut value as *mut i64 as *mut c_void) == 0 {
+                let mut value32 = 0i32;
+                CFNumberGetValue(number, SINT32, &mut value32 as *mut i32 as *mut c_void);
+                return i64::from(value32);
+            }
+            value
+        };
+        // kCGWindowListOptionOnScreenOnly. Front to back.
+        let array = CGWindowListCopyWindowInfo(1, 0);
+        if array.is_null() {
+            return None;
+        }
+        let x_key = cf_key("X");
+        let y_key = cf_key("Y");
+        let w_key = cf_key("Width");
+        let h_key = cf_key("Height");
+        let mut found = None;
+        let count = CFArrayGetCount(array);
+        for index in 0..count {
+            let dict = CFArrayGetValueAtIndex(array, index);
+            if dict.is_null() {
+                continue;
+            }
+            let window_number = cf_i64(dict, kCGWindowNumber);
+            if window_number <= 0 || window_number as u32 == skip_window {
+                continue;
+            }
+            let bounds = CFDictionaryGetValue(dict, kCGWindowBounds);
+            if bounds.is_null() {
+                continue;
+            }
+            let x = cf_f64(bounds, x_key);
+            let y = cf_f64(bounds, y_key);
+            let width = cf_f64(bounds, w_key);
+            let height = cf_f64(bounds, h_key);
+            let inside =
+                point.x >= x && point.y >= y && point.x < x + width && point.y < y + height;
+            if !inside {
+                continue;
+            }
+            let pid = cf_i64(dict, kCGWindowOwnerPID);
+            // Never post back into this process. That echo is what made a
+            // small trackpad tick turn into a runaway scroll.
+            if pid > 0 && pid != our_pid {
+                found = Some(pid as i32);
+                break;
+            }
+        }
+        CFRelease(x_key);
+        CFRelease(y_key);
+        CFRelease(w_key);
+        CFRelease(h_key);
+        CFRelease(array);
+        found
+    }
+}
 
 extern "C" {
     fn CGEventSetLocation(event: core_graphics::sys::CGEventRef, location: CGPoint);
+    fn CGEventPostToPid(pid: i32, event: core_graphics::sys::CGEventRef);
     fn CGDisplayPixelsWide(display: u32) -> usize;
     fn CGDisplayPixelsHigh(display: u32) -> usize;
+}
+
+/// Capture the fixed selection without a PNG round trip. The image is the
+/// display below the overlay when that grab has the same pixel size as the
+/// frozen screenshot; otherwise the full display image is cropped the same way.
+pub fn capture_region_rgba(
+    display_id: u32,
+    full_width: u32,
+    full_height: u32,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+) -> Result<RgbaImage, String> {
+    if let Some(image) = capture_below_overlay(display_id) {
+        if image.width() as u32 == full_width && image.height() as u32 == full_height {
+            if let Ok(region) = crop_cgimage(&image, x, y, width, height) {
+                return Ok(region);
+            }
+        }
+    }
+    let image = CGDisplay::new(display_id)
+        .image()
+        .ok_or_else(|| "CGDisplayCreateImage returned nothing".to_string())?;
+    if image.width() as u32 != full_width || image.height() as u32 != full_height {
+        return Err("size_changed".into());
+    }
+    crop_cgimage(&image, x, y, width, height)
+}
+
+fn capture_below_overlay(display_id: u32) -> Option<CGImage> {
+    use core_graphics::display::{
+        kCGWindowImageBestResolution, kCGWindowImageBoundsIgnoreFraming,
+        kCGWindowListOptionOnScreenBelowWindow,
+    };
+    let window_id = SCROLL_OVERLAY_WINDOW.load(Ordering::SeqCst);
+    if window_id == 0 {
+        return None;
+    }
+    let bounds = CGDisplay::new(display_id).bounds();
+    CGDisplay::screenshot(
+        bounds,
+        kCGWindowListOptionOnScreenBelowWindow,
+        window_id,
+        kCGWindowImageBoundsIgnoreFraming | kCGWindowImageBestResolution,
+    )
+}
+
+fn crop_cgimage(
+    image: &CGImage,
+    x: u32,
+    y: u32,
+    width: u32,
+    height: u32,
+) -> Result<RgbaImage, String> {
+    let full_w = image.width() as u32;
+    let full_h = image.height() as u32;
+    if width == 0
+        || height == 0
+        || x.saturating_add(width) > full_w
+        || y.saturating_add(height) > full_h
+    {
+        return Err("selected region is outside the captured screen".into());
+    }
+    let rect = CGRect::new(
+        &CGPoint::new(f64::from(x), f64::from(y)),
+        &CGSize::new(f64::from(width), f64::from(height)),
+    );
+    let cropped = image
+        .cropped(rect)
+        .ok_or_else(|| "crop capture".to_string())?;
+    cgimage_to_rgba(&cropped)
+}
+
+fn cgimage_to_rgba(image: &CGImage) -> Result<RgbaImage, String> {
+    if image.bits_per_pixel() != 32 {
+        return Err(format!("unexpected {} bpp", image.bits_per_pixel()));
+    }
+    let width = image.width() as u32;
+    let height = image.height() as u32;
+    if width == 0 || height == 0 {
+        return Err("empty display image".into());
+    }
+    let row = image.bytes_per_row();
+    let bgra = image.data();
+    let src = bgra.bytes();
+    let mut rgba = vec![0u8; (width as usize) * (height as usize) * 4];
+    for y in 0..height as usize {
+        for x in 0..width as usize {
+            let i = y * row + x * 4;
+            let o = (y * width as usize + x) * 4;
+            if i + 3 >= src.len() {
+                return Err("display image buffer is short".into());
+            }
+            rgba[o] = src[i + 2];
+            rgba[o + 1] = src[i + 1];
+            rgba[o + 2] = src[i];
+            rgba[o + 3] = 255;
+        }
+    }
+    RgbaImage::from_raw(width, height, rgba).ok_or_else(|| "rgba buffer".to_string())
 }
 
 fn ns_window(window: &tauri::Window) -> Option<*mut Object> {
@@ -441,7 +618,10 @@ fn capture_display_image(id: u32, path: &Path) -> Result<(), String> {
     }
     let width = image.width() as u32;
     let height = image.height() as u32;
-    crate::image_io::diag_log("capture_display_image", &format!("CGDisplayCreateImage => {width}x{height}"));
+    crate::image_io::diag_log(
+        "capture_display_image",
+        &format!("CGDisplayCreateImage => {width}x{height}"),
+    );
     if width == 0 || height == 0 {
         return Err("empty display image".into());
     }
@@ -495,21 +675,14 @@ fn capture_with_screencapture(target: &DisplayTarget, path: &Path) -> Result<(),
         let _ = std::fs::remove_file(path);
         return Err("screencapture image is black".into());
     }
-    info!(
-        "screencapture wrote {}x{}",
-        rgba.width(),
-        rgba.height()
-    );
+    info!("screencapture wrote {}x{}", rgba.width(), rgba.height());
     Ok(())
 }
 
 fn screen_recording_allowed() -> bool {
     unsafe {
         let symbol = b"CGPreflightScreenCaptureAccess\0";
-        let ptr = libc::dlsym(
-            libc::RTLD_DEFAULT,
-            symbol.as_ptr() as *const libc::c_char,
-        );
+        let ptr = libc::dlsym(libc::RTLD_DEFAULT, symbol.as_ptr() as *const libc::c_char);
         if ptr.is_null() {
             return true;
         }
@@ -521,10 +694,7 @@ fn screen_recording_allowed() -> bool {
 fn request_screen_recording() {
     unsafe {
         let symbol = b"CGRequestScreenCaptureAccess\0";
-        let ptr = libc::dlsym(
-            libc::RTLD_DEFAULT,
-            symbol.as_ptr() as *const libc::c_char,
-        );
+        let ptr = libc::dlsym(libc::RTLD_DEFAULT, symbol.as_ptr() as *const libc::c_char);
         if ptr.is_null() {
             return;
         }

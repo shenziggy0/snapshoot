@@ -3497,6 +3497,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "long-stitch"
+version = "0.0.0"
+dependencies = [
+ "image 0.25.4",
+]
+
+[[package]]
 name = "loom"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5774,6 +5781,7 @@ dependencies = [
  "libc",
  "lingua",
  "log",
+ "long-stitch",
  "macos-accessibility-client",
  "mouse_position",
  "objc",
