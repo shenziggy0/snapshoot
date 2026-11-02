@@ -248,26 +248,17 @@
                 "github": "GitHub",
                 "feedback": "피드백",
                 "issue": "오류 제보",
-                "email": "이메일",
                 "community": "커뮤니티",
                 "check_update": "업데이트 확인",
                 "view_log": "로그 확인",
                 "view_config": "설정 확인",
-                "qq_channel": "QQ 채널",
-                "qq_group": "QQ 그룹",
-                "telegram": "텔레그램",
                 "discussion": "GitHub 토론"
             }
         },
         "updater": {
             "title": "업데이트 확인",
             "latest": "현재 최신 버전을 사용 중입니다",
-            "progress": "다운로드 진행",
-            "update": "업데이트",
-            "downloading": "다운로드 중…",
-            "installing": "설치 중…",
-            "cancel": "취소",
-            "installed": "설치가 완료되었습니다. 변경 사항을 적용하려면 애플리케이션을 종료 후 다시 시작하세요"
+            "cancel": "취소"
         }
     }
 }

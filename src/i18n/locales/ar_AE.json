@@ -202,27 +202,18 @@
                 "website": "موقع الوب",
                 "github": "جِت‌هَب",
                 "feedback": "انطباع",
-                "email": "البريد الالكتروني",
                 "community": "المجتمع",
                 "check_update": "تحقق من التحديث",
                 "view_log": "اعرض السجل",
-                "telegram": "تيليجرام",
                 "view_config": "اعرض التكوين",
-                "qq_channel": "قناة QQ",
-                "qq_group": "مجموعة QQ",
                 "discussion": "مناقشة جيتهب",
                 "issue": "ابلاغ المشكلة"
             }
         },
         "updater": {
-            "update": "حدث",
             "title": "تحقق من التحديث",
             "cancel": "إلغاء",
-            "latest": "## الإصدار الأحدث مثبت",
-            "progress": "تقدم التنزيل",
-            "downloading": "تنزيل…",
-            "installing": "تثبيت…",
-            "installed": "اكتمل التثبيت، أعد تشغيل التطبيق لتصبح التغييرات سارية المفعول"
+            "latest": "## الإصدار الأحدث مثبت"
         },
         "recognize": {
             "delete_space": "احذف المسافة",

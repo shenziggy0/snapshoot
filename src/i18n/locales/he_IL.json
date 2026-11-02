@@ -178,20 +178,16 @@
                 "login_success": "כניסה הושלמה"
             },
             "about": {
-                "email": "דוא\"ל",
                 "title": "אודות התוכנה",
                 "community": "קהילה",
                 "check_update": "חפש עדכונים",
                 "view_log": "הצג יומן רישום",
                 "view_config": "הצג תצורה",
-                "telegram": "Telegram",
                 "discussion": "דיון Github",
                 "github": "GitHub",
                 "label": "אודות",
                 "website": "אתר האינטרנט",
                 "feedback": "משוב",
-                "qq_channel": "ערוץ QQ",
-                "qq_group": "קבוצת QQ",
                 "issue": "גיליון"
             },
             "recognize": {
@@ -208,13 +204,8 @@
             }
         },
         "updater": {
-            "installed": "ההתקנה הושלמה, הפעל מחדש את האפליקציה כדי שהשינויים ייכנסו לתוקף",
             "title": "חפש עדכונים",
             "latest": "## הגרסה האחרונה מותקנת",
-            "progress": "התקדמות הורדה",
-            "downloading": "מוריד…",
-            "update": "עדכן",
-            "installing": "מתקין…",
             "cancel": "ביטול"
         },
         "services": {

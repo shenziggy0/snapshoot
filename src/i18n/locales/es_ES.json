@@ -188,21 +188,13 @@
                 "feedback": "Comentarios",
                 "community": "Comunidad",
                 "check_update": "Comprobar actualizaciones",
-                "issue": "Incidencia",
-                "email": "Correo electrónico",
-                "qq_channel": "Canal de QQ",
-                "telegram": "Telegram",
-                "qq_group": "Grupo de QQ"
+                "issue": "Incidencia"
             }
         },
         "updater": {
-            "update": "Actualizar",
-            "installing": "Instalando…",
             "cancel": "Cancelar",
             "latest": "## La última versión está instalada",
-            "title": "Comprobar actualizaciones",
-            "progress": "Progreso de descarga",
-            "downloading": "Descargando…"
+            "title": "Comprobar actualizaciones"
         },
         "services": {
             "no_need": "No requiere configuración",

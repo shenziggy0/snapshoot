@@ -6,16 +6,15 @@ name: Package
 #   - macOS Apple silicon dmg (aarch64-apple-darwin)
 #   - macOS Intel dmg (x86_64-apple-darwin)
 # No release is published here and no updater signature is generated.
-# The tag you trigger from should be v1.0.0; the leading 'v' is stripped,
-# so the built version is 1.0.0.
-# Permissions are minimal: contents read, plus actions write only so
-# upload-artifact / download-artifact can move the three installers.
-# contents: read alone would make the artifact upload fail.
+# The version comes from the nearest v* tag (e.g. v1.0.0 -> 1.0.0). Tags
+# inherited from upstream Pot (3.0.x, updater) are ignored; the build fails
+# when no v* tag is reachable instead of guessing a version.
+# Artifact upload/download uses the runner's own token, so contents: read
+# is the only permission needed.
 on:
     workflow_dispatch:
 permissions:
     contents: read
-    actions: write
 
 jobs:
     change-version:
@@ -33,14 +32,18 @@ jobs:
                   sudo apt-get install -y git
             - id: outputstep
               run: |
-                  TAG=$(git describe --tags 2>/dev/null || echo "1.0.0")
-                  VERSION=$(echo "$TAG" | sed 's/^v//; s/-[0-9]*-.*//g')
+                  TAG=$(git describe --tags --match 'v*')
+                  VERSION=$(echo "$TAG" | sed 's/^v//; s/-[0-9]*-g[0-9a-f]*$//')
+                  if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+                      echo "Invalid version '$VERSION' from tag '$TAG'" >&2
+                      exit 1
+                  fi
                   echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
                   echo "$VERSION"
             - name: Change Version
+              env:
+                  VERSION: ${{ steps.outputstep.outputs.VERSION }}
               run: |
-                  TAG=$(git describe --tags 2>/dev/null || echo "1.0.0")
-                  VERSION=$(echo "$TAG" | sed 's/^v//; s/-[0-9]*-.*//g')
                   sed -i "s/\"version\":.*/\"version\": \"$VERSION\",/g" package.json
                   sed -i "s/\"version\":.*/\"version\": \"$VERSION\"/g" src-tauri/tauri.conf.json
                   sed -i "s/^version = .*/version = \"$VERSION\"/" src-tauri/Cargo.toml

@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"grep -av TRACE 'C:\\\\Users\\\\ADMINI~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--workspace-Snapshoot\\\\1cec5ba7-4275-4a59-bcde-77aac6c65b0c\\\\tasks\\\\bm8wf4a21.output' | grep -av DEBUG | tail -8; taskli...",
+  "error": "Exit code 1\n[2026-11-02][05:32:27][INFO][snapshoot::window] Mouse position: -71, 66\n[2026-11-02][05:32:27][INFO][snapshoot::window] Current Monitor: Monitor { name: Some(\"\\\\\\\\.\\\\DISPLAY2\"), size: PhysicalSize { width: 1920, height: 1080 }, position: PhysicalPosition { x: -1920, y: 0 }, scale_factor: 1.0 }\n[2026-11-02][05:32:27][INFO][snapshoot::window] Window not existence, Creating new window: updater\n[2026-11-02][05:32:29][INFO][webview::unknown] Focus\n[2026-11-02][05:33:07][INFO][snapshoot::t...",
+  "timestamp": "2026-11-02T05:33:15.980Z",
+  "retry_count": 1
+}

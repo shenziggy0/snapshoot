@@ -420,19 +420,15 @@
             },
             "about": {
                 "title": "Sobre a Aplicação",
-                "qq_group": "Grupo QQ",
                 "website": "Website",
                 "check_update": "Procurar Atualização",
-                "telegram": "Telegram",
                 "feedback": "Realimentação",
                 "label": "Sobre",
                 "view_config": "Exibir Configuração",
                 "issue": "Problemas",
                 "community": "Comunidade",
-                "email": "Email",
                 "github": "GitHub",
                 "discussion": "Discussão no GitHub",
-                "qq_channel": "Canal no QQ",
                 "view_log": "Exibir Registro"
             },
             "history": {
@@ -451,14 +447,9 @@
             "speak": "Falar"
         },
         "updater": {
-            "installed": "Instalação concluída, reinicie a aplicação para que as alterações entrem em vigor",
-            "downloading": "A descarregar…",
-            "update": "Atualizar",
-            "progress": "Progresso da Descarga",
             "latest": "## A versão mais recente está instalada",
             "cancel": "Cancelar",
-            "title": "Procurar Atualização",
-            "installing": "A Instalar…"
+            "title": "Procurar Atualização"
         },
         "recognize": {
             "translate": "Traduzir",

@@ -1,0 +1,238 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1793597162670,
+  "projectRoot": "D:\\workspace\\Snapshoot\\snapshoot",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "react",
+        "version": "18.3.1",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "18.3.1",
+        "category": "frontend"
+      },
+      {
+        "name": "vite",
+        "version": "5.4.10",
+        "category": "build"
+      }
+    ],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "pnpm build",
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": "pnpm dev",
+    "scripts": {
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview",
+      "tauri": "tauri"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "public",
+      "scripts",
+      "src"
+    ],
+    "gitBranches": {
+      "defaultBranch": "master",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "asset": {
+      "path": "asset",
+      "purpose": null,
+      "fileCount": 10,
+      "lastAccessed": 1793597162631,
+      "keyFiles": [
+        "1.png",
+        "2.png",
+        "3.png",
+        "eg1.gif",
+        "eg2.gif"
+      ]
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 6,
+      "lastAccessed": 1793597162631,
+      "keyFiles": [
+        "daemon.html",
+        "icon.png",
+        "icon.svg",
+        "index.html",
+        "tesseract-core-simd-lstm.wasm.js"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 0,
+      "lastAccessed": 1793597162640,
+      "keyFiles": []
+    },
+    "patches": {
+      "path": "patches",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1793597162641,
+      "keyFiles": [
+        "hyprland.patch"
+      ]
+    },
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 4,
+      "lastAccessed": 1793597162641,
+      "keyFiles": [
+        "icon.png",
+        "icon.svg",
+        "tesseract-core-simd-lstm.wasm.js",
+        "worker.min.js"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 1,
+      "lastAccessed": 1793597162642,
+      "keyFiles": [
+        "smoke_check.py"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 3,
+      "lastAccessed": 1793597162642,
+      "keyFiles": [
+        "App.jsx",
+        "main.jsx",
+        "style.css"
+      ]
+    },
+    "src-tauri": {
+      "path": "src-tauri",
+      "purpose": null,
+      "fileCount": 11,
+      "lastAccessed": 1793597162643,
+      "keyFiles": [
+        "build.rs",
+        "Cargo.lock",
+        "Cargo.toml",
+        "tauri.conf.json",
+        "tauri.linux.conf.json"
+      ]
+    },
+    "dist\\assets": {
+      "path": "dist\\assets",
+      "purpose": "Static assets",
+      "fileCount": 144,
+      "lastAccessed": 1793597162645,
+      "keyFiles": [
+        "ad-BOo-tPI4.svg",
+        "ad-CDtWnnSA.svg",
+        "af-Cc32fsDB.svg"
+      ]
+    },
+    "src\\components": {
+      "path": "src\\components",
+      "purpose": "UI components",
+      "fileCount": 0,
+      "lastAccessed": 1793597162647,
+      "keyFiles": []
+    },
+    "src\\services": {
+      "path": "src\\services",
+      "purpose": "Business logic services",
+      "fileCount": 0,
+      "lastAccessed": 1793597162647,
+      "keyFiles": []
+    },
+    "src\\utils": {
+      "path": "src\\utils",
+      "purpose": "Utility functions",
+      "fileCount": 8,
+      "lastAccessed": 1793597162648,
+      "keyFiles": [
+        "env.js",
+        "index.js",
+        "invoke_plugin.js"
+      ]
+    },
+    "src-tauri\\src": {
+      "path": "src-tauri\\src",
+      "purpose": "Source code",
+      "fileCount": 21,
+      "lastAccessed": 1793597162649,
+      "keyFiles": [
+        "annotate.rs",
+        "backup.rs",
+        "capture_macos.rs"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src-tauri\\tauri.conf.json",
+      "accessCount": 1,
+      "lastAccessed": 1793597173429,
+      "type": "directory"
+    },
+    {
+      "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\claude\\D--workspace-Snapshoot\\1cec5ba7-4275-4a59-bcde-77aac6c65b0c\\scratchpad\\updater.png",
+      "accessCount": 1,
+      "lastAccessed": 1793597405829,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\claude\\D--workspace-Snapshoot\\1cec5ba7-4275-4a59-bcde-77aac6c65b0c\\scratchpad\\screen.png",
+      "accessCount": 1,
+      "lastAccessed": 1793597458655,
+      "type": "file"
+    },
+    {
+      "path": "src\\window\\Updater\\index.jsx",
+      "accessCount": 1,
+      "lastAccessed": 1793597509701,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\claude\\D--workspace-Snapshoot\\1cec5ba7-4275-4a59-bcde-77aac6c65b0c\\scratchpad\\screen2.png",
+      "accessCount": 1,
+      "lastAccessed": 1793597860590,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

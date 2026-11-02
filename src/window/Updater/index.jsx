@@ -1,58 +1,47 @@
-import { Code, Card, CardBody, Button, Progress, Skeleton } from '@nextui-org/react';
-import { checkUpdate, installUpdate } from '@tauri-apps/api/updater';
+import { Code, Card, CardBody, Button, Skeleton } from '@nextui-org/react';
 import React, { useEffect, useState } from 'react';
 import { appWindow } from '@tauri-apps/api/window';
-import { relaunch } from '@tauri-apps/api/process';
-import toast, { Toaster } from 'react-hot-toast';
+import { invoke } from '@tauri-apps/api/tauri';
+import { open } from '@tauri-apps/api/shell';
 import { useTranslation } from 'react-i18next';
-import { listen } from '@tauri-apps/api/event';
 import ReactMarkdown from 'react-markdown';
 
-import { useConfig, useToastStyle } from '../../hooks';
+import { useConfig } from '../../hooks';
 import { osType } from '../../utils/env';
 
-let unlisten = 0;
-let eventId = 0;
+const RELEASES_PAGE = 'https://github.com/shenziggy0/snapshoot/releases';
 
+// Snapshoot only tells the user about a new release and opens the installer
+// download; installers are unsigned, so nothing is installed automatically.
 export default function Updater() {
     const [transparent] = useConfig('transparent', true);
-    const [downloaded, setDownloaded] = useState(0);
-    const [total, setTotal] = useState(0);
-    const [body, setBody] = useState('');
+    const [release, setRelease] = useState(null);
+    const [error, setError] = useState('');
     const { t } = useTranslation();
-    const toastStyle = useToastStyle();
 
     useEffect(() => {
         if (appWindow.label === 'updater') {
             appWindow.show();
         }
-        checkUpdate().then(
-            (update) => {
-                if (update.shouldUpdate) {
-                    setBody(update.manifest.body);
-                } else {
-                    setBody(t('updater.latest'));
-                }
-            },
-            (e) => {
-                setBody(e.toString());
-                toast.error(e.toString(), { style: toastStyle });
-            }
-        );
-        if (unlisten === 0) {
-            unlisten = listen('tauri://update-download-progress', (e) => {
-                if (eventId === 0) {
-                    eventId = e.id;
-                }
-                if (e.id === eventId) {
-                    setTotal(e.payload.contentLength);
-                    setDownloaded((a) => {
-                        return a + e.payload.chunkLength;
-                    });
-                }
-            });
-        }
+        invoke('check_latest_release').then(setRelease, (e) => {
+            setError(e.toString());
+        });
     }, []);
+
+    let body = '';
+    if (error !== '') {
+        body = `${t('updater.failed')}\n\n${error}`;
+    } else if (release !== null) {
+        body = release.has_update
+            ? `${t('updater.new_version', { version: release.latest })}\n\n${release.notes}`
+            : t('updater.latest');
+    }
+    let downloadUrl = null;
+    if (error !== '') {
+        downloadUrl = RELEASES_PAGE;
+    } else if (release !== null && release.has_update) {
+        downloadUrl = release.download_url ?? release.page_url;
+    }
 
     return (
         <div
@@ -60,7 +49,6 @@ export default function Updater() {
                 osType === 'Linux' && 'rounded-[10px] border-1 border-default-100'
             }`}
         >
-            <Toaster />
             <div className='p-[5px] h-[35px] w-full select-none cursor-default'>
                 <div
                     data-tauri-drag-region='true'
@@ -132,46 +120,16 @@ export default function Updater() {
                     )}
                 </CardBody>
             </Card>
-            {downloaded !== 0 && (
-                <Progress
-                    aria-label='Downloading...'
-                    label={t('updater.progress')}
-                    value={(downloaded / total) * 100}
-                    classNames={{
-                        base: 'w-full px-[80px]',
-                        track: 'drop-shadow-md border border-default',
-                        indicator: 'bg-gradient-to-r from-pink-500 to-yellow-500',
-                        label: 'tracking-wider font-medium text-default-600',
-                        value: 'text-foreground/60',
-                    }}
-                    showValueLabel
-                    size='sm'
-                />
-            )}
-
             <div className='grid gap-4 grid-cols-2 h-[50px] my-[10px] mx-[80px]'>
                 <Button
                     variant='flat'
-                    isLoading={downloaded !== 0}
-                    isDisabled={downloaded !== 0}
+                    isDisabled={downloadUrl === null}
                     color='primary'
                     onPress={() => {
-                        installUpdate().then(
-                            () => {
-                                toast.success(t('updater.installed'), { style: toastStyle, duration: 10000 });
-                                relaunch();
-                            },
-                            (e) => {
-                                toast.error(e.toString(), { style: toastStyle });
-                            }
-                        );
+                        open(downloadUrl);
                     }}
                 >
-                    {downloaded !== 0
-                        ? downloaded > total
-                            ? t('updater.installing')
-                            : t('updater.downloading')
-                        : t('updater.update')}
+                    {t('updater.download')}
                 </Button>
                 <Button
                     variant='flat'

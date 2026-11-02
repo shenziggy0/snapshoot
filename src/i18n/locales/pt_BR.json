@@ -203,26 +203,17 @@
                 "github": "GitHub",
                 "feedback": "Realimentação",
                 "issue": "Problemas",
-                "email": "Email",
                 "community": "Comunidade",
                 "check_update": "Checar por Atualização",
                 "view_log": "Exibir Registro",
                 "view_config": "Exibir Configuração",
-                "qq_channel": "Canal no QQ",
-                "qq_group": "Grupo QQ",
-                "telegram": "Telegram",
                 "discussion": "Discussão no GitHub"
             }
         },
         "updater": {
             "title": "Checar por Atualização",
             "latest": "## A versão mais recente está instalada",
-            "progress": "Progresso do Download",
-            "update": "Atualizar",
-            "downloading": "Baixando…",
-            "installing": "Instalando…",
-            "cancel": "Cancelar",
-            "installed": "Instalação concluída, reinicie o aplicativo para que as alterações entrem em vigor"
+            "cancel": "Cancelar"
         },
         "services": {
             "help": "Guia de Configuração",

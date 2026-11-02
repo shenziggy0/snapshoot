@@ -203,26 +203,17 @@
                 "github": "GitHub",
                 "feedback": "Обратная связь",
                 "issue": "Проблема",
-                "email": "Эл. почта",
                 "community": "Сообщество",
                 "check_update": "Обновление",
                 "view_log": "Журнал",
                 "view_config": "Конфигурация",
-                "qq_channel": "QQ канал",
-                "qq_group": "QQ группа",
-                "telegram": "Telegram",
                 "discussion": "Обсуждение на GitHub"
             }
         },
         "updater": {
             "title": "Проверка обновления",
             "latest": "## Установлена последняя версия",
-            "progress": "Прогресс загрузки",
-            "update": "Обновить",
-            "downloading": "Загрузка…",
-            "installing": "Установка…",
-            "cancel": "Отмена",
-            "installed": "Установка завершена, перезапустите приложение, чтобы изменения вступили в силу"
+            "cancel": "Отмена"
         },
         "services": {
             "help": "Руководство по настройке",

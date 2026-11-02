@@ -28,3 +28,6 @@ smoke-artifacts
 .env.*
 *.pem
 *.key
+
+# 个人学习清单
+ik.md

@@ -248,11 +248,9 @@ export default function Backup() {
                     </div>
                 </div>
                 <div className={`config-item ${backupType !== 'aliyun' ? 'hidden' : ''}`}>
-                    <p style={{ color: '#e67e22' }}>
-                        注意：阿里云盘登录换 token 时会经过上游 Pot 的服务器 pot-app.com/api/ali_access_token，不是 Snapshoot 自己的服务器。扫码登录即表示你接受这一点。默认备份方式是 WebDAV，不是阿里云盘。
-                    </p>
+                    <p style={{ color: '#e67e22' }}>{t('config.backup.aliyun_notice')}</p>
                 </div>
-                <div className={`flex justify-center ${backupType !== 'aliyun' ? 'hidden' : ''}`}> 
+                <div className={`flex justify-center ${backupType !== 'aliyun' ? 'hidden' : ''}`}>
                     <img
                         src={aliyunQrCodeUrl}
                         className={`h-[200px] mb-2 ${aliyunQrCodeUrl === '' ? 'hidden' : ''}`}

@@ -160,6 +160,7 @@ fn main() {
             register_shortcut_by_frontend,
             update_tray,
             updater_window,
+            updater::check_latest_release,
             screenshot::screenshot,
             screenshot::screenshot_intent,
             screenshot::read_capture_image,

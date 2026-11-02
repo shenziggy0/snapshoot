@@ -202,26 +202,17 @@
                 "github": "GitHub",
                 "feedback": "Feedback",
                 "issue": "Problem melden",
-                "email": "E-Mail",
                 "community": "Community-Forum",
                 "check_update": "Auf Updates prüfen",
                 "view_log": "Logdatei anzeigen",
                 "view_config": "Konfigurationsdatei anzeigen",
-                "qq_channel": "QQ Kanal",
-                "qq_group": "QQ Gruppe",
-                "telegram": "Telegram",
                 "discussion": "Diskussion auf GitHub"
             }
         },
         "updater": {
             "title": "Updates prüfen",
             "latest": "## Die neueste Version ist bereits installiert",
-            "progress": "Download-Fortschritt",
-            "update": "Aktualisieren",
-            "downloading": "Herunterladen...",
-            "installing": "Installieren...",
-            "cancel": "Abbrechen",
-            "installed": "Installation abgeschlossen, für Änderungen neu starten"
+            "cancel": "Abbrechen"
         },
         "services": {
             "help": "Konfigurationsanleitung",

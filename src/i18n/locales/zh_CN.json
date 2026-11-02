@@ -190,6 +190,7 @@
                 "password": "密码",
                 "logout": "退出登录",
                 "aliyun_login_first": "请先扫码登录",
+                "aliyun_notice": "注意：阿里云盘登录换 token 时会经过上游 Pot 的服务器 pot-app.com/api/ali_access_token，不是 Snapshoot 自己的服务器。扫码登录即表示你接受这一点。默认备份方式是 WebDAV，不是阿里云盘。",
                 "login_success": "登录成功",
                 "backup": "备份",
                 "restore": "恢复备份",
@@ -205,14 +206,10 @@
                 "github": "GitHub",
                 "feedback": "问题反馈",
                 "issue": "议题",
-                "email": "邮件",
                 "community": "社区交流",
                 "check_update": "检查更新",
                 "view_log": "查看日志",
                 "view_config": "查看配置文件",
-                "qq_channel": "QQ 频道",
-                "qq_group": "QQ 群",
-                "telegram": "Telegram",
                 "discussion": "Github 讨论",
                 "credit": "基于 Pot（pot-app/pot-desktop），GPL-3.0"
             }
@@ -220,16 +217,15 @@
         "updater": {
             "title": "检查更新",
             "latest": "## 已经是最新版本",
-            "progress": "下载进度",
-            "update": "更新",
-            "downloading": "下载中…",
-            "installing": "安装中…",
             "cancel": "取消",
-            "installed": "安装完成，重启应用生效"
+            "new_version": "## 发现新版本 {{version}}",
+            "download": "前往下载",
+            "failed": "## 检查更新失败"
         },
         "services": {
             "help": "配置指南",
             "no_need": "无需配置",
+            "upstream_notice": "注意：使用 {{name}} 会把文本发送到上游 Pot 的服务器 {{host}}，不是 Snapshoot 自己的服务器。启用即表示你接受这一点。",
             "instance_name": "配置名称",
             "translate": {
                 "deepl": {

@@ -190,6 +190,7 @@
                 "password": "Password",
                 "logout": "Logout",
                 "aliyun_login_first": "Please scan the code to log in first.",
+                "aliyun_notice": "Note: signing in to Aliyun Drive exchanges the token through the upstream Pot server pot-app.com/api/ali_access_token, not a Snapshoot server. Scanning the code means you accept this. The default backup type is WebDAV, not Aliyun Drive.",
                 "login_success": "Login Success",
                 "backup": "Backup",
                 "restore": "Restore",
@@ -205,14 +206,10 @@
                 "github": "GitHub",
                 "feedback": "Feedback",
                 "issue": "Issue",
-                "email": "Email",
                 "community": "Community",
                 "check_update": "Check Update",
                 "view_log": "View Log",
                 "view_config": "View Config",
-                "qq_channel": "QQ Channel",
-                "qq_group": "QQ Group",
-                "telegram": "Telegram",
                 "discussion": "Github Discussion",
                 "credit": "Based on Pot (pot-app/pot-desktop), GPL-3.0"
             }
@@ -220,16 +217,15 @@
         "updater": {
             "title": "Check Update",
             "latest": "## The latest version is installed",
-            "progress": "Download Progress",
-            "update": "Update",
-            "downloading": "Downloading…",
-            "installing": "Installing…",
             "cancel": "Cancel",
-            "installed": "Install completed, Restart the application for the changes to take effect"
+            "new_version": "## New version {{version}} available",
+            "download": "Download",
+            "failed": "## Failed to check for updates"
         },
         "services": {
             "help": "Configuration Guide",
             "no_need": "No configuration required",
+            "upstream_notice": "Note: {{name}} sends your text to the upstream Pot server {{host}}, not to a Snapshoot server. Enabling it means you accept this.",
             "instance_name": "Configuration Name",
             "translate": {
                 "deepl": {

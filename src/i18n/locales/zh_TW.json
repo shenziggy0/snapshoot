@@ -203,26 +203,17 @@
                 "github": "GitHub",
                 "feedback": "問題回饋",
                 "issue": "問題回報",
-                "email": "電子郵件",
                 "community": "社群交流",
                 "check_update": "檢查更新",
                 "view_log": "檢視記錄檔",
                 "view_config": "檢視設定",
-                "qq_channel": "QQ 頻道",
-                "qq_group": "QQ 群組",
-                "telegram": "Telegram",
                 "discussion": "Github 討論區"
             }
         },
         "updater": {
             "title": "檢查更新",
             "latest": "## 已安裝最新版本",
-            "progress": "下載進度",
-            "update": "更新",
-            "downloading": "下載中…",
-            "installing": "安裝中…",
-            "cancel": "取消",
-            "installed": "安裝完成，請重新啟動應用程式以使變更生效"
+            "cancel": "取消"
         },
         "services": {
             "help": "設定指南",
