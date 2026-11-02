@@ -12,6 +12,7 @@ import { drawShape } from '../Annotate/render';
 import { useToastStyle } from '../../hooks';
 import { useSystemDark } from '../useSystemDark';
 import CaptureToolbar from './Toolbar';
+import { placeToolbar } from './toolbarPlacement';
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
@@ -92,6 +93,7 @@ export default function Screenshot() {
     const canvasRef = useRef(null);
     const sampleRef = useRef(null);
     const loupeRef = useRef(null);
+    const toolbarRef = useRef(null);
     const imageRef = useRef(null);
     const selectionRef = useRef(null);
     const dragRef = useRef(null);
@@ -130,6 +132,7 @@ export default function Screenshot() {
     const [loadError, setLoadError] = useState('');
     const [cursor, setCursor] = useState({ x: 0, y: 0 });
     const [loupe, setLoupe] = useState(null);
+    const [toolbarSize, setToolbarSize] = useState({ w: 566, h: 72 });
 
     selectionRef.current = selection;
     hoverRef.current = hover;
@@ -795,18 +798,29 @@ export default function Screenshot() {
         return `${Math.max(1, Math.round(selection.w * scaleX))} × ${Math.max(1, Math.round(selection.h * scaleY))}`;
     };
 
-    const toolbarTop = () => {
-        if (!selection) {
-            return 0;
-        }
-        const below = selection.y + selection.h + 10;
-        if (below + 78 < window.innerHeight) {
-            return below;
-        }
-        return Math.max(8, selection.y - 78);
-    };
-
     const editing = Boolean(selection) && intentRef.current !== 'ocr' && intentRef.current !== 'translate';
+
+    useLayoutEffect(() => {
+        const toolbar = toolbarRef.current;
+        if (!editing || !toolbar) {
+            return undefined;
+        }
+        const measure = () => {
+            const w = toolbar.offsetWidth;
+            const h = toolbar.offsetHeight;
+            setToolbarSize((current) => current.w === w && current.h === h ? current : { w, h });
+        };
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(toolbar);
+        return () => observer.disconnect();
+    }, [editing]);
+
+    const toolbarPosition = selection ? placeToolbar({
+        selection,
+        size: { w: toolbarSize.w, h: Math.max(toolbarSize.h, 72) },
+        viewport: { w: window.innerWidth, h: window.innerHeight },
+    }) : undefined;
 
     useEffect(() => {
         if (!longCaptureActive) {
@@ -1032,13 +1046,10 @@ export default function Screenshot() {
             )}
             {selection && editing && (
                 <div
+                    ref={toolbarRef}
                     data-long-capture-hit=''
-                    className='absolute z-40'
-                    style={{
-                        left: clamp(selection.x + selection.w / 2, 180, window.innerWidth - 180),
-                        top: toolbarTop(),
-                        transform: 'translateX(-50%)',
-                    }}
+                    className='absolute z-40 w-max'
+                    style={toolbarPosition}
                 >
                     <CaptureToolbar
                         dark={dark}
