@@ -13,6 +13,11 @@ export default defineConfig(async () => ({
     server: {
         port: 1420,
         strictPort: true,
+        // cargo writes into src-tauri/target while vite starts; watching it
+        // crashes vite on Windows with EBUSY, and tauri watches Rust itself
+        watch: {
+            ignored: ['**/src-tauri/**'],
+        },
     },
     // to make use of `TAURI_DEBUG` and other env variables
     // https://tauri.studio/v1/api/config#buildconfig.beforedevcommand
