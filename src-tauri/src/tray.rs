@@ -27,7 +27,24 @@ pub(crate) fn set_recording(recording: bool) {
             Err(err) => log::warn!("record tray image: {err}"),
         }
     }
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    if let Some(app) = crate::APP.get() {
+        let bytes: &[u8] = if recording {
+            include_bytes!("../icons_mac/tray_recording.png")
+        } else {
+            include_bytes!("../icons_mac/tray.ico")
+        };
+        match image::load_from_memory(bytes) {
+            Ok(image) => {
+                let image = image.into_rgba8();
+                let icon = tauri::Icon::Rgba { rgba: image.as_raw().clone(), width: image.width(), height: image.height() };
+                if let Err(err) = app.tray_handle().set_icon(icon) { log::warn!("record tray: {err}"); }
+                if let Err(err) = app.tray_handle().set_icon_as_template(true) { log::warn!("record tray template: {err}"); }
+            }
+            Err(err) => log::warn!("record tray image: {err}"),
+        }
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
     let _ = recording;
 }
 

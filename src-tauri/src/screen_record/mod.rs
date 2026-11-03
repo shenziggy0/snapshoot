@@ -11,10 +11,29 @@ use tauri::{Manager, State};
 mod windows;
 #[cfg(target_os = "windows")]
 use windows as platform;
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
 mod macos;
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
 use macos as platform;
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
+mod platform {
+    use super::{RecordOptions, RecordResult, RecordStatus};
+    use std::path::Path;
+    pub struct Recorder;
+    pub fn supported() -> bool { false }
+    fn unsupported<T>() -> Result<T, String> { Err("screen_record.unsupported".into()) }
+    impl Recorder {
+        pub fn start(_: RecordOptions) -> Result<Self, String> { unsupported() }
+        pub fn status(&self) -> RecordStatus { unreachable!("unsupported recorder") }
+        pub fn pause(&mut self) -> Result<(), String> { unsupported() }
+        pub fn resume(&mut self) -> Result<(), String> { unsupported() }
+        pub fn stop(&mut self) -> Result<RecordResult, String> { unsupported() }
+        pub fn cancel(&mut self) -> Result<(), String> { unsupported() }
+    }
+    pub fn copy_file(_: &Path) -> Result<(), String> { unsupported() }
+    pub fn reveal(_: &Path) -> Result<(), String> { unsupported() }
+}
 
 pub(super) const ENCODER_FAILED: &str = "screen_record.encoder_failed";
 pub(super) const DISK_FAILED: &str = "screen_record.disk_write_failed";
@@ -230,7 +249,11 @@ pub fn screen_record_hotkey() {
 #[tauri::command]
 pub fn screen_record_support() -> RecordSupport {
     let supported = platform::supported();
-    RecordSupport { supported, system_audio: supported }
+    #[cfg(target_os = "macos")]
+    let system_audio = supported && macos::audio_supported();
+    #[cfg(not(target_os = "macos"))]
+    let system_audio = supported;
+    RecordSupport { supported, system_audio }
 }
 
 #[tauri::command]
