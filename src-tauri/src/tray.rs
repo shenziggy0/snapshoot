@@ -17,12 +17,22 @@ use tauri::{AppHandle, Manager};
 pub(crate) fn set_recording(recording: bool) {
     #[cfg(windows)]
     if let Some(app) = crate::APP.get() {
-        let bytes: &[u8] = if recording { include_bytes!("../icons/tray_recording.png") } else { include_bytes!("../icons/icon.png") };
+        let bytes: &[u8] = if recording {
+            include_bytes!("../icons/tray_recording.png")
+        } else {
+            include_bytes!("../icons/icon.png")
+        };
         match image::load_from_memory(bytes) {
             Ok(image) => {
                 let image = image.into_rgba8();
-                let icon = tauri::Icon::Rgba { rgba: image.as_raw().clone(), width: image.width(), height: image.height() };
-                if let Err(err) = app.tray_handle().set_icon(icon) { log::warn!("record tray: {err}"); }
+                let icon = tauri::Icon::Rgba {
+                    rgba: image.as_raw().clone(),
+                    width: image.width(),
+                    height: image.height(),
+                };
+                if let Err(err) = app.tray_handle().set_icon(icon) {
+                    log::warn!("record tray: {err}");
+                }
             }
             Err(err) => log::warn!("record tray image: {err}"),
         }
@@ -37,9 +47,17 @@ pub(crate) fn set_recording(recording: bool) {
         match image::load_from_memory(bytes) {
             Ok(image) => {
                 let image = image.into_rgba8();
-                let icon = tauri::Icon::Rgba { rgba: image.as_raw().clone(), width: image.width(), height: image.height() };
-                if let Err(err) = app.tray_handle().set_icon(icon) { log::warn!("record tray: {err}"); }
-                if let Err(err) = app.tray_handle().set_icon_as_template(true) { log::warn!("record tray template: {err}"); }
+                let icon = tauri::Icon::Rgba {
+                    rgba: image.as_raw().clone(),
+                    width: image.width(),
+                    height: image.height(),
+                };
+                if let Err(err) = app.tray_handle().set_icon(icon) {
+                    log::warn!("record tray: {err}");
+                }
+                if let Err(err) = app.tray_handle().set_icon_as_template(true) {
+                    log::warn!("record tray template: {err}");
+                }
             }
             Err(err) => log::warn!("record tray image: {err}"),
         }
@@ -75,22 +93,30 @@ pub fn update_tray(app_handle: tauri::AppHandle, mut language: String, mut copy_
         "Update tray with language: {}, copy mode: {}",
         language, copy_mode
     );
-    tray_handle
-        .set_menu(match language.as_str() {
-            "en" => tray_menu_en(),
-            "zh_cn" => tray_menu_zh_cn(),
-            "zh_tw" => tray_menu_zh_tw(),
-            "ja" => tray_menu_ja(),
-            "ko" => tray_menu_ko(),
-            "fr" => tray_menu_fr(),
-            "de" => tray_menu_de(),
-            "ru" => tray_menu_ru(),
-            "pt_br" => tray_menu_pt_br(),
-            "fa" => tray_menu_fa(),
-            "uk" => tray_menu_uk(),
-            _ => tray_menu_en(),
-        })
-        .unwrap();
+    let menu = match language.as_str() {
+        "en" => tray_menu_en(),
+        "zh_cn" => tray_menu_zh_cn(),
+        "zh_tw" => tray_menu_zh_tw(),
+        "ja" => tray_menu_ja(),
+        "ko" => tray_menu_ko(),
+        "fr" => tray_menu_fr(),
+        "de" => tray_menu_de(),
+        "ru" => tray_menu_ru(),
+        "pt_br" => tray_menu_pt_br(),
+        "fa" => tray_menu_fa(),
+        "uk" => tray_menu_uk(),
+        _ => tray_menu_en(),
+    };
+    #[cfg(target_os = "macos")]
+    let menu = menu.add_item(CustomMenuItem::new(
+        "macos_permissions",
+        if language.starts_with("zh") {
+            "权限检查与修复"
+        } else {
+            "Check and repair permissions"
+        },
+    ));
+    tray_handle.set_menu(menu).unwrap();
     #[cfg(not(target_os = "linux"))]
     tray_handle
         .set_tooltip(&format!("Snapshoot {}", app_handle.package_info().version))
@@ -144,6 +170,8 @@ pub fn tray_event_handler<'a>(app: &'a AppHandle, event: SystemTrayEvent) {
             "ocr_recognize" => on_ocr_recognize_click(),
             "ocr_translate" => on_ocr_translate_click(),
             "config" => on_config_click(),
+            #[cfg(target_os = "macos")]
+            "macos_permissions" => crate::macos_permissions::show_status(app.clone(), 0),
             "check_update" => on_check_update_click(),
             "view_log" => on_view_log_click(app),
             "restart" => on_restart_click(app),

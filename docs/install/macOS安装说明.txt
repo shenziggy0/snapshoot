@@ -1,0 +1,57 @@
+Snapshoot macOS 安装与更新说明
+============================
+
+1. 完全退出旧版 Snapshoot（菜单栏图标 → 退出）。
+2. 将 Snapshoot.app 拖到 Applications，选择替换旧版。
+3. 从“应用程序”打开 Snapshoot，不要直接从 DMG 运行。
+
+出现“已损坏，无法打开”或“无法验证开发者”
+--------------------------------------
+此版本未经过 Apple Developer ID 签名和公证，macOS 可能阻止打开。
+“已损坏”也可能表示文件确实有问题，不能仅凭提示判断。
+
+确认安装包来自你信任的 Snapshoot 发布来源后：
+先尝试“系统设置 → 隐私与安全性 → 仍要打开”（如有）。
+若仍被拦截，确认应用已复制到“应用程序”，打开“终端”执行：
+
+xattr -dr com.apple.quarantine /Applications/Snapshoot.app
+
+然后重新打开。此命令只移除 Snapshoot 的下载隔离标记，不会修复损坏的文件。
+如果提示“Permission denied”，请检查应用的所有者及写入权限。
+如果仍无法打开，请重新下载安装包，并反馈 macOS 版本、芯片类型和完整错误。
+无需关闭 Gatekeeper 或系统完整性保护（SIP）。
+
+更新后需要重新授权
+------------------
+未正式签名的应用更新后，旧授权可能失效，即使系统设置中的开关仍然开启。
+支持此流程的新版会在首次启动时，尝试只清除 Snapshoot 自己的：
+- 屏幕录制（部分系统名为“屏幕与系统音频录制”）
+- 辅助功能
+
+随后会弹出重新授权说明。请在“系统设置 → 隐私与安全性”中重新允许这两项，
+完成后完全退出并重新打开 Snapshoot。同一构建后续启动不会反复清除权限。
+全新安装按正常系统提示授权；从尚未记录版本的旧版迁移时会处理一次。
+
+如果选择了“稍后处理”，可从菜单栏图标打开“权限检查与修复”，逐项查看授权并重试。
+若自动清除失败，或者授权开关打开后仍不能截图/滚动：
+退出 Snapshoot，在以上两个权限列表中移除旧条目，再添加
+/Applications/Snapshoot.app 并开启。应用不会清空其他软件的权限或个人设置。
+
+Mac installation (English)
+--------------------------
+Quit the old Snapshoot, drag Snapshoot.app into Applications and replace it.
+Launch it from Applications, not from this disk image.
+
+This build is not Developer ID signed or notarized. If macOS blocks it, first
+try System Settings > Privacy & Security > Open Anyway, if available.
+Only if you trust the download source, remove this app's quarantine flag:
+
+xattr -dr com.apple.quarantine /Applications/Snapshoot.app
+
+This does not repair corrupted files. If it still fails, download again and
+report the complete error, macOS version and CPU architecture.
+
+After an update, the new app attempts to reset only its own Screen Recording
+and Accessibility grants once. Re-enable both in Privacy & Security, then
+fully quit and reopen Snapshoot. If the reset fails, remove the old entries
+and add /Applications/Snapshoot.app again. Fresh installs use normal prompts.

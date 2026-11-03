@@ -13,6 +13,8 @@ mod hotkey;
 mod image_io;
 mod lang_detect;
 mod long_screenshot;
+#[cfg(target_os = "macos")]
+mod macos_permissions;
 mod pin;
 mod screenshot;
 mod screen_record;
@@ -81,15 +83,18 @@ fn main() {
                 app.set_activation_policy(tauri::ActivationPolicy::Regular);
             } else {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-                let trusted =
-                    macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
-                info!("MacOS Accessibility Trusted: {}", trusted);
             }
             // Global AppHandle
             APP.get_or_init(|| app.handle());
             // Init Config
             info!("Init Config Store");
             init_config(app);
+            #[cfg(target_os = "macos")]
+            if !smoke::enabled() && !macos_permissions::prepare(&app.handle(), !is_first_run()) {
+                let trusted =
+                    macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
+                info!("MacOS Accessibility Trusted: {}", trusted);
+            }
             // Check First Run
             if is_first_run() && !smoke::enabled() {
                 // Open Config Window

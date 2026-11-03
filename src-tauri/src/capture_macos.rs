@@ -679,7 +679,7 @@ fn capture_with_screencapture(target: &DisplayTarget, path: &Path) -> Result<(),
     Ok(())
 }
 
-fn screen_recording_allowed() -> bool {
+pub(crate) fn screen_recording_allowed() -> bool {
     unsafe {
         let symbol = b"CGPreflightScreenCaptureAccess\0";
         let ptr = libc::dlsym(libc::RTLD_DEFAULT, symbol.as_ptr() as *const libc::c_char);

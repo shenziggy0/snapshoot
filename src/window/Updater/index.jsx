@@ -36,6 +36,9 @@ export default function Updater() {
             ? `${t('updater.new_version', { version: release.latest })}\n\n${release.notes}`
             : t('updater.latest');
     }
+    if (body !== '' && osType === 'Darwin') {
+        body += `\n\n${t('updater.macos_install_help')}`;
+    }
     let downloadUrl = null;
     if (error !== '') {
         downloadUrl = RELEASES_PAGE;

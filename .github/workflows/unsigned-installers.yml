@@ -35,7 +35,9 @@ jobs:
               run: pnpm install --frozen-lockfile
 
             - name: Build unsigned dmg
-              run: pnpm tauri build --target aarch64-apple-darwin --bundles dmg
+              run: |
+                  pnpm tauri build --target aarch64-apple-darwin --bundles app
+                  python3 scripts/package_macos.py --app src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Snapshoot.app --output-dir src-tauri/target/aarch64-apple-darwin/release/bundle/dmg --arch aarch64
 
             - name: Upload dmg
               uses: actions/upload-artifact@v4

@@ -60,12 +60,21 @@ v1.0.0 提供三个安装包：
 先确认自己的芯片：左上角苹果菜单 → 关于本机，看“芯片”一栏是 Apple M 系列还是 Intel，下载对应的 dmg。
 
 1. 打开 dmg，把 Snapshoot 拖到“应用程序”文件夹。
-2. 首次打开时，macOS 可能会提示“无法验证开发者”。这是因为安装包没有经过 Apple 签名和公证，不是文件损坏。
-3. 按下面的方法放行一次，之后就可以正常双击打开：
-   - 在“访达 → 应用程序”里按住 Control 键点 Snapshoot → 打开 → 在弹窗里点“打开”；
-   - 如果已经直接双击被拦截，去“系统设置 → 隐私与安全性”，在页面下方点“仍要打开”；
-   - 实在打不开时，才用终端执行 `xattr -cr /Applications/Snapshoot.app` 清除隔离标记，再重新打开。
-4. 首次截图和用快捷键时，系统会要求授权：去“系统设置 → 隐私与安全性”，给 Snapshoot 打开“屏幕录制”和“辅助功能”权限，否则截不到图、快捷键也不生效。
+2. 先阅读 DMG 中的“安装前请阅读 - Read Me.txt”，再从“应用程序”打开 Snapshoot。
+3. 当前版本没有 Developer ID 签名和 Apple 公证，可能被 macOS 拦截。确认安装包来自可信来源后，可在“系统设置 → 隐私与安全性”中选择“仍要打开”（如有）。若提示“已损坏”且仍打不开，可执行：
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/Snapshoot.app
+   ```
+   该命令只移除本应用的下载隔离标记，不会修复损坏文件；如果仍无法打开，请重新下载并反馈完整错误。
+4. 首次使用需在“系统设置 → 隐私与安全性”中授权“屏幕录制”和“辅助功能”。更新到支持权限迁移的版本后，应用会在首次启动时尝试清除自己的这两项旧授权，并引导重新授权；同一构建不重复清除。授权完成后请完全退出并重开应用。若自动清除失败，请移除旧条目，再添加“应用程序”里的 Snapshoot。
+
+完整说明见 [macOS 安装与更新说明](docs/install/macOS安装说明.txt)。
+
+开发者打包：先运行 `pnpm tauri build --target aarch64-apple-darwin --bundles app`，再运行：
+```bash
+python3 scripts/package_macos.py --app src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Snapshoot.app --output-dir src-tauri/target/aarch64-apple-darwin/release/bundle/dmg --arch aarch64
+```
+Intel 构建将 target 改为 `x86_64-apple-darwin`、arch 改为 `x64`。此流程对应用做完整临时签名校验，并将说明放入 DMG；仍不属于 Apple 公证版本。权限迁移按版本与签名指纹识别构建，发布时仍应提升版本号；开发模式与 smoke 测试不会清除权限。
 
 ## 隐私提示
 

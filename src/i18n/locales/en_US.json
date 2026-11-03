@@ -234,6 +234,7 @@
             }
         },
         "updater": {
+            "macos_install_help": "### macOS installation and permissions\n\nQuit the old app before replacing it. Read “安装前请阅读 - Read Me.txt” inside the DMG. If macOS reports the app is damaged, follow that guide after confirming you trust the download source.\n\nOn the first launch after a version change, Snapshoot attempts to reset only its own Screen Recording and Accessibility permissions. Grant both again in Privacy & Security, then fully quit and reopen the app. Other apps’ permissions and your settings are not cleared.",
             "title": "Check Update",
             "latest": "## The latest version is installed",
             "cancel": "Cancel",

@@ -85,7 +85,10 @@ jobs:
               run: pnpm install
             - name: Build and Package
               run: |
-                  pnpm tauri build --target ${{ matrix.target }} --bundles dmg
+                  pnpm tauri build --target ${{ matrix.target }} --bundles app
+                  ARCH=aarch64
+                  if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then ARCH=x64; fi
+                  python3 scripts/package_macos.py --app "src-tauri/target/${{ matrix.target }}/release/bundle/macos/Snapshoot.app" --output-dir "src-tauri/target/${{ matrix.target }}/release/bundle/dmg" --arch "$ARCH"
             - name: Upload Artifacts
               uses: actions/upload-artifact@v4
               with:
