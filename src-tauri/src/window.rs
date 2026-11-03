@@ -125,6 +125,9 @@ fn build_window(label: &str, title: &str) -> (Window, bool) {
     match app_handle.get_window(label) {
         Some(v) => {
             info!("Window existence: {}", label);
+            // set_focus alone leaves a minimized window minimized.
+            let _ = v.unminimize();
+            let _ = v.show();
             v.set_focus().unwrap();
             (v, true)
         }
@@ -383,36 +386,89 @@ fn place_screenshot_window(window: &Window) {
 
 #[cfg(windows)]
 fn cover_monitor_win(window: &Window) -> bool {
+    let generation = OVERLAY_PLACEMENT_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let Ok(hwnd) = window.hwnd() else {
         return false;
     };
     unsafe {
         let raw = hwnd.0 as *mut std::ffi::c_void;
-        let monitor = MonitorFromWindow(raw, 2);
-        if monitor.is_null() {
+        let Some(rect) = monitor_rect_at_cursor_win() else {
+            return false;
+        };
+        if !fit_monitor_rect_win(raw, rect) {
             return false;
         }
-        let mut info: MonitorInfo = std::mem::zeroed();
-        info.cb_size = std::mem::size_of::<MonitorInfo>() as u32;
-        if GetMonitorInfoW(monitor, &mut info) == 0 {
-            return false;
-        }
-        let rect = info.rc_monitor;
-        SetWindowPos(
-            raw,
-            (-1isize) as *mut std::ffi::c_void,
-            rect.left,
-            rect.top,
-            rect.right - rect.left,
-            rect.bottom - rect.top,
-            0x0010 | 0x0020,
-        );
+        // WM_DPICHANGED can apply its suggested size after the initial move.
+        // Recheck on the event loop after DPI/layout messages have settled.
+        // A newer placement invalidates pending checks for the previous screen.
+        let window = window.clone();
+        std::thread::spawn(move || {
+            for delay in [40, 160] {
+                std::thread::sleep(std::time::Duration::from_millis(delay));
+                let posted = window.clone();
+                let _ = window.run_on_main_thread(move || {
+                    if OVERLAY_PLACEMENT_GENERATION.load(Ordering::SeqCst) != generation {
+                        return;
+                    }
+                    if let Ok(hwnd) = posted.hwnd() {
+                        let raw = hwnd.0 as *mut std::ffi::c_void;
+                        let mut actual: WinRect = std::mem::zeroed();
+                        if GetWindowRect(raw, &mut actual) != 0 && actual != rect {
+                            if !fit_monitor_rect_win(raw, rect) {
+                                warn!("overlay monitor rect did not settle: expected {rect:?}");
+                            }
+                        }
+                    }
+                });
+            }
+        });
     }
     true
 }
 
 #[cfg(windows)]
+unsafe fn monitor_rect_at_cursor_win() -> Option<WinRect> {
+    // A new overlay starts on the primary display; select by cursor instead.
+    let mut cursor = WinPoint { x: 0, y: 0 };
+    if GetCursorPos(&mut cursor) == 0 { return None; }
+    let monitor = MonitorFromPoint(cursor, 2); // MONITOR_DEFAULTTONEAREST
+    if monitor.is_null() { return None; }
+    let mut info: MonitorInfo = std::mem::zeroed();
+    info.cb_size = std::mem::size_of::<MonitorInfo>() as u32;
+    if GetMonitorInfoW(monitor, &mut info) == 0 { return None; }
+    Some(info.rc_monitor)
+}
+
+#[cfg(windows)]
+static OVERLAY_PLACEMENT_GENERATION: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+#[cfg(windows)]
+unsafe fn fit_monitor_rect_win(raw: *mut std::ffi::c_void, rect: WinRect) -> bool {
+    for _ in 0..2 {
+        if SetWindowPos(raw, (-1isize) as *mut std::ffi::c_void,
+            rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
+            0x0010 | 0x0020) == 0 {
+            return false;
+        }
+        let mut actual: WinRect = std::mem::zeroed();
+        if GetWindowRect(raw, &mut actual) != 0 && actual == rect {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(windows)]
 #[repr(C)]
+struct WinPoint {
+    x: i32,
+    y: i32,
+}
+
+#[cfg(windows)]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct WinRect {
     left: i32,
     top: i32,
@@ -432,7 +488,9 @@ struct MonitorInfo {
 #[cfg(windows)]
 #[link(name = "user32")]
 extern "system" {
-    fn MonitorFromWindow(hwnd: *mut std::ffi::c_void, flags: u32) -> *mut std::ffi::c_void;
+    fn GetCursorPos(point: *mut WinPoint) -> i32;
+    fn MonitorFromPoint(point: WinPoint, flags: u32) -> *mut std::ffi::c_void;
+    fn GetWindowRect(hwnd: *mut std::ffi::c_void, rect: *mut WinRect) -> i32;
     fn GetMonitorInfoW(monitor: *mut std::ffi::c_void, info: *mut MonitorInfo) -> i32;
     fn SetWindowPos(
         hwnd: *mut std::ffi::c_void,
@@ -482,6 +540,7 @@ pub(crate) fn screenshot_window() -> Window {
     window.on_window_event(move |event| {
         if let tauri::WindowEvent::Destroyed = event {
             crate::long_screenshot::abandon_active();
+            crate::screen_record::abandon_active();
         }
     });
     place_screenshot_window(&window);
@@ -517,7 +576,7 @@ pub fn fit_overlay_window() {
 }
 
 pub(crate) fn open_frozen_overlay() {
-    if crate::long_screenshot::is_active() {
+    if crate::long_screenshot::is_active() || crate::screen_record::is_active() {
         warn!("ignoring screenshot request while scroll capture is active");
         return;
     }
@@ -577,19 +636,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 /// CSS-pixel rectangles that must keep receiving clicks (the toolbar) while
 /// the rest of the overlay lets the page underneath handle the wheel.
-static LONG_CAPTURE_HIT_RECTS: std::sync::Mutex<Vec<(f64, f64, f64, f64)>> =
+static OVERLAY_HIT_RECTS: std::sync::Mutex<Vec<(f64, f64, f64, f64)>> =
     std::sync::Mutex::new(Vec::new());
-static LONG_CAPTURE_PASS_STOP: AtomicBool = AtomicBool::new(true);
-static LONG_CAPTURE_POLLER: AtomicBool = AtomicBool::new(false);
-static LONG_CAPTURE_POLL_QUEUED: AtomicBool = AtomicBool::new(false);
-static LONG_CAPTURE_CLICK_THROUGH: AtomicBool = AtomicBool::new(false);
+static OVERLAY_PASS_STOP: AtomicBool = AtomicBool::new(true);
+static OVERLAY_POLLER: AtomicBool = AtomicBool::new(false);
+static OVERLAY_POLL_QUEUED: AtomicBool = AtomicBool::new(false);
+static OVERLAY_CLICK_THROUGH: AtomicBool = AtomicBool::new(false);
 
-pub(crate) fn set_long_capture_hit_rects(rects: &[(f64, f64, f64, f64)]) {
-    *LONG_CAPTURE_HIT_RECTS.lock().unwrap() = rects.to_vec();
+pub(crate) fn set_overlay_hit_rects(rects: &[(f64, f64, f64, f64)]) {
+    *OVERLAY_HIT_RECTS.lock().unwrap() = rects.to_vec();
 }
 
 pub(crate) fn long_capture_click_through() -> bool {
-    LONG_CAPTURE_CLICK_THROUGH.load(Ordering::SeqCst)
+    OVERLAY_CLICK_THROUGH.load(Ordering::SeqCst)
 }
 
 fn screenshot_handle() -> Option<Window> {
@@ -597,7 +656,7 @@ fn screenshot_handle() -> Option<Window> {
 }
 
 fn apply_click_through(window: &Window, click_through: bool) {
-    LONG_CAPTURE_CLICK_THROUGH.store(click_through, Ordering::SeqCst);
+    OVERLAY_CLICK_THROUGH.store(click_through, Ordering::SeqCst);
     // Tauri's Windows implementation applies this on a later turn of the UI
     // thread. Set the extended style here so a wheel replay in the same call
     // already falls through to the window underneath.
@@ -654,7 +713,7 @@ fn set_click_through_style(window: &Window, click_through: bool) {
 }
 
 fn cursor_over_controls(window: &Window) -> bool {
-    let rects = LONG_CAPTURE_HIT_RECTS.lock().unwrap().clone();
+    let rects = OVERLAY_HIT_RECTS.lock().unwrap().clone();
     if rects.is_empty() {
         return false;
     }
@@ -692,32 +751,32 @@ fn cursor_over_controls(window: &Window) -> bool {
 }
 
 fn refresh_click_through(window: Window) {
-    if LONG_CAPTURE_PASS_STOP.load(Ordering::SeqCst) {
+    if OVERLAY_PASS_STOP.load(Ordering::SeqCst) {
         apply_click_through(&window, false);
         return;
     }
     let click_through = !cursor_over_controls(&window);
-    if click_through != LONG_CAPTURE_CLICK_THROUGH.load(Ordering::SeqCst) {
+    if click_through != OVERLAY_CLICK_THROUGH.load(Ordering::SeqCst) {
         apply_click_through(&window, click_through);
     }
 }
 
 fn ensure_click_through_poller() {
-    if LONG_CAPTURE_POLLER
+    if OVERLAY_POLLER
         .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
         .is_err()
     {
         return;
     }
     std::thread::spawn(|| loop {
-        let stopping = LONG_CAPTURE_PASS_STOP.load(Ordering::SeqCst);
+        let stopping = OVERLAY_PASS_STOP.load(Ordering::SeqCst);
         std::thread::sleep(std::time::Duration::from_millis(if stopping {
             40
         } else {
             16
         }));
-        if LONG_CAPTURE_PASS_STOP.load(Ordering::SeqCst) {
-            if LONG_CAPTURE_CLICK_THROUGH.load(Ordering::SeqCst) {
+        if OVERLAY_PASS_STOP.load(Ordering::SeqCst) {
+            if OVERLAY_CLICK_THROUGH.load(Ordering::SeqCst) {
                 if let Some(window) = screenshot_handle() {
                     let posted = window.clone();
                     let _ = posted.run_on_main_thread(move || apply_click_through(&window, false));
@@ -728,15 +787,15 @@ fn ensure_click_through_poller() {
         let Some(window) = screenshot_handle() else {
             continue;
         };
-        if LONG_CAPTURE_POLL_QUEUED.swap(true, Ordering::SeqCst) {
+        if OVERLAY_POLL_QUEUED.swap(true, Ordering::SeqCst) {
             continue;
         }
         let queued = window.clone().run_on_main_thread(move || {
-            LONG_CAPTURE_POLL_QUEUED.store(false, Ordering::SeqCst);
+            OVERLAY_POLL_QUEUED.store(false, Ordering::SeqCst);
             refresh_click_through(window);
         });
         if queued.is_err() {
-            LONG_CAPTURE_POLL_QUEUED.store(false, Ordering::SeqCst);
+            OVERLAY_POLL_QUEUED.store(false, Ordering::SeqCst);
         }
     });
 }
@@ -744,6 +803,7 @@ fn ensure_click_through_poller() {
 /// Runs on the main thread (the start command is synchronous). Keep the
 /// overlay on screen, drop it out of the hit test, and exclude it from grabs.
 pub(crate) fn enter_long_screenshot_mode() -> Result<(), String> {
+    if crate::screen_record::is_active() { return Err("screen_record.already_running".into()); }
     let window =
         screenshot_handle().ok_or_else(|| "screenshot window is not available".to_string())?;
     #[cfg(target_os = "macos")]
@@ -751,29 +811,75 @@ pub(crate) fn enter_long_screenshot_mode() -> Result<(), String> {
         crate::capture_macos::prepare_scroll_capture(&window)?;
     }
     #[cfg(windows)]
-    set_excluded_from_capture(&window, true);
-    LONG_CAPTURE_PASS_STOP.store(false, Ordering::SeqCst);
+    let _ = set_excluded_from_capture(&window, true);
+    OVERLAY_PASS_STOP.store(false, Ordering::SeqCst);
     apply_click_through(&window, true);
     ensure_click_through_poller();
     Ok(())
 }
 
 pub(crate) fn leave_long_screenshot_mode() {
-    LONG_CAPTURE_PASS_STOP.store(true, Ordering::SeqCst);
-    LONG_CAPTURE_HIT_RECTS.lock().unwrap().clear();
+    OVERLAY_PASS_STOP.store(true, Ordering::SeqCst);
+    OVERLAY_HIT_RECTS.lock().unwrap().clear();
     let _ = crate::image_io::spawn_main(|| {
         #[cfg(target_os = "macos")]
         crate::capture_macos::clear_scroll_overlay_window();
         if let Some(window) = screenshot_handle() {
             #[cfg(windows)]
-            set_excluded_from_capture(&window, false);
+            let _ = set_excluded_from_capture(&window, false);
             apply_click_through(&window, false);
         }
     });
 }
 
+pub(crate) fn enter_record_mode() -> Result<(), String> {
+    let window = screenshot_handle().ok_or("screen_record.encoder_failed")?;
+    #[cfg(windows)]
+    set_excluded_from_capture(&window, true)?;
+    #[cfg(target_os = "macos")]
+    crate::capture_macos::exclude_from_capture(&window);
+    OVERLAY_PASS_STOP.store(false, Ordering::SeqCst);
+    apply_click_through(&window, true);
+    ensure_click_through_poller();
+    Ok(())
+}
+
+pub(crate) fn leave_record_mode(close: bool) {
+    OVERLAY_PASS_STOP.store(true, Ordering::SeqCst);
+    OVERLAY_HIT_RECTS.lock().unwrap().clear();
+    let _ = crate::image_io::spawn_main(move || {
+        if let Some(window) = screenshot_handle() {
+            #[cfg(windows)]
+            let _ = set_excluded_from_capture(&window, false);
+            apply_click_through(&window, false);
+            if close { let _ = window.close(); }
+        }
+        crate::screen_record::finish_overlay_transition();
+    });
+}
+
+pub(crate) fn record_result_window(clipboard_ok: bool) {
+    let (window, _) = build_window("record_result", "Snapshoot");
+    let monitor = monitor_at_mouse();
+    let scale = monitor.scale_factor();
+    let width = 380.0;
+    let height = 220.0;
+    let _ = window.set_size(tauri::LogicalSize::new(width, height));
+    let _ = window.set_resizable(false);
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_skip_taskbar(true);
+    let _ = window.set_position(tauri::PhysicalPosition::new(
+        monitor.position().x + monitor.size().width as i32 - ((width + 24.0) * scale) as i32,
+        monitor.position().y + monitor.size().height as i32 - ((height + 64.0) * scale) as i32,
+    ));
+    let _ = window.show();
+    // Store notification state in the URL-independent window event. The result
+    // page also reads the Rust-owned result on mount, avoiding event races.
+    let _ = window.emit("record-result-ready", clipboard_ok);
+}
+
 #[cfg(windows)]
-fn set_excluded_from_capture(window: &Window, exclude: bool) {
+fn set_excluded_from_capture(window: &Window, exclude: bool) -> Result<(), String> {
     // Tauri's `hwnd()` is `windows 0.39`, which is a different type from the
     // `windows 0.58` dependency used here. The handle is a pointer either way.
     #[link(name = "user32")]
@@ -781,12 +887,15 @@ fn set_excluded_from_capture(window: &Window, exclude: bool) {
         fn SetWindowDisplayAffinity(hwnd: *mut std::ffi::c_void, affinity: u32) -> i32;
     }
     let Ok(hwnd) = window.hwnd() else {
-        return;
+        return Err("window handle is not available".into());
     };
     let affinity = if exclude { 0x11 } else { 0 };
     unsafe {
-        let _ = SetWindowDisplayAffinity(hwnd.0 as *mut std::ffi::c_void, affinity);
+        if SetWindowDisplayAffinity(hwnd.0 as *mut std::ffi::c_void, affinity) == 0 {
+            return Err(std::io::Error::last_os_error().to_string());
+        }
     }
+    Ok(())
 }
 
 /// This command is synchronous, so Tauri invokes it on the main thread. Keep

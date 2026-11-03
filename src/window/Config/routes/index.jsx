@@ -6,10 +6,12 @@ import General from '../pages/General';
 import Service from '../pages/Service';
 import History from '../pages/History';
 import Hotkey from '../pages/Hotkey';
+import Record from '../pages/Record';
 import Backup from '../pages/Backup';
 import About from '../pages/About';
 
 const routes = [
+    { path: '/record', element: <Record /> },
     {
         path: '/general',
         element: <General />,

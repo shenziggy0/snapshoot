@@ -15,6 +15,7 @@ mod lang_detect;
 mod long_screenshot;
 mod pin;
 mod screenshot;
+mod screen_record;
 mod server;
 mod smoke;
 mod system_ocr;
@@ -97,6 +98,7 @@ fn main() {
             }
             app.manage(StringWrapper(Mutex::new("".to_string())));
             app.manage(long_screenshot::LongCaptureManager::default());
+            app.manage(screen_record::ScreenRecordManager::default());
             // Update Tray Menu
             update_tray(app.app_handle(), "".to_string(), "".to_string());
             // Start http server
@@ -168,7 +170,17 @@ fn main() {
             long_screenshot::long_capture_start,
             long_screenshot::long_capture_status,
             long_screenshot::long_capture_scroll,
-            long_screenshot::long_capture_set_hit_rects,
+            long_screenshot::overlay_set_hit_rects,
+            screen_record::screen_record_support,
+            screen_record::screen_record_start,
+            screen_record::screen_record_status,
+            screen_record::screen_record_pause,
+            screen_record::screen_record_resume,
+            screen_record::screen_record_stop,
+            screen_record::screen_record_cancel,
+            screen_record::screen_record_last_result,
+            screen_record::screen_record_reveal_last,
+            screen_record::screen_record_delete_last,
             long_screenshot::long_capture_finish_copy,
             long_screenshot::long_capture_cancel,
             window::fit_overlay_window,

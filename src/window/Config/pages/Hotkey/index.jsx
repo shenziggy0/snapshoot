@@ -53,6 +53,7 @@ export default function Hotkey() {
     const annotateDefault = osType === 'Darwin' ? 'Command+Shift+A' : 'F1';
     const pinDefault = osType === 'Darwin' ? 'Command+Shift+P' : 'F3';
     const [screenshotAnnotate, setScreenshotAnnotate] = useConfig('hotkey_screenshot_annotate', annotateDefault);
+    const [screenRecord, setScreenRecord] = useConfig('hotkey_screen_record', osType === 'Windows_NT' ? 'F2' : '');
     const [pinClipboard, setPinClipboard] = useConfig('hotkey_pin_clipboard', pinDefault);
 
     const { t } = useTranslation();
@@ -121,6 +122,16 @@ export default function Hotkey() {
         <Card>
             <Toaster />
             <CardBody>
+                <div className='config-item'>
+                    <h3 className='my-auto'>{t('config.hotkey.screen_record')}</h3>
+                    {screenRecord !== null && (
+                        <Input variant='bordered' value={screenRecord} label={t('config.hotkey.set_hotkey')}
+                            className='max-w-[50%]' onKeyDown={(e) => keyDown(e, setScreenRecord)}
+                            onFocus={() => { if (screenRecord) unregister(screenRecord); setScreenRecord(''); }}
+                            endContent={<Button size='sm' variant='flat' className={`${screenRecord === '' && 'hidden'}`}
+                                onPress={() => registerHandler('hotkey_screen_record', screenRecord)}>{t('common.ok')}</Button>} />
+                    )}
+                </div>
                 <div className='config-item'>
                     <h3 className='my-auto'>{t('config.hotkey.selection_translate')}</h3>
                     {selectionTranslate !== null && (

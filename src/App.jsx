@@ -12,6 +12,7 @@ import Recognize from './window/Recognize';
 import Annotate from './window/Annotate';
 import Updater from './window/Updater';
 import Pin from './window/Pin';
+import RecordResult from './window/RecordResult';
 import { store } from './utils/store';
 import Config from './window/Config';
 import { useConfig } from './hooks';
@@ -25,6 +26,7 @@ const windowMap = {
     annotate: <Annotate />,
     config: <Config />,
     updater: <Updater />,
+    record_result: <RecordResult />,
 };
 
 export default function App() {
@@ -56,6 +58,7 @@ export default function App() {
                 }
                 if (e.key === 'Escape') {
                     if (appWindow.label === 'screenshot') {
+                        await invoke('screen_record_cancel');
                         await invoke('long_capture_cancel');
                     }
                     await appWindow.close();
@@ -72,6 +75,7 @@ export default function App() {
                 }
                 if (e.key === 'Escape') {
                     if (appWindow.label === 'screenshot') {
+                        await invoke('screen_record_cancel');
                         await invoke('long_capture_cancel');
                     }
                     await appWindow.close();

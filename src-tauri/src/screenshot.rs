@@ -9,10 +9,17 @@ use std::path::Path;
 use std::sync::Mutex;
 use tauri::Manager;
 
+static RECORD_TARGET: Mutex<Option<CaptureTarget>> = Mutex::new(None);
+
+pub(crate) fn record_capture_target() -> Option<CaptureTarget> {
+    RECORD_TARGET.lock().unwrap().clone()
+}
+
 static INTENT: Mutex<String> = Mutex::new(String::new());
 static EDIT_IMAGE: Mutex<String> = Mutex::new(String::new());
 
 pub fn prepare_screen_capture(intent: &str) {
+    if crate::screen_record::is_active() { return; }
     *INTENT.lock().unwrap() = intent.to_string();
     EDIT_IMAGE.lock().unwrap().clear();
 }
@@ -203,6 +210,8 @@ fn capture_screen_to(x: i32, y: i32, path: &Path) -> Result<(), String> {
 /// Grab the monitor under the cursor. The overlay window must already be
 /// ordered out; this does not create or show one.
 pub fn capture_for_overlay() -> Result<(), String> {
+    let target = capture_target_at_mouse()?;
+    *RECORD_TARGET.lock().unwrap() = Some(target.clone());
     let path = full_screenshot_path();
     let _ = std::fs::remove_file(&path);
     #[cfg(target_os = "macos")]
@@ -211,9 +220,7 @@ pub fn capture_for_overlay() -> Result<(), String> {
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let monitor = crate::window::monitor_at_mouse();
-        let pos = *monitor.position();
-        screenshot(pos.x, pos.y)?;
+        screenshot(target.x, target.y)?;
         reject_blank(&path)
     }
 }

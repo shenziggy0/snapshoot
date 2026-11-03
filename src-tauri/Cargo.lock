@@ -3498,7 +3498,7 @@ dependencies = [
 
 [[package]]
 name = "long-stitch"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "image 0.25.4",
 ]
@@ -5768,10 +5768,11 @@ dependencies = [
 
 [[package]]
 name = "snapshoot"
-version = "0.0.0"
+version = "1.0.0"
 dependencies = [
  "arboard",
  "base64 0.22.1",
+ "chrono",
  "core-foundation",
  "core-graphics 0.23.2",
  "dirs 5.0.1",

@@ -433,7 +433,7 @@ pub fn long_capture_scroll(
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
-pub struct LongCaptureHitRect {
+pub struct OverlayHitRect {
     pub x: f64,
     pub y: f64,
     pub width: f64,
@@ -443,12 +443,12 @@ pub struct LongCaptureHitRect {
 /// CSS-pixel rectangles (toolbar, hint) that must stay clickable while the
 /// rest of the overlay lets scroll events through.
 #[tauri::command]
-pub fn long_capture_set_hit_rects(rects: Vec<LongCaptureHitRect>) {
+pub fn overlay_set_hit_rects(rects: Vec<OverlayHitRect>) {
     let rects = rects
         .into_iter()
         .map(|rect| (rect.x, rect.y, rect.width, rect.height))
         .collect::<Vec<_>>();
-    crate::window::set_long_capture_hit_rects(&rects);
+    crate::window::set_overlay_hit_rects(&rects);
 }
 
 #[tauri::command(async)]

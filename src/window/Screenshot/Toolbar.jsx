@@ -19,6 +19,7 @@ import {
     MdTextFields,
     MdTranslate,
     MdUndo,
+    MdVideocam,
 } from 'react-icons/md';
 import { HiOutlinePencil } from 'react-icons/hi';
 
@@ -44,6 +45,7 @@ function IconButton({ title, active, disabled, onClick, dark, children }) {
         <button
             type='button'
             title={title}
+            aria-label={title}
             disabled={disabled}
             onMouseDown={(event) => event.stopPropagation()}
             onClick={onClick}
@@ -79,6 +81,8 @@ export default function CaptureToolbar(props) {
         onOcr,
         onTranslate,
         onLongScreenshot,
+        onScreenRecord,
+        recordIntent = false,
         longCaptureActive = false,
         copyBusy = false,
         onPin,
@@ -90,6 +94,18 @@ export default function CaptureToolbar(props) {
         ? 'border-white/10 bg-neutral-900/95 text-white'
         : 'border-black/10 bg-white/95 text-neutral-800';
     const showProps = Boolean(tool) && !longCaptureActive;
+
+    if (recordIntent) {
+        return (
+            <div className={`flex items-center gap-2 rounded-xl border p-1.5 shadow-lg ${bar}`}>
+                <button type='button' disabled={!onScreenRecord} onClick={onScreenRecord}
+                    className='flex h-9 items-center gap-1 rounded-md bg-red-600 px-3 text-sm text-white disabled:opacity-40'>
+                    <MdVideocam />{t('screen_record.start')}
+                </button>
+                <IconButton title={t('annotate.close')} dark={dark} onClick={onClose}><MdClose size={18} /></IconButton>
+            </div>
+        );
+    }
 
     return (
         <div className='flex flex-col items-center gap-1'>
@@ -134,6 +150,11 @@ export default function CaptureToolbar(props) {
                         onClick={onLongScreenshot}
                     >
                         <MdPhotoSizeSelectActual size={16} />
+                    </IconButton>
+                )}
+                {onScreenRecord && (
+                    <IconButton title={t('screen_record.label')} disabled={longCaptureActive} dark={dark} onClick={onScreenRecord}>
+                        <MdVideocam size={18} />
                     </IconButton>
                 )}
                 <IconButton

@@ -12,6 +12,7 @@ import { drawShape } from '../Annotate/render';
 import { useToastStyle } from '../../hooks';
 import { useSystemDark } from '../useSystemDark';
 import CaptureToolbar from './Toolbar';
+import RecordControls from './RecordControls';
 import { placeToolbar } from './toolbarPlacement';
 
 const HANDLES = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -110,6 +111,12 @@ export default function Screenshot() {
     const strokeRef = useRef(4);
     const fontRef = useRef(24);
     const toolRef = useRef('');
+    const recordRef = useRef(false);
+    const recordBusyRef = useRef(false);
+    const [recordActive, setRecordActive] = useState(false);
+    const [recordBusy, setRecordBusy] = useState(false);
+    const [recordStatus, setRecordStatus] = useState(null);
+    const [recordSupported, setRecordSupported] = useState(false);
     const longCaptureRef = useRef(false);
     const longCaptureBusyRef = useRef(false);
     const longCaptureMessageRef = useRef('');
@@ -397,6 +404,7 @@ export default function Screenshot() {
 
     useEffect(() => {
         const onMove = (event) => {
+            if (recordRef.current) return;
             const drag = dragRef.current;
             if (!drag) {
                 hoverAt(event.clientX, event.clientY);
@@ -535,6 +543,85 @@ export default function Screenshot() {
         return out.toDataURL('image/png').split(',')[1];
     };
 
+    useEffect(() => {
+        let alive = true;
+        invoke('screen_record_support').then((support) => {
+            if (alive) setRecordSupported(support.supported);
+        }).catch(() => {});
+        const unlisten = listen('screen-record-error', (event) => {
+            if (!alive) return;
+            recordRef.current = false;
+            setRecordActive(false);
+            toast.error(t(String(event.payload)), { style: toastStyle });
+        });
+        return () => { alive = false; unlisten.then((f) => f()); };
+    }, []);
+
+    useEffect(() => {
+        if (!recordActive) return undefined;
+        let alive = true;
+        let pending = false;
+        const timer = setInterval(async () => {
+            if (pending || recordBusyRef.current) return;
+            pending = true;
+            try {
+                const status = await invoke('screen_record_status');
+                if (alive) setRecordStatus(status);
+            } catch (error) {
+                if (alive && !recordBusyRef.current) setRecordStatus((previous) => ({
+                    ...previous, state: 'error', message: String(error),
+                }));
+            } finally { pending = false; }
+        }, 500);
+        return () => { alive = false; clearInterval(timer); };
+    }, [recordActive]);
+
+    const startScreenRecord = async () => {
+        if (!recordSupported || recordBusyRef.current || longCaptureRef.current || recordRef.current) return;
+        const region = selectionImageRect(selectionRef.current);
+        if (!region) return;
+        recordBusyRef.current = true;
+        recordRef.current = true;
+        dragRef.current = null;
+        setTool('');
+        setDraft(null);
+        setTextDraft(null);
+        setLoupe(null);
+        setRecordStatus(null);
+        setRecordBusy(true);
+        setRecordActive(true);
+        try {
+            setRecordStatus(await invoke('screen_record_start', { region }));
+        } catch (error) {
+            recordRef.current = false;
+            setRecordActive(false);
+            toast.error(t(String(error)), { style: toastStyle });
+        } finally {
+            recordBusyRef.current = false;
+            setRecordBusy(false);
+        }
+    };
+
+    const recordAction = async (action) => {
+        if (recordBusyRef.current) return;
+        recordBusyRef.current = true;
+        setRecordBusy(true);
+        try {
+            const status = await invoke(`screen_record_${action}`);
+            if (action === 'pause' || action === 'resume') setRecordStatus(status);
+            else { recordRef.current = false; setRecordActive(false); }
+        } catch (error) {
+            if (action === 'stop') {
+                recordRef.current = false;
+                setRecordActive(false);
+            }
+            toast.error(t(String(error)), { style: toastStyle });
+        } finally {
+            recordBusyRef.current = false;
+            setRecordBusy(false);
+        }
+    };
+
     const startLongScreenshot = async () => {
         const region = selectionImageRect(selectionRef.current);
         if (!region) {
@@ -627,6 +714,20 @@ export default function Screenshot() {
 
     useEffect(() => {
         const onKey = async (event) => {
+            if (recordRef.current) {
+                if (event.key === 'Escape' || event.key === 'Enter' || event.key.startsWith('Arrow')) {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                    if (event.key === 'Escape' && !recordBusyRef.current) await recordAction('cancel');
+                }
+                return;
+            }
+            if (intentRef.current === 'record' && event.key === 'Enter' && selectionRef.current) {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                await startScreenRecord();
+                return;
+            }
             if (document.activeElement?.tagName === 'INPUT') {
                 return;
             }
@@ -859,16 +960,16 @@ export default function Screenshot() {
     }, [longCaptureActive]);
 
     useEffect(() => {
-        if (!longCaptureActive) {
+        if (!longCaptureActive && !recordActive) {
             return undefined;
         }
         let alive = true;
         const publish = () => {
-            const rects = Array.from(document.querySelectorAll('[data-long-capture-hit]')).map((node) => {
+            const rects = Array.from(document.querySelectorAll('[data-overlay-hit]')).map((node) => {
                 const rect = node.getBoundingClientRect();
                 return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
             });
-            invoke('long_capture_set_hit_rects', { rects }).catch(() => {
+            invoke('overlay_set_hit_rects', { rects }).catch(() => {
                 // The session can end while this timer is still in flight.
             });
         };
@@ -884,7 +985,7 @@ export default function Screenshot() {
             clearInterval(timer);
             window.removeEventListener('resize', publish);
         };
-    }, [longCaptureActive]);
+    }, [longCaptureActive, recordActive]);
 
     useEffect(() => {
         let active = true;
@@ -942,11 +1043,11 @@ export default function Screenshot() {
                 className='absolute'
                 style={
                     layout && intentRef.current === 'edit'
-                        ? { left: layout.left, top: layout.top, width: layout.width, height: layout.height, opacity: longCaptureActive ? 0 : 1 }
-                        : { left: 0, top: 0, width: '100%', height: '100%', opacity: longCaptureActive ? 0 : 1 }
+                        ? { left: layout.left, top: layout.top, width: layout.width, height: layout.height, opacity: longCaptureActive || recordActive ? 0 : 1 }
+                        : { left: 0, top: 0, width: '100%', height: '100%', opacity: longCaptureActive || recordActive ? 0 : 1 }
                 }
             />
-            {layout && !longCaptureActive && !(selection || hover) && (
+            {layout && !longCaptureActive && !recordActive && !(selection || hover) && (
                 <div className='pointer-events-none absolute inset-0 bg-black/45' />
             )}
             {(selection || hover) && (
@@ -957,8 +1058,8 @@ export default function Screenshot() {
                         top: (selection || hover).y,
                         width: Math.max(0, (selection || hover).w),
                         height: Math.max(0, (selection || hover).h),
-                        boxShadow: '0 0 0 1px rgba(0,0,0,0.45), 0 0 0 9999px rgba(0,0,0,0.45)',
-                        border: '1px solid rgba(255,255,255,0.92)',
+                        boxShadow: recordActive ? 'none' : '0 0 0 1px rgba(0,0,0,0.45), 0 0 0 9999px rgba(0,0,0,0.45)',
+                        border: recordActive ? '2px dashed #ef4444' : '1px solid rgba(255,255,255,0.92)',
                         background: 'transparent',
                     }}
                 />
@@ -969,7 +1070,7 @@ export default function Screenshot() {
                     onMouseDown={onBackgroundDown}
                 />
             )}
-            {selection && (
+            {selection && !recordActive && (
                 <div
                     className='pointer-events-none absolute z-20 rounded bg-black/70 px-1.5 py-0.5 text-[11px]'
                     style={{ left: selection.x, top: Math.max(4, selection.y - 22) }}
@@ -977,7 +1078,7 @@ export default function Screenshot() {
                     {scaleLabel()}
                 </div>
             )}
-            {selection && editing && !longCaptureActive && (
+            {selection && editing && !longCaptureActive && !recordActive && (
                 <div
                     className='absolute z-30'
                     style={{ left: selection.x, top: selection.y, width: selection.w, height: selection.h }}
@@ -1047,11 +1148,15 @@ export default function Screenshot() {
             {selection && editing && (
                 <div
                     ref={toolbarRef}
-                    data-long-capture-hit=''
+                    data-overlay-hit=''
                     className='absolute z-40 w-max'
                     style={toolbarPosition}
                 >
-                    <CaptureToolbar
+                    {recordActive ? (
+                        <RecordControls status={recordStatus} busy={recordBusy}
+                            onPause={() => recordAction(recordStatus?.state === 'paused' ? 'resume' : 'pause')}
+                            onStop={() => recordAction('stop')} onCancel={() => recordAction('cancel')} />
+                    ) : <CaptureToolbar
                         dark={dark}
                         tool={tool}
                         setTool={setTool}
@@ -1068,13 +1173,15 @@ export default function Screenshot() {
                         onOcr={() => finish('ocr')}
                         onTranslate={() => finish('translate')}
                         onLongScreenshot={intentRef.current === 'edit' ? undefined : startLongScreenshot}
+                        recordIntent={intentRef.current === 'record'}
+                        onScreenRecord={recordSupported && intentRef.current !== 'edit' ? startScreenRecord : undefined}
                         longCaptureActive={longCaptureActive}
                         copyBusy={longCaptureBusy}
                         onPin={() => finish('pin')}
                         onSave={() => finish('save')}
                         onCopy={() => finish('copy')}
                         onClose={() => appWindow.close()}
-                    />
+                    />}
                 </div>
             )}
             {longCaptureActive && (

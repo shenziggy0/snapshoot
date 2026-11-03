@@ -14,6 +14,23 @@ use tauri::SystemTrayMenuItem;
 use tauri::SystemTraySubmenu;
 use tauri::{AppHandle, Manager};
 
+pub(crate) fn set_recording(recording: bool) {
+    #[cfg(windows)]
+    if let Some(app) = crate::APP.get() {
+        let bytes: &[u8] = if recording { include_bytes!("../icons/tray_recording.png") } else { include_bytes!("../icons/icon.png") };
+        match image::load_from_memory(bytes) {
+            Ok(image) => {
+                let image = image.into_rgba8();
+                let icon = tauri::Icon::Rgba { rgba: image.as_raw().clone(), width: image.width(), height: image.height() };
+                if let Err(err) = app.tray_handle().set_icon(icon) { log::warn!("record tray: {err}"); }
+            }
+            Err(err) => log::warn!("record tray image: {err}"),
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = recording;
+}
+
 #[tauri::command]
 pub fn update_tray(app_handle: tauri::AppHandle, mut language: String, mut copy_mode: String) {
     let tray_handle = app_handle.tray_handle();

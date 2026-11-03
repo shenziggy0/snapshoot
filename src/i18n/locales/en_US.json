@@ -155,7 +155,8 @@
                 "pin_clipboard": "Pin Clipboard Image",
                 "is_register": "The hotkey is already registered",
                 "success": "Hotkey register success",
-                "set_hotkey": "Press to Set Hotkey"
+                "set_hotkey": "Press to Set Hotkey",
+                "screen_record": "Record region / stop recording"
             },
             "service": {
                 "label": "Service",
@@ -212,6 +213,24 @@
                 "view_config": "View Config",
                 "discussion": "Github Discussion",
                 "credit": "Based on Pot (pot-app/pot-desktop), GPL-3.0"
+            },
+            "record": {
+                "label": "Recording",
+                "resolution": "Resolution",
+                "original": "Original (up to 4096 px)",
+                "1080p": "1080p (up to 1920 × 1080)",
+                "720p": "720p (up to 1280 × 720)",
+                "fps": "Frame rate",
+                "quality": "Quality",
+                "high": "High",
+                "standard": "Standard",
+                "small": "Small file",
+                "cursor": "Record mouse cursor",
+                "system_audio": "Record system audio",
+                "save_dir": "Save folder",
+                "default_dir": "Videos / Snapshoot",
+                "choose_dir": "Choose folder",
+                "reset_dir": "Use default folder"
             }
         },
         "updater": {
@@ -538,6 +557,29 @@
             "saved": "Saved",
             "no_image": "No image on the clipboard",
             "load_failed": "Could not display this pinned image."
+        },
+        "screen_record": {
+            "label": "Record region",
+            "start": "Start recording",
+            "pause": "Pause",
+            "paused": "Paused",
+            "resume": "Resume",
+            "stop": "Stop",
+            "cancel": "Discard",
+            "processing": "Processing…",
+            "saved": "Recording saved",
+            "copied": "Video file copied to clipboard",
+            "reveal": "Open location",
+            "delete": "Delete",
+            "unsupported": "Screen recording is not supported on this system.",
+            "permission_denied": "Screen recording permission was denied.",
+            "encoder_failed": "Recording failed. Check the display and encoder, then try again.",
+            "already_running": "A capture is already running.",
+            "disk_write_failed": "Unable to write the video. Check the folder and free disk space.",
+            "invalid_region": "Select a region of at least 2 × 2 physical pixels within one display.",
+            "not_running": "No active recording.",
+            "no_result": "The video file is no longer available.",
+            "clipboard_failed": "Video saved; clipboard copy failed."
         }
     }
 }

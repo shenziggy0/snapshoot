@@ -155,7 +155,8 @@
                 "pin_clipboard": "剪贴板贴图",
                 "is_register": "快捷键已被注册",
                 "success": "快捷键注册成功",
-                "set_hotkey": "按下按键设置快捷键"
+                "set_hotkey": "按下按键设置快捷键",
+                "screen_record": "区域录屏 / 停止录制"
             },
             "service": {
                 "label": "服务设置",
@@ -212,6 +213,24 @@
                 "view_config": "查看配置文件",
                 "discussion": "Github 讨论",
                 "credit": "基于 Pot（pot-app/pot-desktop），GPL-3.0"
+            },
+            "record": {
+                "label": "录屏",
+                "resolution": "分辨率",
+                "original": "原始尺寸（最长边 4096 像素）",
+                "1080p": "1080p（不超过 1920 × 1080）",
+                "720p": "720p（不超过 1280 × 720）",
+                "fps": "帧率",
+                "quality": "清晰度",
+                "high": "高画质",
+                "standard": "标准",
+                "small": "小文件",
+                "cursor": "录制鼠标",
+                "system_audio": "录制系统声音",
+                "save_dir": "保存目录",
+                "default_dir": "系统「视频」目录 / Snapshoot",
+                "choose_dir": "选择目录",
+                "reset_dir": "使用默认目录"
             }
         },
         "updater": {
@@ -538,6 +557,29 @@
             "saved": "已保存",
             "no_image": "剪贴板中没有图片",
             "load_failed": "无法显示这张贴图。"
+        },
+        "screen_record": {
+            "label": "区域录屏",
+            "start": "开始录制",
+            "pause": "暂停",
+            "paused": "已暂停",
+            "resume": "继续",
+            "stop": "停止",
+            "cancel": "放弃",
+            "processing": "处理中…",
+            "saved": "录屏已保存",
+            "copied": "视频文件已复制到剪贴板",
+            "reveal": "打开位置",
+            "delete": "删除",
+            "unsupported": "当前系统暂不支持录屏。",
+            "permission_denied": "录屏权限被拒绝，请检查系统权限。",
+            "encoder_failed": "录屏失败，请检查显示器和编码器后重试。",
+            "already_running": "已有录屏或长截图正在进行。",
+            "disk_write_failed": "无法写入视频，请检查保存目录和磁盘空间。",
+            "invalid_region": "请在同一显示器内选择至少 2 × 2 物理像素的区域。",
+            "not_running": "当前没有进行中的录屏。",
+            "no_result": "视频文件已不存在。",
+            "clipboard_failed": "视频已保存，但未能复制到剪贴板。"
         }
     }
 }

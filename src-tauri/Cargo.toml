@@ -44,6 +44,7 @@ walkdir = "2.5"
 thiserror = "1.0"
 font-kit = "0.14.2"
 image = "0.25.4"
+chrono = "0.4"
 long-stitch = { path = "long-stitch" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -56,7 +57,7 @@ objc = "0.2"
 libc = "0.2"
 
 [target.'cfg(windows)'.dependencies]
-windows = {version="0.58.0",features= ["Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_Foundation", "Graphics_Imaging", "Media_Ocr", "Foundation", "Globalization", "Storage", "Storage_Streams"] }
+windows = {version="0.58.0",features= ["Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_Foundation", "Graphics_Imaging", "Media_Ocr", "Foundation", "Globalization", "Storage", "Storage_Streams", "Foundation_Metadata", "Graphics_Capture", "Graphics_DirectX_Direct3D11", "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi_Common", "Win32_Graphics_Gdi", "Win32_Media_MediaFoundation", "Win32_Media_Audio", "Win32_Media_KernelStreaming", "Win32_Media_Multimedia", "Win32_System_Com", "Win32_System_Performance", "Win32_System_WinRT_Graphics_Capture", "Win32_System_WinRT_Direct3D11", "Win32_System_DataExchange", "Win32_System_Memory", "Win32_UI_Shell", "Win32_UI_Shell_Common"] }
 window-shadows = "0.2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
