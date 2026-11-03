@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- macOS menu bar template: black glyph only, the system tints it. -->
+  <path d="M65 34 C62 27 57 25 50 25 C41 25 35 30 35 37.5 C35 45 41 47.5 50 50 C59 52.5 65 55 65 62.5 C65 70 59 75 50 75 C43 75 37.5 72.5 34.5 66" fill="none" stroke="#000000" stroke-width="12" stroke-linecap="round"/>
+  <g fill="none" stroke="#000000" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"><path d="M70 8 H82 Q92 8 92 18 V30"/><path d="M30 92 H18 Q8 92 8 82 V70"/></g>
+</svg>

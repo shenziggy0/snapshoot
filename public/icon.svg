@@ -1,22 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#3B9BFF"/>
-      <stop offset="1" stop-color="#1550E0"/>
-    </linearGradient>
-    <linearGradient id="dot" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#FFFFFF"/>
-      <stop offset="1" stop-color="#CFE4FF"/>
-    </linearGradient>
-  </defs>
-  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
-  <g fill="none" stroke="#FFFFFF" stroke-width="64" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M240 400 V300 a60 60 0 0 1 60 -60 H400"/>
-    <path d="M624 240 H724 a60 60 0 0 1 60 60 V400"/>
-    <path d="M784 624 V724 a60 60 0 0 1 -60 60 H624"/>
-    <path d="M400 784 H300 a60 60 0 0 1 -60 -60 V624"/>
+  <!-- Snapshoot app icon: rounded S with two diagonal crop corners. Drawn on a 100-unit grid. -->
+  <g transform="translate(64 64) scale(8.96)">
+    <rect width="100" height="100" rx="22" fill="#1E63F0"/>
+    <path d="M65 34 C62 27 57 25 50 25 C41 25 35 30 35 37.5 C35 45 41 47.5 50 50 C59 52.5 65 55 65 62.5 C65 70 59 75 50 75 C43 75 37.5 72.5 34.5 66" fill="none" stroke="#FFFFFF" stroke-width="10" stroke-linecap="round"/>
+    <g fill="none" stroke="#FFFFFF" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"><path d="M72 15 H80 Q85 15 85 20 V28"/><path d="M28 85 H20 Q15 85 15 80 V72"/></g>
   </g>
-  <circle cx="512" cy="512" r="128" fill="url(#dot)"/>
-  <circle cx="512" cy="512" r="56" fill="#1E63F0"/>
-  <circle cx="552" cy="472" r="20" fill="#FFFFFF"/>
 </svg>

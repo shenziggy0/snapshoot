@@ -1,6 +1,10 @@
-# Snapshoot
+<p align="center">
+  <img src="public/icon.png" width="128" alt="Snapshoot">
+</p>
 
-Snapshoot is a cross-platform screenshot tool for Windows and macOS. Take a screenshot, then annotate it, pin it on screen, capture a long screenshot, run OCR, or translate it, all in one flow, without switching between several apps.
+<h1 align="center">Snapshoot</h1>
+
+Snapshoot is a cross-platform screenshot tool for Windows and macOS. Take a screenshot, then annotate it, pin it on screen, capture a long screenshot, record the screen, run OCR, or translate it, all in one flow, without switching between several apps.
 
 ## Features
 
@@ -8,6 +12,7 @@ Snapshoot is a cross-platform screenshot tool for Windows and macOS. Take a scre
 - **Annotate**: draw boxes, arrows, lines, mosaics, and text right on the screenshot, with crop and undo.
 - **Pin**: pin a screenshot on top of other windows, so you can look at it while you write. Pin size and opacity are adjustable.
 - **Long screenshot**: automatically scroll and stitch a page, useful for web pages and long documents.
+- **Screen recording**: record a selected area to MP4 with adjustable resolution, frame rate, and quality. System audio, pause, and resume are supported. The file is saved automatically and copied to the clipboard, ready to paste. Requires macOS 12.3 or later; system audio needs macOS 13 or later.
 - **OCR**: recognize text in images, with local and online recognition services.
 - **Translate**: selection translate, input translate, screenshot translate, and OCR translate, with many translation services you can add and switch in Settings.
 - **History**: translation and recognition history can be searched and exported.
@@ -22,12 +27,13 @@ All shortcuts can be changed in Settings -> Shortcuts. These are the defaults:
 | --- | --- | --- |
 | Screenshot annotate | Command + Shift + A | F1 |
 | Pin from clipboard | Command + Shift + P | F3 |
+| Screen recording | Not set | F2 |
 | Selection translate | Not set | Not set |
 | Input translate | Not set | Not set |
 | OCR recognize | Not set | Not set |
 | OCR translate | Not set | Not set |
 
-Selection, input, and OCR shortcuts are empty by default. Set one that feels comfortable the first time you use them.
+Selection, input, and OCR shortcuts are empty by default, and so is screen recording on macOS. Set one that feels comfortable the first time you use them.
 
 ## Download and install
 
