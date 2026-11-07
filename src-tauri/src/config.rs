@@ -169,10 +169,7 @@ pub fn get_plugin_list(plugin_type: &str) -> Option<Vec<String>> {
 pub fn get(key: &str) -> Option<Value> {
     let state = APP.get().unwrap().state::<StoreWrapper>();
     let store = state.0.lock().unwrap();
-    match store.get(key) {
-        Some(value) => Some(value.clone()),
-        None => None,
-    }
+    store.get(key).cloned()
 }
 
 pub fn set<T: serde::ser::Serialize>(key: &str, value: T) {

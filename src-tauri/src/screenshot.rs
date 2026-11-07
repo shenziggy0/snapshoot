@@ -1,8 +1,6 @@
 use crate::image_io::cache_file;
 use crate::windows_list::{list_window_frames, WindowFrame};
 use crate::APP;
-use base64::{engine::general_purpose, Engine as _};
-use image::GenericImageView;
 use log::{info, warn};
 use serde::Serialize;
 use std::path::Path;
@@ -19,7 +17,9 @@ static INTENT: Mutex<String> = Mutex::new(String::new());
 static EDIT_IMAGE: Mutex<String> = Mutex::new(String::new());
 
 pub fn prepare_screen_capture(intent: &str) {
-    if crate::screen_record::is_active() { return; }
+    if crate::screen_record::is_active() {
+        return;
+    }
     *INTENT.lock().unwrap() = intent.to_string();
     EDIT_IMAGE.lock().unwrap().clear();
 }
@@ -34,10 +34,13 @@ fn full_screenshot_path() -> std::path::PathBuf {
 }
 
 #[derive(Serialize)]
-pub struct CapturedImage {
-    pub data: String,
-    pub width: u32,
-    pub height: u32,
+#[serde(rename_all = "camelCase")]
+pub struct OverlayBoot {
+    pub request_id: u64,
+    pub ready: bool,
+    pub intent: String,
+    pub image_path: Option<String>,
+    pub error: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -56,14 +59,14 @@ pub fn capture_target_at_mouse() -> Result<CaptureTarget, String> {
     #[cfg(target_os = "macos")]
     {
         let target = crate::capture_macos::capture_target_at_mouse()?;
-        return Ok(CaptureTarget {
+        Ok(CaptureTarget {
             x: target.x,
             y: target.y,
             width: target.width,
             height: target.height,
             display_id: target.id,
             scale: target.scale,
-        });
+        })
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -92,7 +95,7 @@ pub fn capture_target_region(
 ) -> Result<image::RgbaImage, String> {
     #[cfg(target_os = "macos")]
     {
-        return crate::capture_macos::capture_region_rgba(
+        crate::capture_macos::capture_region_rgba(
             target.display_id,
             full_width,
             full_height,
@@ -100,7 +103,7 @@ pub fn capture_target_region(
             y,
             width,
             height,
-        );
+        )
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -112,19 +115,6 @@ pub fn capture_target_region(
             return Err("selected region is outside the captured screen".into());
         }
         Ok(image::imageops::crop_imm(&image, x, y, width, height).to_image())
-    }
-}
-
-pub fn capture_target_to(target: &CaptureTarget, path: &Path) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        crate::capture_macos::capture_id_to(target.display_id, path)?;
-        Ok(())
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        capture_screen_to(target.x, target.y, path)?;
-        reject_blank(path)
     }
 }
 
@@ -216,7 +206,7 @@ pub fn capture_for_overlay() -> Result<(), String> {
     let _ = std::fs::remove_file(&path);
     #[cfg(target_os = "macos")]
     {
-        return crate::capture_macos::capture_to(&path);
+        crate::capture_macos::capture_to(&path)
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -225,6 +215,7 @@ pub fn capture_for_overlay() -> Result<(), String> {
     }
 }
 
+#[cfg(not(target_os = "macos"))]
 fn reject_blank(path: &Path) -> Result<(), String> {
     let image = image::open(path).map_err(|err| format!("decode capture: {err}"))?;
     let rgba = image.to_rgba8();
@@ -304,39 +295,49 @@ pub fn report_capture_failure(detail: &str) {
     tauri::api::dialog::message(parent.as_ref(), "无法截取屏幕", text);
 }
 
+/// One small handshake replaces the old intent + whole-PNG-over-IPC pair.
+/// The page loads the PNG directly through the asset protocol, so there is no
+/// Base64 copy, no extra image decode on the Rust main thread, and no large
+/// JSON payload in the latency-sensitive path.
 #[tauri::command]
-pub fn screenshot_intent() -> String {
-    let intent = INTENT.lock().unwrap().clone();
-    if intent.is_empty() {
-        "annotate".to_string()
-    } else {
-        intent
+pub fn screenshot_boot() -> OverlayBoot {
+    let (request_id, ready) = crate::window::overlay_boot_state();
+    let intent = {
+        let current = INTENT.lock().unwrap().clone();
+        if current.is_empty() {
+            "annotate".to_string()
+        } else {
+            current
+        }
+    };
+    if request_id == 0 || !ready {
+        return OverlayBoot {
+            request_id,
+            ready: false,
+            intent,
+            image_path: None,
+            error: None,
+        };
     }
-}
 
-#[tauri::command]
-pub fn read_capture_image() -> Result<CapturedImage, String> {
     let edit = EDIT_IMAGE.lock().unwrap().clone();
     let path = if edit.is_empty() {
         full_screenshot_path()
     } else {
         std::path::PathBuf::from(edit)
     };
-    let bytes =
-        std::fs::read(&path).map_err(|err| format!("read capture {}: {err}", path.display()))?;
-    if bytes.len() < 32 {
-        return Err("capture file is empty".into());
+    let error = match std::fs::metadata(&path) {
+        Ok(metadata) if metadata.len() >= 32 => None,
+        Ok(_) => Some("capture file is empty".to_string()),
+        Err(err) => Some(format!("read capture {}: {err}", path.display())),
+    };
+    OverlayBoot {
+        request_id,
+        ready: true,
+        intent,
+        image_path: error.is_none().then(|| path.to_string_lossy().to_string()),
+        error,
     }
-    let image = image::load_from_memory(&bytes).map_err(|err| format!("decode capture: {err}"))?;
-    let (width, height) = image.dimensions();
-    if width == 0 || height == 0 {
-        return Err("capture has no pixels".into());
-    }
-    Ok(CapturedImage {
-        data: general_purpose::STANDARD.encode(bytes),
-        width,
-        height,
-    })
 }
 
 #[tauri::command]

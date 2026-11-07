@@ -2,22 +2,28 @@ import { appWindow } from '@tauri-apps/api/window';
 import { BrowserRouter } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { warn } from 'tauri-plugin-log-api';
-import React, { useEffect } from 'react';
 import { useTheme } from 'next-themes';
 
 import { invoke } from '@tauri-apps/api/tauri';
-import Screenshot from './window/Screenshot';
-import Translate from './window/Translate';
-import Recognize from './window/Recognize';
-import Annotate from './window/Annotate';
-import Updater from './window/Updater';
-import Pin from './window/Pin';
-import RecordResult from './window/RecordResult';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { store } from './utils/store';
-import Config from './window/Config';
 import { useConfig } from './hooks';
 import './style.css';
 import './i18n';
+
+// Each Tauri window only needs its own page. Loading every window up front
+// made the hidden screenshot webview parse the config, OCR and translate UI
+// before it could show a frozen frame.
+const Screenshot = lazy(() => import('./window/Screenshot'));
+const Translate = lazy(() => import('./window/Translate'));
+const Recognize = lazy(() => import('./window/Recognize'));
+const Annotate = lazy(() => import('./window/Annotate'));
+const Updater = lazy(() => import('./window/Updater'));
+const Pin = lazy(() => import('./window/Pin'));
+const PinText = lazy(() => import('./window/PinText'));
+const RecordResult = lazy(() => import('./window/RecordResult'));
+const Config = lazy(() => import('./window/Config'));
+const QuickAccess = lazy(() => import('./window/QuickAccess'));
 
 const windowMap = {
     translate: <Translate />,
@@ -27,6 +33,7 @@ const windowMap = {
     config: <Config />,
     updater: <Updater />,
     record_result: <RecordResult />,
+    quick_access: <QuickAccess />,
 };
 
 export default function App() {
@@ -60,8 +67,12 @@ export default function App() {
                     if (appWindow.label === 'screenshot') {
                         await invoke('screen_record_cancel');
                         await invoke('long_capture_cancel');
+                        await invoke('hide_screenshot_window');
+                    } else if (appWindow.label === 'quick_access') {
+                        await invoke('hide_quick_access_window');
+                    } else {
+                        await appWindow.close();
                     }
-                    await appWindow.close();
                 }
             });
         } else {
@@ -77,8 +88,12 @@ export default function App() {
                     if (appWindow.label === 'screenshot') {
                         await invoke('screen_record_cancel');
                         await invoke('long_capture_cancel');
+                        await invoke('hide_screenshot_window');
+                    } else if (appWindow.label === 'quick_access') {
+                        await invoke('hide_quick_access_window');
+                    } else {
+                        await appWindow.close();
                     }
-                    await appWindow.close();
                 }
             });
         }
@@ -126,6 +141,16 @@ export default function App() {
         }
     }, [appFont, appFallbackFont, appFontSize]);
 
-    const page = appWindow.label.startsWith('pin_') ? <Pin /> : windowMap[appWindow.label];
-    return <BrowserRouter>{page}</BrowserRouter>;
+    const page = appWindow.label.startsWith('pin_text_') ? (
+        <PinText />
+    ) : appWindow.label.startsWith('pin_') ? (
+        <Pin />
+    ) : (
+        windowMap[appWindow.label]
+    );
+    return (
+        <BrowserRouter>
+            <Suspense fallback={null}>{page}</Suspense>
+        </BrowserRouter>
+    );
 }

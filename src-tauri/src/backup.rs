@@ -63,10 +63,10 @@ pub async fn webdav(
             let options =
                 SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
             zip.start_file("config.json", options)?;
-            zip.write(&std::fs::read(&config_path)?)?;
+            zip.write_all(&std::fs::read(&config_path)?)?;
             if database_path.exists() {
                 zip.start_file("history.db", options)?;
-                zip.write(&std::fs::read(&database_path)?)?;
+                zip.write_all(&std::fs::read(&database_path)?)?;
             }
             if plugin_path.exists() {
                 for entry in WalkDir::new(plugin_path) {
@@ -79,7 +79,7 @@ pub async fn webdav(
                     if path.is_file() {
                         info!("adding file {path:?} as {file_name:?} ...");
                         zip.start_file(file_name, options)?;
-                        zip.write(&std::fs::read(entry.path())?)?;
+                        zip.write_all(&std::fs::read(entry.path())?)?;
                     } else {
                         continue;
                     }
@@ -91,24 +91,18 @@ pub async fn webdav(
                 .put(&format!("/{}", name.unwrap()), std::fs::read(&zip_path)?)
                 .await
             {
-                Ok(()) => return Ok("".to_string()),
-                Err(e) => {
-                    return Err(Error::Error(format!("WebDav Put Error: {}", e).into()));
-                }
+                Ok(()) => Ok("".to_string()),
+                Err(e) => Err(Error::Error(format!("WebDav Put Error: {}", e).into())),
             }
         }
 
         "delete" => match client.delete(&format!("/{}", name.unwrap())).await {
-            Ok(()) => return Ok("".to_string()),
-            Err(e) => {
-                return Err(Error::Error(format!("WebDav Delete Error: {}", e).into()));
-            }
+            Ok(()) => Ok("".to_string()),
+            Err(e) => Err(Error::Error(format!("WebDav Delete Error: {}", e).into())),
         },
-        _ => {
-            return Err(Error::Error(
-                format!("WebDav Operate Error: {}", operate).into(),
-            ));
-        }
+        _ => Err(Error::Error(
+            format!("WebDav Operate Error: {}", operate).into(),
+        )),
     }
 }
 
@@ -132,10 +126,10 @@ pub async fn local(operate: &str, path: String) -> Result<String, Error> {
             let options =
                 SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
             zip.start_file("config.json", options)?;
-            zip.write(&std::fs::read(&config_path)?)?;
+            zip.write_all(&std::fs::read(&config_path)?)?;
             if database_path.exists() {
                 zip.start_file("history.db", options)?;
-                zip.write(&std::fs::read(&database_path)?)?;
+                zip.write_all(&std::fs::read(&database_path)?)?;
             }
             if plugin_path.exists() {
                 for entry in WalkDir::new(plugin_path) {
@@ -148,7 +142,7 @@ pub async fn local(operate: &str, path: String) -> Result<String, Error> {
                     if path.is_file() {
                         info!("adding file {path:?} as {file_name:?} ...");
                         zip.start_file(file_name, options)?;
-                        zip.write(&std::fs::read(entry.path())?)?;
+                        zip.write_all(&std::fs::read(entry.path())?)?;
                     } else {
                         continue;
                     }
@@ -167,11 +161,9 @@ pub async fn local(operate: &str, path: String) -> Result<String, Error> {
             zip.extract(config_dir_path)?;
             Ok("".to_string())
         }
-        _ => {
-            return Err(Error::Error(
-                format!("Local Operate Error: {}", operate).into(),
-            ));
-        }
+        _ => Err(Error::Error(
+            format!("Local Operate Error: {}", operate).into(),
+        )),
     }
 }
 
@@ -200,10 +192,8 @@ pub async fn aliyun(operate: &str, path: String, url: String) -> Result<String, 
             zip.extract(config_dir_path)?;
             Ok("".to_string())
         }
-        _ => {
-            return Err(Error::Error(
-                format!("Local Operate Error: {}", operate).into(),
-            ));
-        }
+        _ => Err(Error::Error(
+            format!("Local Operate Error: {}", operate).into(),
+        )),
     }
 }

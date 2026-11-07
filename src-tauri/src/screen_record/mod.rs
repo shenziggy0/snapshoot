@@ -3,8 +3,8 @@ use crate::screenshot::CaptureTarget;
 use crate::APP;
 use serde::Serialize;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Mutex;
 use tauri::{Manager, State};
 
 #[cfg(target_os = "windows")]
@@ -21,18 +21,38 @@ mod platform {
     use super::{RecordOptions, RecordResult, RecordStatus};
     use std::path::Path;
     pub struct Recorder;
-    pub fn supported() -> bool { false }
-    fn unsupported<T>() -> Result<T, String> { Err("screen_record.unsupported".into()) }
-    impl Recorder {
-        pub fn start(_: RecordOptions) -> Result<Self, String> { unsupported() }
-        pub fn status(&self) -> RecordStatus { unreachable!("unsupported recorder") }
-        pub fn pause(&mut self) -> Result<(), String> { unsupported() }
-        pub fn resume(&mut self) -> Result<(), String> { unsupported() }
-        pub fn stop(&mut self) -> Result<RecordResult, String> { unsupported() }
-        pub fn cancel(&mut self) -> Result<(), String> { unsupported() }
+    pub fn supported() -> bool {
+        false
     }
-    pub fn copy_file(_: &Path) -> Result<(), String> { unsupported() }
-    pub fn reveal(_: &Path) -> Result<(), String> { unsupported() }
+    fn unsupported<T>() -> Result<T, String> {
+        Err("screen_record.unsupported".into())
+    }
+    impl Recorder {
+        pub fn start(_: RecordOptions) -> Result<Self, String> {
+            unsupported()
+        }
+        pub fn status(&self) -> RecordStatus {
+            unreachable!("unsupported recorder")
+        }
+        pub fn pause(&mut self) -> Result<(), String> {
+            unsupported()
+        }
+        pub fn resume(&mut self) -> Result<(), String> {
+            unsupported()
+        }
+        pub fn stop(&mut self) -> Result<RecordResult, String> {
+            unsupported()
+        }
+        pub fn cancel(&mut self) -> Result<(), String> {
+            unsupported()
+        }
+    }
+    pub fn copy_file(_: &Path) -> Result<(), String> {
+        unsupported()
+    }
+    pub fn reveal(_: &Path) -> Result<(), String> {
+        unsupported()
+    }
 }
 
 pub(super) const ENCODER_FAILED: &str = "screen_record.encoder_failed";
@@ -40,7 +60,12 @@ pub(super) const DISK_FAILED: &str = "screen_record.disk_write_failed";
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub enum RecordState { Recording, Paused, Finalizing, Error }
+pub enum RecordState {
+    Recording,
+    Paused,
+    Finalizing,
+    Error,
+}
 
 #[derive(Clone, Debug, Serialize)]
 pub struct RecordStatus {
@@ -63,7 +88,11 @@ pub struct RecordResult {
 }
 
 #[derive(Serialize)]
-pub struct RecordSupport { pub supported: bool, pub system_audio: bool }
+pub struct RecordSupport {
+    pub supported: bool,
+    pub system_audio: bool,
+    pub microphone: bool,
+}
 
 #[derive(Clone)]
 pub(super) struct RecordOptions {
@@ -75,6 +104,7 @@ pub(super) struct RecordOptions {
     pub bitrate: u32,
     pub cursor: bool,
     pub audio: bool,
+    pub microphone: bool,
     pub path: PathBuf,
 }
 
@@ -87,67 +117,128 @@ pub struct ScreenRecordManager {
 }
 
 pub fn is_active() -> bool {
-    APP.get().map(|app| {
-        let manager = app.state::<ScreenRecordManager>();
-        manager.closing.load(Ordering::SeqCst) || manager.active.lock().unwrap().is_some()
-    }).unwrap_or(false)
+    APP.get()
+        .map(|app| {
+            let manager = app.state::<ScreenRecordManager>();
+            manager.closing.load(Ordering::SeqCst) || manager.active.lock().unwrap().is_some()
+        })
+        .unwrap_or(false)
 }
 
 pub(crate) fn finish_overlay_transition() {
     if let Some(app) = APP.get() {
-        app.state::<ScreenRecordManager>().closing.store(false, Ordering::SeqCst);
+        app.state::<ScreenRecordManager>()
+            .closing
+            .store(false, Ordering::SeqCst);
     }
 }
 
 // Destruction callbacks must never join a capture worker on the event loop.
 pub fn abandon_active() {
     if let Some(app) = APP.get() {
-        let generation = app.state::<ScreenRecordManager>().generation.load(Ordering::SeqCst);
+        let generation = app
+            .state::<ScreenRecordManager>()
+            .generation
+            .load(Ordering::SeqCst);
         let app = app.clone();
-        std::thread::spawn(move || { let _ = app.state::<ScreenRecordManager>().cancel_generation(Some(generation)); });
+        std::thread::spawn(move || {
+            let _ = app
+                .state::<ScreenRecordManager>()
+                .cancel_generation(Some(generation));
+        });
     }
 }
 
 fn config_string(key: &str, default: &str) -> String {
-    crate::config::get(key).and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_else(|| default.into())
+    crate::config::get(key)
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_else(|| default.into())
 }
 
 impl ScreenRecordManager {
     fn start(&self, region: CaptureRegion) -> Result<RecordStatus, String> {
         let mut active = self.active.lock().unwrap();
-        if self.closing.load(Ordering::SeqCst) || active.is_some() || crate::long_screenshot::is_active() {
+        if self.closing.load(Ordering::SeqCst)
+            || active.is_some()
+            || crate::long_screenshot::is_active()
+        {
             return Err("screen_record.already_running".into());
         }
-        if !platform::supported() { return Err("screen_record.unsupported".into()); }
+        if !platform::supported() {
+            return Err("screen_record.unsupported".into());
+        }
         let target = crate::screenshot::record_capture_target().ok_or(ENCODER_FAILED)?;
-        if region.x.checked_add(region.width).map_or(true, |v| v > target.width)
-            || region.y.checked_add(region.height).map_or(true, |v| v > target.height) {
+        if region
+            .x
+            .checked_add(region.width)
+            .is_none_or(|v| v > target.width)
+            || region
+                .y
+                .checked_add(region.height)
+                .is_none_or(|v| v > target.height)
+        {
             return Err("screen_record.invalid_region".into());
         }
-        let (width, height) = compute_output_size(region.width, region.height, &config_string("record_resolution", "original"));
-        if width == 0 || height == 0 { return Err("screen_record.invalid_region".into()); }
-        let fps = crate::config::get("record_fps").and_then(|v| v.as_u64()).filter(|v| [15, 30, 60].contains(v)).unwrap_or(30) as u32;
+        let (width, height) = compute_output_size(
+            region.width,
+            region.height,
+            &config_string("record_resolution", "original"),
+        );
+        if width == 0 || height == 0 {
+            return Err("screen_record.invalid_region".into());
+        }
+        let fps = crate::config::get("record_fps")
+            .and_then(|v| v.as_u64())
+            .filter(|v| [15, 30, 60].contains(v))
+            .unwrap_or(30) as u32;
         let directory = config_string("record_save_dir", "");
         let directory = if directory.is_empty() {
             dirs::video_dir().ok_or(DISK_FAILED)?.join("Snapshoot")
-        } else { PathBuf::from(directory) };
+        } else {
+            PathBuf::from(directory)
+        };
         std::fs::create_dir_all(&directory).map_err(|_| DISK_FAILED)?;
         let stem = format!("Snapshoot_{}", chrono::Local::now().format("%Y%m%d_%H%M%S"));
         let mut path = directory.join(format!("{stem}.mp4"));
         // Reserve the name: rapid recordings must not overwrite an earlier result.
         for suffix in 0..1000 {
-            if suffix > 0 { path = directory.join(format!("{stem}_{suffix}.mp4")); }
-            match std::fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+            if suffix > 0 {
+                path = directory.join(format!("{stem}_{suffix}.mp4"));
+            }
+            match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+            {
                 Ok(_) => break,
                 Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists && suffix < 999 => continue,
                 Err(_) => return Err(DISK_FAILED.into()),
             }
         }
+        let microphone = crate::config::get("record_microphone")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let audio = !microphone
+            && crate::config::get("record_system_audio")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
         let options = RecordOptions {
-            target, region, width, height, fps,
-            bitrate: compute_bitrate(width, height, fps, &config_string("record_quality", "standard")),
-            cursor: crate::config::get("record_cursor").and_then(|v| v.as_bool()).unwrap_or(true),
-            audio: crate::config::get("record_system_audio").and_then(|v| v.as_bool()).unwrap_or(false),
+            target,
+            region,
+            width,
+            height,
+            fps,
+            bitrate: compute_bitrate(
+                width,
+                height,
+                fps,
+                &config_string("record_quality", "standard"),
+            ),
+            cursor: crate::config::get("record_cursor")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true),
+            audio,
+            microphone,
             path: path.clone(),
         };
         if let Err(err) = crate::window::enter_record_mode() {
@@ -178,13 +269,22 @@ impl ScreenRecordManager {
     }
 
     fn status(&self) -> Result<RecordStatus, String> {
-        self.active.lock().unwrap().as_ref().map(|r| r.status()).ok_or_else(|| "screen_record.not_running".into())
+        self.active
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|r| r.status())
+            .ok_or_else(|| "screen_record.not_running".into())
     }
 
     fn pause(&self, paused: bool) -> Result<RecordStatus, String> {
         let mut active = self.active.lock().unwrap();
         let recorder = active.as_mut().ok_or("screen_record.not_running")?;
-        if paused { recorder.pause()?; } else { recorder.resume()?; }
+        if paused {
+            recorder.pause()?;
+        } else {
+            recorder.resume()?;
+        }
         Ok(recorder.status())
     }
 
@@ -197,16 +297,25 @@ impl ScreenRecordManager {
         drop(active);
         crate::tray::set_recording(false);
         let mut result = match result {
-            Ok(result) => { crate::window::leave_record_mode(true); result }
-            Err(err) => { crate::window::leave_record_mode(false); return Err(err); }
+            Ok(result) => {
+                crate::window::leave_record_mode(true);
+                result
+            }
+            Err(err) => {
+                crate::window::leave_record_mode(false);
+                return Err(err);
+            }
         };
         // Saving succeeds independently of a clipboard locked by another process.
         let copied = platform::copy_file(std::path::Path::new(&result.path));
-        if let Err(err) = &copied { log::warn!("record clipboard: {err}"); }
+        if let Err(err) = &copied {
+            log::warn!("record clipboard: {err}");
+        }
         let clipboard_ok = copied.is_ok();
         result.clipboard_copied = clipboard_ok;
         *self.last.lock().unwrap() = Some(result.clone());
-        let _ = crate::image_io::spawn_main(move || crate::window::record_result_window(clipboard_ok));
+        let _ =
+            crate::image_io::spawn_main(move || crate::window::record_result_window(clipboard_ok));
         Ok(result)
     }
 
@@ -216,7 +325,9 @@ impl ScreenRecordManager {
 
     fn cancel_generation(&self, generation: Option<u64>) -> Result<(), String> {
         let mut active = self.active.lock().unwrap();
-        if generation.is_some_and(|g| g != self.generation.load(Ordering::SeqCst)) { return Ok(()); }
+        if generation.is_some_and(|g| g != self.generation.load(Ordering::SeqCst)) {
+            return Ok(());
+        }
         if let Some(mut recorder) = active.take() {
             let result = recorder.cancel();
             self.closing.store(true, Ordering::SeqCst);
@@ -230,7 +341,13 @@ impl ScreenRecordManager {
 }
 
 pub fn screen_record_hotkey() {
-    if APP.get().is_some_and(|app| app.state::<ScreenRecordManager>().closing.load(Ordering::SeqCst)) { return; }
+    if APP.get().is_some_and(|app| {
+        app.state::<ScreenRecordManager>()
+            .closing
+            .load(Ordering::SeqCst)
+    }) {
+        return;
+    }
     if is_active() {
         std::thread::spawn(|| {
             if let Some(app) = APP.get() {
@@ -241,8 +358,7 @@ pub fn screen_record_hotkey() {
             }
         });
     } else if platform::supported() && !crate::long_screenshot::is_active() {
-        crate::screenshot::prepare_screen_capture("record");
-        crate::window::open_frozen_overlay();
+        crate::window::open_frozen_overlay("record");
     }
 }
 
@@ -253,23 +369,54 @@ pub fn screen_record_support() -> RecordSupport {
     let system_audio = supported && macos::audio_supported();
     #[cfg(not(target_os = "macos"))]
     let system_audio = supported;
-    RecordSupport { supported, system_audio }
+    #[cfg(target_os = "macos")]
+    let microphone = supported && macos::microphone_supported();
+    #[cfg(not(target_os = "macos"))]
+    let microphone = false;
+    RecordSupport {
+        supported,
+        system_audio,
+        microphone,
+    }
 }
 
 #[tauri::command]
-pub fn screen_record_start(region: CaptureRegion, manager: State<'_, ScreenRecordManager>) -> Result<RecordStatus, String> { manager.start(region) }
+pub fn screen_record_start(
+    region: CaptureRegion,
+    manager: State<'_, ScreenRecordManager>,
+) -> Result<RecordStatus, String> {
+    manager.start(region)
+}
 #[tauri::command(async)]
-pub fn screen_record_status(manager: State<'_, ScreenRecordManager>) -> Result<RecordStatus, String> { manager.status() }
+pub fn screen_record_status(
+    manager: State<'_, ScreenRecordManager>,
+) -> Result<RecordStatus, String> {
+    manager.status()
+}
 #[tauri::command(async)]
-pub fn screen_record_pause(manager: State<'_, ScreenRecordManager>) -> Result<RecordStatus, String> { manager.pause(true) }
+pub fn screen_record_pause(
+    manager: State<'_, ScreenRecordManager>,
+) -> Result<RecordStatus, String> {
+    manager.pause(true)
+}
 #[tauri::command(async)]
-pub fn screen_record_resume(manager: State<'_, ScreenRecordManager>) -> Result<RecordStatus, String> { manager.pause(false) }
+pub fn screen_record_resume(
+    manager: State<'_, ScreenRecordManager>,
+) -> Result<RecordStatus, String> {
+    manager.pause(false)
+}
 #[tauri::command(async)]
-pub fn screen_record_stop(manager: State<'_, ScreenRecordManager>) -> Result<RecordResult, String> { manager.stop() }
+pub fn screen_record_stop(manager: State<'_, ScreenRecordManager>) -> Result<RecordResult, String> {
+    manager.stop()
+}
 #[tauri::command(async)]
-pub fn screen_record_cancel(manager: State<'_, ScreenRecordManager>) -> Result<(), String> { manager.cancel() }
+pub fn screen_record_cancel(manager: State<'_, ScreenRecordManager>) -> Result<(), String> {
+    manager.cancel()
+}
 #[tauri::command]
-pub fn screen_record_last_result(manager: State<'_, ScreenRecordManager>) -> Option<RecordResult> { manager.last.lock().unwrap().clone() }
+pub fn screen_record_last_result(manager: State<'_, ScreenRecordManager>) -> Option<RecordResult> {
+    manager.last.lock().unwrap().clone()
+}
 #[tauri::command]
 pub fn screen_record_reveal_last(manager: State<'_, ScreenRecordManager>) -> Result<(), String> {
     let last = manager.last.lock().unwrap();
@@ -281,8 +428,8 @@ pub fn screen_record_delete_last(manager: State<'_, ScreenRecordManager>) -> Res
     let mut last = manager.last.lock().unwrap();
     if let Some(result) = last.as_ref() {
         match std::fs::remove_file(&result.path) {
-            Ok(()) => {},
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {},
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(_) => return Err(DISK_FAILED.into()),
         }
     }
@@ -300,15 +447,27 @@ pub fn compute_output_size(width: u32, height: u32, resolution: &str) -> (u32, u
         _ => (4096.0, 4096.0),
     };
     let scale = (long / width.max(height) as f64)
-        .min(short / width.min(height) as f64).min(1.0);
-    let result = ((width as f64 * scale) as u32 & !1, (height as f64 * scale) as u32 & !1);
-    if result.0 < 2 || result.1 < 2 { (0, 0) } else { result }
+        .min(short / width.min(height) as f64)
+        .min(1.0);
+    let result = (
+        (width as f64 * scale) as u32 & !1,
+        (height as f64 * scale) as u32 & !1,
+    );
+    if result.0 < 2 || result.1 < 2 {
+        (0, 0)
+    } else {
+        result
+    }
 }
 
 pub fn compute_bitrate(width: u32, height: u32, fps: u32, quality: &str) -> u32 {
-    let percent = match quality { "high" => 15, "small" => 4, _ => 8 };
-    (u64::from(width) * u64::from(height) * u64::from(fps) * percent / 100)
-        .min(u64::from(u32::MAX)) as u32
+    let percent = match quality {
+        "high" => 15,
+        "small" => 4,
+        _ => 8,
+    };
+    (u64::from(width) * u64::from(height) * u64::from(fps) * percent / 100).min(u64::from(u32::MAX))
+        as u32
 }
 
 #[cfg(test)]

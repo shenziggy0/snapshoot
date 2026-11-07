@@ -16,8 +16,9 @@ mod long_screenshot;
 #[cfg(target_os = "macos")]
 mod macos_permissions;
 mod pin;
-mod screenshot;
+mod quick_access;
 mod screen_record;
+mod screenshot;
 mod server;
 mod smoke;
 mod system_ocr;
@@ -118,16 +119,14 @@ fn main() {
                     .show()
                     .unwrap(),
             }
-            match get("proxy_enable") {
-                Some(v) => {
-                    if v.as_bool().unwrap()
-                        && get("proxy_host")
-                            .map_or(false, |host| !host.as_str().unwrap().is_empty())
-                    {
-                        let _ = set_proxy();
-                    }
+            if let Some(v) = get("proxy_enable") {
+                let enabled = v.as_bool().unwrap_or(false);
+                let has_host = get("proxy_host")
+                    .and_then(|host| host.as_str().map(|value| !value.is_empty()))
+                    .unwrap_or(false);
+                if enabled && has_host {
+                    let _ = set_proxy();
                 }
-                None => {}
             }
             // Check Update
             check_update(app.handle());
@@ -148,8 +147,20 @@ fn main() {
             )));
             start_clipboard_monitor(app.handle());
             pin::cleanup_stale_pins();
-            if smoke::enabled() {
-                std::thread::spawn(|| smoke::run());
+            if let Some(count) = smoke::capture_bench_count() {
+                std::thread::spawn(move || smoke::run_capture_bench(count));
+            } else if smoke::enabled() {
+                std::thread::spawn(smoke::run);
+            } else {
+                // Keep the latency-sensitive overlay out of the first shortcut.
+                // The hidden WebView reports request id 0 until a capture begins.
+                std::thread::spawn(|| {
+                    std::thread::sleep(std::time::Duration::from_millis(1500));
+                    let _ = crate::image_io::spawn_main(|| {
+                        crate::window::prewarm_screenshot_window();
+                        crate::quick_access::prewarm_quick_access();
+                    });
+                });
             }
             Ok(())
         })
@@ -160,6 +171,7 @@ fn main() {
             get_base64,
             copy_img,
             system_ocr,
+            system_ocr_layout,
             set_proxy,
             unset_proxy,
             run_binary,
@@ -169,8 +181,7 @@ fn main() {
             updater_window,
             updater::check_latest_release,
             screenshot::screenshot,
-            screenshot::screenshot_intent,
-            screenshot::read_capture_image,
+            screenshot::screenshot_boot,
             screenshot::list_capture_windows,
             long_screenshot::long_capture_start,
             long_screenshot::long_capture_status,
@@ -188,7 +199,9 @@ fn main() {
             screen_record::screen_record_delete_last,
             long_screenshot::long_capture_finish_copy,
             long_screenshot::long_capture_cancel,
-            window::fit_overlay_window,
+            window::prepare_overlay_display,
+            window::reveal_overlay,
+            window::hide_screenshot_window,
             lang_detect,
             webdav,
             local,
@@ -200,10 +213,23 @@ fn main() {
             annotate::save_png_base64,
             annotate::open_ocr_from_png_base64,
             annotate::open_translate_from_png_base64,
+            quick_access::capture_history_add,
+            quick_access::capture_history_list,
+            quick_access::capture_history_copy,
+            quick_access::capture_history_share,
+            quick_access::capture_history_save,
+            quick_access::capture_history_pin,
+            quick_access::capture_history_edit,
+            quick_access::capture_history_ocr,
+            quick_access::capture_history_delete,
+            quick_access::capture_history_clear,
+            quick_access::show_quick_access,
+            quick_access::hide_quick_access_window,
             pin::annotate_pin,
             pin::pin_png_base64,
             pin::pin_image_base64,
             pin::pin_window_info,
+            pin::pin_text_content,
             pin::copy_pin_image,
             pin::save_pin_image,
             pin::ocr_pin_image,

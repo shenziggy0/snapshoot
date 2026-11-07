@@ -35,5 +35,9 @@ export default defineConfig(async () => ({
         minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
         // produce sourcemaps for debug builds
         sourcemap: !!process.env.TAURI_DEBUG,
+        // Pages are route-split per Tauri window. The remaining shared UI
+        // chunk is loaded from the local custom protocol, so 600 KiB is a
+        // more useful warning threshold than the web default.
+        chunkSizeWarningLimit: 600,
     },
 }));

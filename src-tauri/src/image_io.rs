@@ -3,9 +3,6 @@ use crate::APP;
 use base64::{engine::general_purpose, Engine as _};
 use image::DynamicImage;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-
-static CAPTURE_ORIGIN: Mutex<Option<(i32, i32)>> = Mutex::new(None);
 
 /// Append a line to a fixed diagnostic log next to the project so the agent
 /// can read it even when `tauri dev` keeps stdout in the terminal. The path
@@ -17,26 +14,16 @@ pub fn diag_log(tag: &str, message: &str) {
     ];
     let line = format!("[{}] {}\n", tag, message);
     for path in candidates {
-        if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
             use std::io::Write;
             let _ = file.write_all(line.as_bytes());
             return;
         }
     }
-}
-
-pub fn remember_capture_origin(x: Option<i32>, y: Option<i32>) {
-    if let (Some(x), Some(y)) = (x, y) {
-        *CAPTURE_ORIGIN.lock().unwrap() = Some((x, y));
-    }
-}
-
-pub fn clear_capture_origin() {
-    *CAPTURE_ORIGIN.lock().unwrap() = None;
-}
-
-pub fn take_capture_origin() -> Option<(i32, i32)> {
-    CAPTURE_ORIGIN.lock().unwrap().take()
 }
 
 pub fn app_cache_dir() -> PathBuf {

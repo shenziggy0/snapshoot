@@ -12,6 +12,7 @@ export default function Record() {
     const [quality, setQuality] = useConfig('record_quality', 'standard');
     const [cursor, setCursor] = useConfig('record_cursor', true);
     const [audio, setAudio] = useConfig('record_system_audio', false);
+    const [microphone, setMicrophone] = useConfig('record_microphone', false);
     const [directory, setDirectory] = useConfig('record_save_dir', '');
     const [support, setSupport] = useState(null);
     const [error, setError] = useState('');
@@ -64,10 +65,24 @@ export default function Record() {
                 </Switch>
                 {support?.system_audio && (
                     <Switch
-                        isSelected={audio === true}
+                        isSelected={audio === true && microphone !== true}
+                        isDisabled={microphone === true}
                         onValueChange={setAudio}
                     >
                         {t('config.record.system_audio')}
+                    </Switch>
+                )}
+                {support?.microphone && (
+                    <Switch
+                        isSelected={microphone === true}
+                        onValueChange={(value) => {
+                            setMicrophone(value);
+                            if (value) {
+                                setAudio(false);
+                            }
+                        }}
+                    >
+                        {t('config.record.microphone')}
                     </Switch>
                 )}
                 <Input

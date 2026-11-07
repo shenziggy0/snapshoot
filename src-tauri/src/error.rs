@@ -1,5 +1,6 @@
 // create the error type that represents all errors possible in our program
 #[derive(Debug, thiserror::Error)]
+#[allow(clippy::enum_variant_names)]
 pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),

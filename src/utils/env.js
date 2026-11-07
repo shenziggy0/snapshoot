@@ -7,8 +7,14 @@ export let osVersion = '';
 export let appVersion = '';
 
 export async function initEnv() {
-    osType = await type();
-    arch = await archFn();
-    osVersion = await version();
-    appVersion = await getVersion();
+    const [nextType, nextArch, nextVersion, nextAppVersion] = await Promise.all([
+        type(),
+        archFn(),
+        version(),
+        getVersion(),
+    ]);
+    osType = nextType;
+    arch = nextArch;
+    osVersion = nextVersion;
+    appVersion = nextAppVersion;
 }

@@ -72,6 +72,8 @@
                 },
                 "transparent": "透明效果",
                 "dev_mode": "开发模式",
+                "capture_auto_copy": "截图后自动复制",
+                "quick_access": "显示快速访问浮层",
                 "proxy": {
                     "title": "网络代理",
                     "host": "代理地址",
@@ -225,8 +227,9 @@
                 "high": "高画质",
                 "standard": "标准",
                 "small": "小文件",
-                "cursor": "录制鼠标",
-                "system_audio": "录制系统声音",
+            "cursor": "录制鼠标",
+            "system_audio": "录制系统声音",
+            "microphone": "录制麦克风（替代系统声音）",
                 "save_dir": "保存目录",
                 "default_dir": "系统「视频」目录 / Snapshoot",
                 "choose_dir": "选择目录",
@@ -523,7 +526,13 @@
             "copied": "已复制",
             "saved": "已保存",
             "empty": "截图为空",
-            "load_failed": "截图已读到，但无法显示。请重试截图。"
+            "load_failed": "截图已读到，但无法显示。请重试截图。",
+            "translate_overlay": "截图内翻译",
+            "privacy": "敏感信息打码",
+            "translating": "正在识别并翻译…",
+            "original_text": "原文",
+            "no_sensitive": "没有识别到需要打码的敏感信息",
+            "redacted": "已打码 {count} 处敏感信息"
         },
         "long_screenshot": {
             "title": "截长图",
@@ -574,6 +583,7 @@
             "delete": "删除",
             "unsupported": "当前系统暂不支持录屏。",
             "permission_denied": "录屏权限被拒绝，请检查系统权限。",
+            "microphone_unsupported": "当前平台不支持麦克风录制。",
             "encoder_failed": "录屏失败，请检查显示器和编码器后重试。",
             "already_running": "已有录屏或长截图正在进行。",
             "disk_write_failed": "无法写入视频，请检查保存目录和磁盘空间。",
@@ -581,6 +591,19 @@
             "not_running": "当前没有进行中的录屏。",
             "no_result": "视频文件已不存在。",
             "clipboard_failed": "视频已保存，但未能复制到剪贴板。"
+        },
+        "quick_access": {
+            "history": "截图历史",
+            "recent": "最近截图",
+            "empty": "暂无截图",
+            "empty_hint": "完成一次截图后会显示在这里",
+            "no_capture": "还没有截图",
+            "click_edit": "点击缩略图进入标注",
+            "edit": "标注截图",
+            "delete": "从历史中删除",
+            "share": "分享链接",
+            "share_copied": "分享链接已复制",
+            "share_needs_webdav": "请先在设置 → 备份中配置 WebDAV"
         }
     }
 }

@@ -7,7 +7,8 @@ use std::time::Duration;
 /// Snapshoot ships unsigned installers and has no updater signing key, so
 /// Tauri's built-in updater is not used. Instead the latest GitHub release is
 /// compared with the running version and the user downloads the installer.
-const LATEST_RELEASE_API: &str = "https://api.github.com/repos/shenziggy0/snapshoot/releases/latest";
+const LATEST_RELEASE_API: &str =
+    "https://api.github.com/repos/shenziggy0/snapshoot/releases/latest";
 
 #[derive(Deserialize)]
 struct GithubAsset {
@@ -104,14 +105,19 @@ pub async fn check_latest_release(app_handle: tauri::AppHandle) -> Result<Releas
 /// Startup check. Network failures are only logged; the updater window opens
 /// only when a newer release exists.
 pub fn check_update(app_handle: tauri::AppHandle) {
-    let enabled = get("check_update").and_then(|v| v.as_bool()).unwrap_or(true);
+    let enabled = get("check_update")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
     if !enabled || crate::smoke::enabled() {
         return;
     }
     tauri::async_runtime::spawn(async move {
         match check_latest_release(app_handle).await {
             Ok(release) if release.has_update => {
-                info!("New version available: {} -> {}", release.current, release.latest);
+                info!(
+                    "New version available: {} -> {}",
+                    release.current, release.latest
+                );
                 updater_window();
             }
             Ok(_) => {}

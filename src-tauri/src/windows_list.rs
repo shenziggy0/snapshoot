@@ -15,7 +15,7 @@ pub fn list_window_frames() -> Vec<WindowFrame> {
     }
     #[cfg(target_os = "macos")]
     {
-        return list_windows_mac();
+        list_windows_mac()
     }
     #[cfg(not(any(windows, target_os = "macos")))]
     {
@@ -118,9 +118,9 @@ fn list_windows_mac() -> Vec<WindowFrame> {
         value
     }
     unsafe fn backing_scale() -> f64 {
-        let class = objc_getClass(b"NSScreen\0".as_ptr() as *const c_char);
-        let main_sel = sel_registerName(b"mainScreen\0".as_ptr() as *const c_char);
-        let scale_sel = sel_registerName(b"backingScaleFactor\0".as_ptr() as *const c_char);
+        let class = objc_getClass(c"NSScreen".as_ptr());
+        let main_sel = sel_registerName(c"mainScreen".as_ptr());
+        let scale_sel = sel_registerName(c"backingScaleFactor".as_ptr());
         let msg_id: unsafe extern "C" fn(*const c_void, *const c_void) -> *const c_void =
             std::mem::transmute(objc_msgSend as *const ());
         let screen = msg_id(class, main_sel);

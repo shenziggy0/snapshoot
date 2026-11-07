@@ -72,6 +72,8 @@
                 },
                 "transparent": "Transparent Effect",
                 "dev_mode": "Developer Mode",
+                "capture_auto_copy": "Auto copy after capture",
+                "quick_access": "Show quick access overlay",
                 "proxy": {
                     "title": "Proxy",
                     "host": "Host",
@@ -225,8 +227,9 @@
                 "high": "High",
                 "standard": "Standard",
                 "small": "Small file",
-                "cursor": "Record mouse cursor",
-                "system_audio": "Record system audio",
+            "cursor": "Record mouse cursor",
+            "system_audio": "Record system audio",
+            "microphone": "Record microphone (instead of system audio)",
                 "save_dir": "Save folder",
                 "default_dir": "Videos / Snapshoot",
                 "choose_dir": "Choose folder",
@@ -523,7 +526,13 @@
             "copied": "Copied",
             "saved": "Saved",
             "empty": "Screenshot is empty",
-            "load_failed": "Could not display the screenshot. The file was read, but the image failed to decode."
+            "load_failed": "Could not display the screenshot. The file was read, but the image failed to decode.",
+            "translate_overlay": "Translate in place",
+            "privacy": "Redact sensitive text",
+            "translating": "Recognizing and translating…",
+            "original_text": "Original",
+            "no_sensitive": "No sensitive text was detected",
+            "redacted": "Redacted {count} sensitive item(s)"
         },
         "long_screenshot": {
             "title": "Scroll capture",
@@ -574,6 +583,7 @@
             "delete": "Delete",
             "unsupported": "Screen recording is not supported on this system.",
             "permission_denied": "Screen recording permission was denied.",
+            "microphone_unsupported": "Microphone recording is not supported on this platform.",
             "encoder_failed": "Recording failed. Check the display and encoder, then try again.",
             "already_running": "A capture is already running.",
             "disk_write_failed": "Unable to write the video. Check the folder and free disk space.",
@@ -581,6 +591,19 @@
             "not_running": "No active recording.",
             "no_result": "The video file is no longer available.",
             "clipboard_failed": "Video saved; clipboard copy failed."
+        },
+        "quick_access": {
+            "history": "Capture history",
+            "recent": "Recent captures",
+            "empty": "No captures yet",
+            "empty_hint": "Your latest screenshot will appear here",
+            "no_capture": "No screenshot",
+            "click_edit": "Click the thumbnail to annotate",
+            "edit": "Annotate capture",
+            "delete": "Remove from history",
+            "share": "Share link",
+            "share_copied": "Share link copied",
+            "share_needs_webdav": "Configure WebDAV in Settings → Backup first"
         }
     }
 }

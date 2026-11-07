@@ -25,7 +25,13 @@ fn default_hotkey(name: &str) -> &'static str {
                 "F3"
             }
         }
-        "hotkey_screen_record" => if cfg!(target_os = "windows") { "F2" } else { "" },
+        "hotkey_screen_record" => {
+            if cfg!(target_os = "windows") {
+                "F2"
+            } else {
+                ""
+            }
+        }
         _ => "",
     }
 }
@@ -90,7 +96,9 @@ pub fn register_shortcut(shortcut: &str) -> Result<(), String> {
             "",
         )?,
         "hotkey_pin_clipboard" => register(app_handle, "hotkey_pin_clipboard", pin_clipboard, "")?,
-        "hotkey_screen_record" => register(app_handle, "hotkey_screen_record", screen_record_hotkey, "")?,
+        "hotkey_screen_record" => {
+            register(app_handle, "hotkey_screen_record", screen_record_hotkey, "")?
+        }
         "all" => {
             register(
                 app_handle,
@@ -114,7 +122,8 @@ pub fn register_shortcut(shortcut: &str) -> Result<(), String> {
             if let Err(err) = register(app_handle, "hotkey_pin_clipboard", pin_clipboard, "") {
                 shortcut_errors.push(err);
             }
-            if let Err(err) = register(app_handle, "hotkey_screen_record", screen_record_hotkey, "") {
+            if let Err(err) = register(app_handle, "hotkey_screen_record", screen_record_hotkey, "")
+            {
                 shortcut_errors.push(err);
             }
             if !shortcut_errors.is_empty() {
@@ -157,7 +166,12 @@ pub fn register_shortcut_by_frontend(name: &str, shortcut: &str) -> Result<(), S
         "hotkey_pin_clipboard" => {
             register(app_handle, "hotkey_pin_clipboard", pin_clipboard, shortcut)?
         }
-        "hotkey_screen_record" => register(app_handle, "hotkey_screen_record", screen_record_hotkey, shortcut)?,
+        "hotkey_screen_record" => register(
+            app_handle,
+            "hotkey_screen_record",
+            screen_record_hotkey,
+            shortcut,
+        )?,
         _ => {}
     }
     Ok(())

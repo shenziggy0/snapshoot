@@ -3,6 +3,8 @@ use crate::config::set;
 use crate::StringWrapper;
 use crate::APP;
 use log::{info, warn};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, MutexGuard};
 use tauri::Manager;
 use tauri::Monitor;
 use tauri::Window;
@@ -369,19 +371,19 @@ fn place_screenshot_window(window: &Window) {
     #[cfg(target_os = "macos")]
     {
         crate::capture_macos::cover_monitor(window);
-        return;
     }
-    #[cfg(windows)]
+    #[cfg(not(target_os = "macos"))]
     {
+        #[cfg(windows)]
         if cover_monitor_win(window) {
             return;
         }
+        let monitor = monitor_at_mouse();
+        let pos = monitor.position();
+        let size = monitor.size();
+        let _ = window.set_position(tauri::PhysicalPosition::new(pos.x, pos.y));
+        let _ = window.set_size(tauri::PhysicalSize::new(size.width, size.height));
     }
-    let monitor = monitor_at_mouse();
-    let pos = monitor.position();
-    let size = monitor.size();
-    let _ = window.set_position(tauri::PhysicalPosition::new(pos.x, pos.y));
-    let _ = window.set_size(tauri::PhysicalSize::new(size.width, size.height));
 }
 
 #[cfg(windows)]
@@ -430,12 +432,18 @@ fn cover_monitor_win(window: &Window) -> bool {
 unsafe fn monitor_rect_at_cursor_win() -> Option<WinRect> {
     // A new overlay starts on the primary display; select by cursor instead.
     let mut cursor = WinPoint { x: 0, y: 0 };
-    if GetCursorPos(&mut cursor) == 0 { return None; }
+    if GetCursorPos(&mut cursor) == 0 {
+        return None;
+    }
     let monitor = MonitorFromPoint(cursor, 2); // MONITOR_DEFAULTTONEAREST
-    if monitor.is_null() { return None; }
+    if monitor.is_null() {
+        return None;
+    }
     let mut info: MonitorInfo = std::mem::zeroed();
     info.cb_size = std::mem::size_of::<MonitorInfo>() as u32;
-    if GetMonitorInfoW(monitor, &mut info) == 0 { return None; }
+    if GetMonitorInfoW(monitor, &mut info) == 0 {
+        return None;
+    }
     Some(info.rc_monitor)
 }
 
@@ -446,9 +454,16 @@ static OVERLAY_PLACEMENT_GENERATION: std::sync::atomic::AtomicU64 =
 #[cfg(windows)]
 unsafe fn fit_monitor_rect_win(raw: *mut std::ffi::c_void, rect: WinRect) -> bool {
     for _ in 0..2 {
-        if SetWindowPos(raw, (-1isize) as *mut std::ffi::c_void,
-            rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
-            0x0010 | 0x0020) == 0 {
+        if SetWindowPos(
+            raw,
+            (-1isize) as *mut std::ffi::c_void,
+            rect.left,
+            rect.top,
+            rect.right - rect.left,
+            rect.bottom - rect.top,
+            0x0010 | 0x0020,
+        ) == 0
+        {
             return false;
         }
         let mut actual: WinRect = std::mem::zeroed();
@@ -503,19 +518,134 @@ extern "system" {
     ) -> i32;
 }
 
-/// Capture is finished before this runs. The page shows itself after the
-/// frozen image is decoded. A short fallback shows the window if that signal
-/// never arrives (hidden webviews often do not run animation frames).
-pub(crate) fn screenshot_window() -> Window {
-    let app_handle = APP.get().unwrap();
-    if let Some(window) = app_handle.get_window("screenshot") {
-        place_screenshot_window(&window);
-        let _ = window.set_always_on_top(true);
-        let _ = window.emit("screenshot-reload", ());
-        reveal_overlay_fallback(window.clone());
-        return window;
+#[derive(Debug)]
+struct OverlayGate {
+    current: u64,
+    busy: bool,
+    ready: bool,
+    revealed: bool,
+    started: Option<std::time::Instant>,
+}
+
+impl OverlayGate {
+    const fn new() -> Self {
+        Self {
+            current: 0,
+            busy: false,
+            ready: false,
+            revealed: true,
+            started: None,
+        }
     }
 
+    fn begin(&mut self) -> Option<u64> {
+        if self.busy {
+            return None;
+        }
+        self.current = self.current.wrapping_add(1);
+        self.busy = true;
+        self.ready = false;
+        self.revealed = false;
+        self.started = Some(std::time::Instant::now());
+        Some(self.current)
+    }
+
+    fn mark_ready(&mut self, request_id: u64) -> bool {
+        if self.current != request_id || !self.busy {
+            return false;
+        }
+        self.ready = true;
+        true
+    }
+
+    fn can_prepare(&self, request_id: u64) -> bool {
+        self.current == request_id && self.ready && self.busy && !self.revealed
+    }
+
+    fn can_reveal(&self, request_id: u64) -> bool {
+        self.current == request_id && self.ready
+    }
+
+    fn complete(&mut self, request_id: u64) -> bool {
+        if self.current != request_id || !self.ready {
+            return false;
+        }
+        self.revealed = true;
+        self.busy = false;
+        true
+    }
+
+    fn fallback(&mut self, request_id: u64) -> bool {
+        if self.current != request_id || !self.ready || self.revealed {
+            return false;
+        }
+        self.revealed = true;
+        self.busy = false;
+        true
+    }
+
+    fn abort(&mut self, request_id: u64) {
+        if self.current == request_id {
+            self.busy = false;
+            self.ready = false;
+            self.revealed = true;
+            self.started = None;
+        }
+    }
+
+    fn cancel(&mut self) {
+        self.current = self.current.wrapping_add(1);
+        self.busy = false;
+        self.ready = false;
+        self.revealed = true;
+        self.started = None;
+    }
+
+    fn snapshot(&self) -> (u64, bool) {
+        (self.current, self.ready)
+    }
+
+    fn elapsed_ms(&self, request_id: u64) -> Option<u128> {
+        if self.current != request_id {
+            return None;
+        }
+        self.started.map(|started| started.elapsed().as_millis())
+    }
+}
+
+static OVERLAY_GATE: Mutex<OverlayGate> = Mutex::new(OverlayGate::new());
+static OVERLAY_FRAME_READY: AtomicBool = AtomicBool::new(false);
+static OVERLAY_WATCHDOG_USED: AtomicBool = AtomicBool::new(false);
+
+fn overlay_gate() -> MutexGuard<'static, OverlayGate> {
+    OVERLAY_GATE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+pub(crate) fn overlay_boot_state() -> (u64, bool) {
+    overlay_gate().snapshot()
+}
+
+pub(crate) fn last_overlay_frame_ready() -> bool {
+    OVERLAY_FRAME_READY.load(Ordering::SeqCst)
+}
+
+pub(crate) fn overlay_watchdog_used() -> bool {
+    OVERLAY_WATCHDOG_USED.load(Ordering::SeqCst)
+}
+
+fn begin_overlay_request() -> Option<u64> {
+    let request_id = overlay_gate().begin();
+    if request_id.is_some() {
+        OVERLAY_FRAME_READY.store(false, Ordering::SeqCst);
+        OVERLAY_WATCHDOG_USED.store(false, Ordering::SeqCst);
+    }
+    request_id
+}
+
+fn build_screenshot_window() -> Result<Window, tauri::Error> {
+    let app_handle = APP.get().unwrap();
     let builder = WindowBuilder::new(
         app_handle,
         "screenshot",
@@ -536,74 +666,216 @@ pub(crate) fn screenshot_window() -> Window {
         .hidden_title(true)
         .title_bar_style(tauri::TitleBarStyle::Overlay);
 
-    let window = builder.build().expect("create screenshot window");
+    let window = builder.build()?;
     window.on_window_event(move |event| {
         if let tauri::WindowEvent::Destroyed = event {
             crate::long_screenshot::abandon_active();
             crate::screen_record::abandon_active();
+            overlay_gate().cancel();
         }
     });
     place_screenshot_window(&window);
-    reveal_overlay_fallback(window.clone());
-    window
+    Ok(window)
 }
 
-fn reveal_overlay_fallback(window: Window) {
-    std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(350));
-        match window.is_visible() {
-            Ok(true) => {}
-            Ok(false) => {
-                warn!("overlay still hidden after 350ms; showing it");
-                let _ = window.show();
-                let _ = window.set_focus();
-                let _ = window.set_always_on_top(true);
-            }
-            Err(err) => warn!("overlay visibility check failed: {err}"),
+/// Create the hidden screenshot WebView during idle time. The first shortcut
+/// then only reloads a warm page instead of paying WebView startup in the
+/// latency-sensitive capture path.
+pub(crate) fn prewarm_screenshot_window() {
+    let Some(app) = APP.get() else {
+        return;
+    };
+    if app.get_window("screenshot").is_some() {
+        return;
+    }
+    match build_screenshot_window() {
+        Ok(window) => {
+            #[cfg(target_os = "macos")]
+            crate::capture_macos::set_window_alpha(&window, 0.0);
+            info!("screenshot overlay prewarmed");
         }
+        Err(err) => warn!("prewarm screenshot overlay failed: {err}"),
+    }
+}
+
+/// Capture is finished before this runs. The page owns the reveal: it first
+/// shows a transparent window, waits for the canvas frame, then asks Rust to
+/// make that same window visible. A slow watchdog exists only for a broken
+/// page, never as a second normal display path.
+fn screenshot_window_for_request(request_id: u64) -> Option<Window> {
+    if !overlay_gate().mark_ready(request_id) {
+        return None;
+    }
+
+    let app_handle = APP.get()?;
+    if let Some(window) = app_handle.get_window("screenshot") {
+        place_screenshot_window(&window);
+        #[cfg(target_os = "macos")]
+        crate::capture_macos::set_window_alpha(&window, 0.0);
+        let _ = window.set_always_on_top(true);
+        let _ = window.emit("screenshot-reload", request_id);
+        arm_overlay_reveal_watchdog(request_id, window.clone());
+        return Some(window);
+    }
+
+    let window = match build_screenshot_window() {
+        Ok(window) => window,
+        Err(err) => {
+            warn!("create screenshot window failed: {err}");
+            overlay_gate().abort(request_id);
+            return None;
+        }
+    };
+    #[cfg(target_os = "macos")]
+    crate::capture_macos::set_window_alpha(&window, 0.0);
+    arm_overlay_reveal_watchdog(request_id, window.clone());
+    Some(window)
+}
+
+fn arm_overlay_reveal_watchdog(request_id: u64, window: Window) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(2500));
+        if !overlay_gate().fallback(request_id) {
+            return;
+        }
+        let elapsed = overlay_gate()
+            .elapsed_ms(request_id)
+            .map(|value| format!("{value}ms"))
+            .unwrap_or_else(|| "unknown".to_string());
+        OVERLAY_FRAME_READY.store(false, Ordering::SeqCst);
+        OVERLAY_WATCHDOG_USED.store(true, Ordering::SeqCst);
+        warn!("overlay first frame was not reported after 2500ms; revealing with watchdog ({elapsed})");
+        let shown = window.clone();
+        let _ = crate::image_io::spawn_main(move || {
+            let _ = shown.show();
+            #[cfg(target_os = "macos")]
+            crate::capture_macos::set_window_alpha(&shown, 1.0);
+            let _ = shown.set_focus();
+            let _ = shown.set_always_on_top(true);
+            let _ = shown.set_ignore_cursor_events(false);
+        });
     });
 }
 
 #[tauri::command]
-pub fn fit_overlay_window() {
-    let Some(window) = APP.get().and_then(|app| app.get_window("screenshot")) else {
-        return;
+pub fn prepare_overlay_display(request_id: u64) -> bool {
+    let ready = {
+        let gate = overlay_gate();
+        if gate.current == request_id && gate.ready && gate.revealed {
+            return true;
+        }
+        gate.can_prepare(request_id)
     };
-    place_screenshot_window(&window);
-    let _ = window.set_always_on_top(true);
+    if !ready {
+        return false;
+    }
+    let Some(window) = APP.get().and_then(|app| app.get_window("screenshot")) else {
+        return false;
+    };
     #[cfg(target_os = "macos")]
-    crate::capture_macos::cover_monitor(&window);
+    crate::capture_macos::set_window_alpha(&window, 0.0);
+    let _ = window.set_ignore_cursor_events(true);
+    window.show().is_ok()
 }
 
-pub(crate) fn open_frozen_overlay() {
+#[tauri::command]
+pub fn reveal_overlay(request_id: u64, image_loaded: bool) -> bool {
+    if !overlay_gate().can_reveal(request_id) {
+        return false;
+    }
+    let elapsed = overlay_gate()
+        .elapsed_ms(request_id)
+        .map(|value| format!("{value}ms"))
+        .unwrap_or_else(|| "unknown".to_string());
+    let Some(window) = APP.get().and_then(|app| app.get_window("screenshot")) else {
+        overlay_gate().abort(request_id);
+        return false;
+    };
+    let _ = window.show();
+    #[cfg(target_os = "macos")]
+    crate::capture_macos::set_window_alpha(&window, 1.0);
+    let _ = window.set_ignore_cursor_events(false);
+    let _ = window.set_focus();
+    let _ = window.set_always_on_top(true);
+    OVERLAY_FRAME_READY.store(image_loaded, Ordering::SeqCst);
+    let completed = overlay_gate().complete(request_id);
+    if completed {
+        info!("overlay revealed request={request_id} image={image_loaded} after {elapsed}");
+    }
+    completed
+}
+
+#[tauri::command]
+pub fn hide_screenshot_window() {
+    overlay_gate().cancel();
+    OVERLAY_FRAME_READY.store(false, Ordering::SeqCst);
+    OVERLAY_WATCHDOG_USED.store(false, Ordering::SeqCst);
+    crate::long_screenshot::abandon_active();
+    crate::screen_record::abandon_active();
+    if let Some(window) = APP.get().and_then(|app| app.get_window("screenshot")) {
+        let _ = window.hide();
+    }
+    crate::quick_access::show_pending();
+}
+
+pub(crate) fn open_edit_overlay(path: &std::path::Path) -> Option<Window> {
+    let request_id = begin_overlay_request()?;
+    crate::screenshot::prepare_edit_image(path);
+    screenshot_window_for_request(request_id)
+}
+
+/// Used by the smoke test; the screenshot hotkey path below allocates its
+/// request before the background capture.
+pub(crate) fn screenshot_window() -> Option<Window> {
+    let request_id = begin_overlay_request()?;
+    screenshot_window_for_request(request_id)
+}
+
+pub(crate) fn open_frozen_overlay(intent: &str) {
     if crate::long_screenshot::is_active() || crate::screen_record::is_active() {
         warn!("ignoring screenshot request while scroll capture is active");
         return;
     }
-    use std::sync::atomic::{AtomicBool, Ordering};
-    static BUSY: AtomicBool = AtomicBool::new(false);
-    if BUSY.swap(true, Ordering::SeqCst) {
+    crate::quick_access::hide_for_capture();
+    let Some(request_id) = begin_overlay_request() else {
+        warn!("ignoring screenshot request while the previous overlay is still loading");
         return;
-    }
+    };
+    // Snapshot the intent only after this request owns the gate. A duplicate
+    // shortcut must not overwrite the capture that is already in flight.
+    crate::screenshot::prepare_screen_capture(intent);
     let was_visible = dismiss_screenshot_window();
     std::thread::spawn(move || {
+        let capture_started = std::time::Instant::now();
         if was_visible {
-            // Return to the event loop first so macOS can drop the overlay
-            // from the framebuffer before the capture runs.
-            std::thread::sleep(std::time::Duration::from_millis(80));
+            // Give WindowServer two frames to composite the removed overlay.
+            // The window normally stays hidden between captures, so this path
+            // only runs when a new capture replaces a visible frozen frame.
+            std::thread::sleep(std::time::Duration::from_millis(32));
         }
         let result = crate::screenshot::capture_for_overlay();
-        let queued = crate::image_io::spawn_main(move || {
-            BUSY.store(false, Ordering::SeqCst);
-            match result {
-                Ok(()) => {
-                    let _ = screenshot_window();
+        crate::image_io::diag_log(
+            "overlay_capture",
+            &format!(
+                "request={request_id} visible_retry={was_visible} elapsed={}ms ok={}",
+                capture_started.elapsed().as_millis(),
+                result.is_ok()
+            ),
+        );
+        let queued = crate::image_io::spawn_main(move || match result {
+            Ok(()) => {
+                if screenshot_window_for_request(request_id).is_none() {
+                    warn!("dropping stale screenshot request {request_id}");
                 }
-                Err(err) => crate::screenshot::report_capture_failure(&err),
+            }
+            Err(err) => {
+                dismiss_screenshot_window();
+                overlay_gate().abort(request_id);
+                crate::screenshot::report_capture_failure(&err);
             }
         });
         if queued.is_err() {
-            BUSY.store(false, Ordering::SeqCst);
+            overlay_gate().abort(request_id);
         }
     });
 }
@@ -631,8 +903,6 @@ pub(crate) fn dismiss_screenshot_window() -> bool {
     let _ = window.set_ignore_cursor_events(false);
     visible
 }
-
-use std::sync::atomic::{AtomicBool, Ordering};
 
 /// CSS-pixel rectangles that must keep receiving clicks (the toolbar) while
 /// the rest of the overlay lets the page underneath handle the wheel.
@@ -803,7 +1073,9 @@ fn ensure_click_through_poller() {
 /// Runs on the main thread (the start command is synchronous). Keep the
 /// overlay on screen, drop it out of the hit test, and exclude it from grabs.
 pub(crate) fn enter_long_screenshot_mode() -> Result<(), String> {
-    if crate::screen_record::is_active() { return Err("screen_record.already_running".into()); }
+    if crate::screen_record::is_active() {
+        return Err("screen_record.already_running".into());
+    }
     let window =
         screenshot_handle().ok_or_else(|| "screenshot window is not available".to_string())?;
     #[cfg(target_os = "macos")]
@@ -852,7 +1124,9 @@ pub(crate) fn leave_record_mode(close: bool) {
             #[cfg(windows)]
             let _ = set_excluded_from_capture(&window, false);
             apply_click_through(&window, false);
-            if close { let _ = window.close(); }
+            if close {
+                let _ = window.close();
+            }
         }
         crate::screen_record::finish_overlay_transition();
     });
@@ -909,7 +1183,7 @@ pub(crate) fn forward_long_capture_scroll(
         screenshot_handle().ok_or_else(|| "screenshot window is not available".to_string())?;
     #[cfg(target_os = "macos")]
     {
-        return crate::capture_macos::forward_scroll(&window, delta_y, center_x, center_y);
+        crate::capture_macos::forward_scroll(&window, delta_y, center_x, center_y)
     }
     #[cfg(windows)]
     {
@@ -956,12 +1230,10 @@ fn forward_scroll_windows(window: &Window, delta_y: i32) -> Result<(), String> {
 }
 
 pub fn ocr_recognize() {
-    crate::screenshot::prepare_screen_capture("ocr");
-    open_frozen_overlay();
+    open_frozen_overlay("ocr");
 }
 pub fn ocr_translate() {
-    crate::screenshot::prepare_screen_capture("translate");
-    open_frozen_overlay();
+    open_frozen_overlay("translate");
 }
 
 #[tauri::command(async)]
@@ -972,4 +1244,60 @@ pub fn updater_window() {
         .unwrap();
     window.set_size(tauri::LogicalSize::new(600, 400)).unwrap();
     window.center().unwrap();
+}
+
+#[cfg(test)]
+mod overlay_gate_tests {
+    use super::OverlayGate;
+
+    #[test]
+    fn accepts_only_one_capture_until_the_first_frame_is_revealed() {
+        let mut gate = OverlayGate::new();
+        let first = gate.begin().expect("first request");
+        assert!(
+            gate.begin().is_none(),
+            "capture must not re-enter while busy"
+        );
+        assert!(!gate.can_prepare(first), "capture file is not ready yet");
+        assert!(gate.mark_ready(first));
+        assert!(gate.can_prepare(first));
+        assert!(gate.complete(first));
+        assert!(gate.begin().is_some(), "next shortcut after reveal");
+    }
+
+    #[test]
+    fn stale_page_cannot_reveal_or_hide_a_newer_capture() {
+        let mut gate = OverlayGate::new();
+        let first = gate.begin().expect("first request");
+        assert!(gate.mark_ready(first));
+        assert!(gate.complete(first));
+
+        let second = gate.begin().expect("second request");
+        assert!(gate.mark_ready(second));
+        assert!(!gate.can_reveal(first));
+        assert!(!gate.complete(first));
+        assert!(gate.can_reveal(second));
+        assert!(gate.complete(second));
+    }
+
+    #[test]
+    fn watchdog_reveals_once_and_releases_the_busy_gate() {
+        let mut gate = OverlayGate::new();
+        let request = gate.begin().expect("request");
+        assert!(gate.mark_ready(request));
+        assert!(gate.fallback(request));
+        assert!(!gate.fallback(request), "watchdog must be idempotent");
+        assert!(!gate.can_prepare(request));
+        assert!(gate.begin().is_some());
+    }
+
+    #[test]
+    fn hiding_an_overlay_invalidates_its_watchdog() {
+        let mut gate = OverlayGate::new();
+        let request = gate.begin().expect("request");
+        assert!(gate.mark_ready(request));
+        gate.cancel();
+        assert!(!gate.fallback(request));
+        assert!(gate.begin().is_some());
+    }
 }

@@ -9,8 +9,10 @@ import {
     MdDocumentScanner,
     MdFormatListNumbered,
     MdGesture,
+    MdGTranslate,
     MdGridOn,
     MdHorizontalRule,
+    MdPrivacyTip,
     MdPushPin,
     MdPhotoSizeSelectActual,
     MdRadioButtonUnchecked,
@@ -80,6 +82,8 @@ export default function CaptureToolbar(props) {
         onRedo,
         onOcr,
         onTranslate,
+        onInlineTranslate,
+        onRedact,
         onLongScreenshot,
         onScreenRecord,
         recordIntent = false,
@@ -90,19 +94,28 @@ export default function CaptureToolbar(props) {
         onCopy,
         onClose,
     } = props;
-    const bar = dark
-        ? 'border-white/10 bg-neutral-900/95 text-white'
-        : 'border-black/10 bg-white/95 text-neutral-800';
+    const bar = dark ? 'border-white/10 bg-neutral-900/95 text-white' : 'border-black/10 bg-white/95 text-neutral-800';
     const showProps = Boolean(tool) && !longCaptureActive;
 
     if (recordIntent) {
         return (
             <div className={`flex items-center gap-2 rounded-xl border p-1.5 shadow-lg ${bar}`}>
-                <button type='button' disabled={!onScreenRecord} onClick={onScreenRecord}
-                    className='flex h-9 items-center gap-1 rounded-md bg-red-600 px-3 text-sm text-white disabled:opacity-40'>
-                    <MdVideocam />{t('screen_record.start')}
+                <button
+                    type='button'
+                    disabled={!onScreenRecord}
+                    onClick={onScreenRecord}
+                    className='flex h-9 items-center gap-1 rounded-md bg-red-600 px-3 text-sm text-white disabled:opacity-40'
+                >
+                    <MdVideocam />
+                    {t('screen_record.start')}
                 </button>
-                <IconButton title={t('annotate.close')} dark={dark} onClick={onClose}><MdClose size={18} /></IconButton>
+                <IconButton
+                    title={t('annotate.close')}
+                    dark={dark}
+                    onClick={onClose}
+                >
+                    <MdClose size={18} />
+                </IconButton>
             </div>
         );
     }
@@ -153,7 +166,12 @@ export default function CaptureToolbar(props) {
                     </IconButton>
                 )}
                 {onScreenRecord && (
-                    <IconButton title={t('screen_record.label')} disabled={longCaptureActive} dark={dark} onClick={onScreenRecord}>
+                    <IconButton
+                        title={t('screen_record.label')}
+                        disabled={longCaptureActive}
+                        dark={dark}
+                        onClick={onScreenRecord}
+                    >
                         <MdVideocam size={18} />
                     </IconButton>
                 )}
@@ -172,6 +190,22 @@ export default function CaptureToolbar(props) {
                     onClick={onTranslate}
                 >
                     <MdTranslate size={16} />
+                </IconButton>
+                <IconButton
+                    title={t('annotate.translate_overlay')}
+                    disabled={longCaptureActive}
+                    dark={dark}
+                    onClick={onInlineTranslate}
+                >
+                    <MdGTranslate size={16} />
+                </IconButton>
+                <IconButton
+                    title={t('annotate.privacy')}
+                    disabled={longCaptureActive}
+                    dark={dark}
+                    onClick={onRedact}
+                >
+                    <MdPrivacyTip size={16} />
                 </IconButton>
                 <IconButton
                     title={t('annotate.pin')}

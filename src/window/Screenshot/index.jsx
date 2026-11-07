@@ -5,11 +5,14 @@ import { writeText } from '@tauri-apps/api/clipboard';
 import toast, { Toaster } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api';
+import { convertFileSrc } from '@tauri-apps/api/tauri';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { MdClose, MdContentCopy } from 'react-icons/md';
 
 import { drawShape } from '../Annotate/render';
-import { useToastStyle } from '../../hooks';
+import { translateOnce } from '../../utils/translate_once';
+import { useConfig, useToastStyle } from '../../hooks';
 import { useSystemDark } from '../useSystemDark';
 import CaptureToolbar from './Toolbar';
 import RecordControls from './RecordControls';
@@ -27,28 +30,51 @@ function normalize(rect) {
     return { x, y, w: Math.abs(rect.w), h: Math.abs(rect.h) };
 }
 
-function loadHtmlImage(src) {
+function loadHtmlImage(src, withCors = false) {
     return new Promise((resolve, reject) => {
         const image = new Image();
+        if (withCors) {
+            // The asset response allows the webview origin. Requesting CORS
+            // keeps the canvas untainted so copy/save can still export it.
+            image.crossOrigin = 'anonymous';
+        }
         image.onload = () => resolve(image);
         image.onerror = () => reject(new Error('decode'));
         image.src = src;
     });
 }
 
-function base64ToObjectUrl(data) {
-    const binary = atob(data);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) {
-        bytes[index] = binary.charCodeAt(index);
+async function loadCaptureImage(src) {
+    try {
+        return await loadHtmlImage(src, true);
+    } catch (corsError) {
+        // Some WKWebView versions do not apply CORS to custom schemes. Fetching
+        // the same local asset and decoding a blob keeps the canvas exportable.
+        const response = await fetch(src);
+        if (!response.ok) {
+            throw corsError;
+        }
+        const url = URL.createObjectURL(await response.blob());
+        try {
+            return await loadHtmlImage(url);
+        } finally {
+            URL.revokeObjectURL(url);
+        }
     }
-    return URL.createObjectURL(new Blob([bytes], { type: 'image/png' }));
 }
 
 function handleStyle(handle, rect) {
     const size = 8;
     const x = { w: rect.x, e: rect.x + rect.w, n: rect.x + rect.w / 2, s: rect.x + rect.w / 2 }[
-        handle.includes('w') ? 'w' : handle.includes('e') ? 'e' : handle.includes('n') || handle.includes('s') ? (handle.includes('n') ? 'n' : 's') : 'n'
+        handle.includes('w')
+            ? 'w'
+            : handle.includes('e')
+              ? 'e'
+              : handle.includes('n') || handle.includes('s')
+                ? handle.includes('n')
+                    ? 'n'
+                    : 's'
+                : 'n'
     ];
     let left = rect.x + rect.w / 2;
     let top = rect.y + rect.h / 2;
@@ -91,6 +117,10 @@ export default function Screenshot() {
     const { t } = useTranslation();
     const toastStyle = useToastStyle();
     const dark = useSystemDark();
+    const [autoCopy] = useConfig('capture_auto_copy', true);
+    const autoCopyRef = useRef(Boolean(autoCopy));
+    const autoCopiedRef = useRef(false);
+    autoCopyRef.current = Boolean(autoCopy);
     const canvasRef = useRef(null);
     const sampleRef = useRef(null);
     const loupeRef = useRef(null);
@@ -106,7 +136,7 @@ export default function Screenshot() {
     const layoutRef = useRef(null);
     const framesRef = useRef([]);
     const originRef = useRef({ x: 0, y: 0 });
-    const blobRef = useRef('');
+    const bootSeqRef = useRef(0);
     const colorRef = useRef('#e11d48');
     const strokeRef = useRef(4);
     const fontRef = useRef(24);
@@ -137,6 +167,7 @@ export default function Screenshot() {
     const [fontSize, setFontSize] = useState(24);
     const [textDraft, setTextDraft] = useState(null);
     const [loadError, setLoadError] = useState('');
+    const [inlineTranslation, setInlineTranslation] = useState(null);
     const [cursor, setCursor] = useState({ x: 0, y: 0 });
     const [loupe, setLoupe] = useState(null);
     const [toolbarSize, setToolbarSize] = useState({ w: 566, h: 72 });
@@ -205,8 +236,35 @@ export default function Screenshot() {
         paint();
     });
 
+    async function revealRequest(requestId, live, imageLoaded = false) {
+        try {
+            const accepted = await invoke('prepare_overlay_display', { requestId });
+            if (!accepted || !live()) {
+                return;
+            }
+            // The window is now visible but fully transparent, so animation
+            // frames run and the first visible composition is the painted
+            // frozen frame rather than a blank webview.
+            await waitUntilPainted(120);
+            if (!live()) {
+                return;
+            }
+            await invoke('reveal_overlay', { requestId, imageLoaded });
+            const fitted = await appWindow.innerPosition();
+            if (live()) {
+                originRef.current = { x: fitted.x, y: fitted.y };
+            }
+        } catch (error) {
+            console.error('overlay reveal failed', error);
+        }
+    }
+
     const boot = async () => {
+        const sequence = ++bootSeqRef.current;
+        const live = () => sequence === bootSeqRef.current;
+        let requestId = 0;
         setLoadError('');
+        setInlineTranslation(null);
         setSelection(null);
         setHover(null);
         setTool('');
@@ -214,26 +272,55 @@ export default function Screenshot() {
         setDraft(null);
         setLongCaptureMode(false);
         setLongCaptureStatus(null);
-        if (blobRef.current) {
-            URL.revokeObjectURL(blobRef.current);
-            blobRef.current = '';
-        }
+        framesRef.current = [];
+        autoCopiedRef.current = false;
+        imageRef.current = null;
+        layoutRef.current = null;
+        selectionRef.current = null;
+        setImage(null);
+        setLayout(null);
+        const canvas = canvasRef.current;
+        canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+
         try {
-            const intent = await invoke('screenshot_intent');
-            intentRef.current = intent || 'annotate';
-            if (intentRef.current !== 'edit') {
-                const inner = await appWindow.innerPosition();
-                originRef.current = { x: inner.x, y: inner.y };
-                framesRef.current = await invoke('list_capture_windows');
-            } else {
-                framesRef.current = [];
+            const payload = await invoke('screenshot_boot');
+            if (!live()) {
+                return;
             }
-            const captured = await invoke('read_capture_image');
-            const objectUrl = base64ToObjectUrl(captured.data);
-            blobRef.current = objectUrl;
-            const next = await loadHtmlImage(objectUrl);
+            requestId = Number(payload?.requestId || 0);
+            // Request 0 is the idle prewarm page. A capture request arrives as
+            // a reload event once its PNG is on disk.
+            if (!requestId || !payload?.ready) {
+                return;
+            }
+            intentRef.current = payload.intent || 'annotate';
+
+            // Geometry only feeds hover highlighting and must not delay the
+            // frozen first frame. Window enumeration is even later because it
+            // is a synchronous macOS main-thread command.
+            if (intentRef.current !== 'edit') {
+                void appWindow
+                    .innerPosition()
+                    .then((inner) => {
+                        if (live()) {
+                            originRef.current = { x: inner.x, y: inner.y };
+                        }
+                    })
+                    .catch(() => {});
+            }
+
+            if (payload.error || !payload.imagePath) {
+                flushSync(() => setLoadError(payload.error || 'screenshot is unavailable'));
+                await revealRequest(requestId, live);
+                return;
+            }
+
+            const source = `${convertFileSrc(payload.imagePath)}?v=${requestId}`;
+            const next = await loadCaptureImage(source);
+            if (!live()) {
+                return;
+            }
             imageRef.current = next;
-            await invoke('fit_overlay_window');
             const placed = placeImage(next, intentRef.current);
             layoutRef.current = placed.layout;
             flushSync(() => {
@@ -245,26 +332,27 @@ export default function Screenshot() {
                 }
             });
             paint();
-            await waitUntilPainted(300);
-            await revealOverlay();
+            await revealRequest(requestId, live, true);
+            if (live() && intentRef.current !== 'edit') {
+                void invoke('list_capture_windows')
+                    .then((frames) => {
+                        if (live()) {
+                            framesRef.current = frames;
+                        }
+                    })
+                    .catch(() => {});
+            }
         } catch (error) {
+            if (!live()) {
+                return;
+            }
             console.error('overlay boot failed', error);
-            setLoadError(String(error));
-            await revealOverlay();
+            flushSync(() => setLoadError(String(error)));
+            if (requestId) {
+                await revealRequest(requestId, live);
+            }
         }
     };
-
-    async function revealOverlay() {
-        try {
-            await appWindow.show();
-            await appWindow.setFocus();
-            await appWindow.setAlwaysOnTop(true);
-            const fitted = await appWindow.innerPosition();
-            originRef.current = { x: fitted.x, y: fitted.y };
-        } catch (error) {
-            console.error('overlay show failed', error);
-        }
-    }
 
     useEffect(() => {
         let cancel = false;
@@ -285,10 +373,8 @@ export default function Screenshot() {
         })();
         return () => {
             cancel = true;
+            bootSeqRef.current += 1;
             unlisten();
-            if (blobRef.current) {
-                URL.revokeObjectURL(blobRef.current);
-            }
         };
     }, []);
 
@@ -429,8 +515,16 @@ export default function Screenshot() {
             if (drag.kind === 'move') {
                 const next = {
                     ...drag.origin,
-                    x: clamp(drag.origin.x + dx, bounds.x ?? bounds.left ?? 0, (bounds.x ?? 0) + (bounds.w ?? bounds.width) - drag.origin.w),
-                    y: clamp(drag.origin.y + dy, bounds.y ?? bounds.top ?? 0, (bounds.y ?? 0) + (bounds.h ?? bounds.height) - drag.origin.h),
+                    x: clamp(
+                        drag.origin.x + dx,
+                        bounds.x ?? bounds.left ?? 0,
+                        (bounds.x ?? 0) + (bounds.w ?? bounds.width) - drag.origin.w
+                    ),
+                    y: clamp(
+                        drag.origin.y + dy,
+                        bounds.y ?? bounds.top ?? 0,
+                        (bounds.y ?? 0) + (bounds.h ?? bounds.height) - drag.origin.h
+                    ),
                 };
                 const limit = imageBounds();
                 next.x = clamp(next.x, limit.x, limit.x + limit.w - next.w);
@@ -460,7 +554,10 @@ export default function Screenshot() {
                 }
                 if ((shape.type === 'pen' || shape.type === 'highlighter') && shape.points?.length) {
                     commitShape(shape);
-                } else if ((shape.type === 'line' || shape.type === 'arrow') && Math.hypot(shape.x2 - shape.x, shape.y2 - shape.y) >= 2) {
+                } else if (
+                    (shape.type === 'line' || shape.type === 'arrow') &&
+                    Math.hypot(shape.x2 - shape.x, shape.y2 - shape.y) >= 2
+                ) {
                     commitShape(shape);
                 } else if (Math.abs(shape.w || 0) >= 2 || Math.abs(shape.h || 0) >= 2) {
                     commitShape(shape);
@@ -544,17 +641,52 @@ export default function Screenshot() {
     };
 
     useEffect(() => {
+        if (
+            !autoCopyRef.current ||
+            autoCopiedRef.current ||
+            !image ||
+            !selection ||
+            selection.w < 8 ||
+            selection.h < 8 ||
+            intentRef.current !== 'annotate'
+        ) {
+            return undefined;
+        }
+        // Wait until a drag/resize has settled before touching the clipboard.
+        const timer = setTimeout(() => {
+            if (autoCopiedRef.current) {
+                return;
+            }
+            const data = exportBase64(selection);
+            if (!data) {
+                return;
+            }
+            autoCopiedRef.current = true;
+            void invoke('copy_png_base64', { data }).catch((error) => {
+                console.error('auto copy failed', error);
+            });
+            recordHistory(data, 'auto', true);
+        }, 450);
+        return () => clearTimeout(timer);
+    }, [selection, image]);
+
+    useEffect(() => {
         let alive = true;
-        invoke('screen_record_support').then((support) => {
-            if (alive) setRecordSupported(support.supported);
-        }).catch(() => {});
+        invoke('screen_record_support')
+            .then((support) => {
+                if (alive) setRecordSupported(support.supported);
+            })
+            .catch(() => {});
         const unlisten = listen('screen-record-error', (event) => {
             if (!alive) return;
             recordRef.current = false;
             setRecordActive(false);
             toast.error(t(String(event.payload)), { style: toastStyle });
         });
-        return () => { alive = false; unlisten.then((f) => f()); };
+        return () => {
+            alive = false;
+            unlisten.then((f) => f());
+        };
     }, []);
 
     useEffect(() => {
@@ -568,12 +700,20 @@ export default function Screenshot() {
                 const status = await invoke('screen_record_status');
                 if (alive) setRecordStatus(status);
             } catch (error) {
-                if (alive && !recordBusyRef.current) setRecordStatus((previous) => ({
-                    ...previous, state: 'error', message: String(error),
-                }));
-            } finally { pending = false; }
+                if (alive && !recordBusyRef.current)
+                    setRecordStatus((previous) => ({
+                        ...previous,
+                        state: 'error',
+                        message: String(error),
+                    }));
+            } finally {
+                pending = false;
+            }
         }, 500);
-        return () => { alive = false; clearInterval(timer); };
+        return () => {
+            alive = false;
+            clearInterval(timer);
+        };
     }, [recordActive]);
 
     const startScreenRecord = async () => {
@@ -609,7 +749,10 @@ export default function Screenshot() {
         try {
             const status = await invoke(`screen_record_${action}`);
             if (action === 'pause' || action === 'resume') setRecordStatus(status);
-            else { recordRef.current = false; setRecordActive(false); }
+            else {
+                recordRef.current = false;
+                setRecordActive(false);
+            }
         } catch (error) {
             if (action === 'stop') {
                 recordRef.current = false;
@@ -654,7 +797,7 @@ export default function Screenshot() {
         try {
             await invoke('long_capture_finish_copy');
             toast.success(t('annotate.copied'), { style: toastStyle });
-            await appWindow.close();
+            await invoke('hide_screenshot_window');
         } catch (error) {
             showLongCaptureError(error);
         } finally {
@@ -676,11 +819,18 @@ export default function Screenshot() {
         setLongCaptureStatus(null);
     };
 
+    const recordHistory = (data, action, showQuick = true) => {
+        void invoke('capture_history_add', { data, action, showQuick }).catch((error) => {
+            console.error('capture history failed', error);
+        });
+    };
+
     const finish = async (action, rect) => {
         if (longCaptureRef.current) {
             await finishLongCapture();
             return;
         }
+        autoCopiedRef.current = true;
         const data = exportBase64(rect || selectionRef.current);
         if (!data) {
             return;
@@ -688,6 +838,7 @@ export default function Screenshot() {
         try {
             if (action === 'copy') {
                 await invoke('copy_png_base64', { data });
+                recordHistory(data, 'copy', true);
             } else if (action === 'save') {
                 const path = await save({
                     defaultPath: 'snapshoot-screenshot.png',
@@ -697,16 +848,112 @@ export default function Screenshot() {
                     return;
                 }
                 await invoke('save_png_base64', { path, data });
+                recordHistory(data, 'save', true);
                 toast.success(t('annotate.saved'), { style: toastStyle });
                 return;
             } else if (action === 'pin') {
                 await invoke('pin_png_base64', { data });
+                recordHistory(data, 'pin', true);
             } else if (action === 'ocr') {
                 await invoke('open_ocr_from_png_base64', { data });
+                recordHistory(data, 'ocr', false);
             } else if (action === 'translate') {
                 await invoke('open_translate_from_png_base64', { data });
+                recordHistory(data, 'translate', false);
             }
-            await appWindow.close();
+            await invoke('hide_screenshot_window');
+        } catch (error) {
+            toast.error(String(error), { style: toastStyle });
+        }
+    };
+
+    const runInlineTranslate = async () => {
+        const current = selectionRef.current;
+        if (!current) {
+            return;
+        }
+        setInlineTranslation({ selection: { ...current }, loading: true, original: '', translated: '', error: '' });
+        try {
+            const data = exportBase64(current);
+            const layout = await invoke('system_ocr_layout', { data });
+            const original = (layout.lines || [])
+                .map((line) => line.text)
+                .join('\n')
+                .trim();
+            const barcodeText = (layout.barcodes || [])
+                .map((barcode) => barcode.text)
+                .join('\n')
+                .trim();
+            if (!original && barcodeText) {
+                setInlineTranslation({
+                    selection: { ...current },
+                    loading: false,
+                    original: barcodeText,
+                    translated: barcodeText,
+                    error: '',
+                });
+                return;
+            }
+            if (!original) {
+                throw new Error(t('annotate.empty'));
+            }
+            const translated = await translateOnce(original);
+            setInlineTranslation({
+                selection: { ...current },
+                loading: false,
+                original,
+                translated,
+                error: '',
+            });
+        } catch (error) {
+            setInlineTranslation(null);
+            toast.error(String(error), { style: toastStyle });
+        }
+    };
+
+    const sensitiveLine = (text) => {
+        const value = String(text || '');
+        return (
+            /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value) ||
+            /(?:\+?86[-\s]?)?1[3-9]\d{9}\b/.test(value) ||
+            /\b(?:sk|pk|ghp|xox[baprs])[-_][A-Za-z0-9_-]{12,}\b/.test(value) ||
+            /\bAKIA[0-9A-Z]{16}\b/.test(value) ||
+            /\bBearer\s+[A-Za-z0-9._-]{12,}/i.test(value) ||
+            /(?:password|passwd|pwd|token|secret|api[\s_-]?key|\b[A-Z0-9]{2,8}[\s_-]?KEY|密码|密钥|口令|令牌)\s*[:=：]\s*\S+/i.test(
+                value
+            ) ||
+            /\b\d{6}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]\b/.test(value)
+        );
+    };
+
+    const redactSensitive = async () => {
+        const current = selectionRef.current;
+        if (!current) {
+            return;
+        }
+        try {
+            const data = exportBase64(current);
+            const layout = await invoke('system_ocr_layout', { data });
+            const region = selectionImageRect(current);
+            if (!region) {
+                return;
+            }
+            const redactions = (layout.lines || [])
+                .filter((line) => sensitiveLine(line.text))
+                .map((line) => ({
+                    type: 'mosaic',
+                    x: region.x + line.x - 2,
+                    y: region.y + line.y - 2,
+                    w: line.width + 4,
+                    h: line.height + 4,
+                    block: Math.max(8, Math.round(line.height / 2)),
+                }));
+            if (redactions.length === 0) {
+                toast(t('annotate.no_sensitive'), { style: toastStyle });
+                return;
+            }
+            publish([...shapesRef.current, ...redactions], []);
+            toast.success(t('annotate.redacted', { count: redactions.length }), { style: toastStyle });
         } catch (error) {
             toast.error(String(error), { style: toastStyle });
         }
@@ -752,9 +999,12 @@ export default function Screenshot() {
             } else if (event.key.startsWith('Arrow') && selectionRef.current) {
                 event.preventDefault();
                 const step = event.shiftKey ? 10 : 1;
-                const delta = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[
-                    event.key
-                ];
+                const delta = {
+                    ArrowLeft: [-step, 0],
+                    ArrowRight: [step, 0],
+                    ArrowUp: [0, -step],
+                    ArrowDown: [0, step],
+                }[event.key];
                 const limit = imageBounds();
                 const current = selectionRef.current;
                 setSelection({
@@ -788,7 +1038,12 @@ export default function Screenshot() {
             return;
         }
         event.preventDefault();
-        dragRef.current = { kind: 'new', x: event.clientX, y: event.clientY, origin: { x: event.clientX, y: event.clientY } };
+        dragRef.current = {
+            kind: 'new',
+            x: event.clientX,
+            y: event.clientY,
+            origin: { x: event.clientX, y: event.clientY },
+        };
         setSelection({ x: event.clientX, y: event.clientY, w: 0, h: 0 });
     };
 
@@ -809,8 +1064,17 @@ export default function Screenshot() {
             return;
         }
         if (active === 'number') {
-            const n = shapesRef.current.reduce((max, shape) => (shape.type === 'number' ? Math.max(max, shape.n) : max), 0) + 1;
-            commitShape({ type: 'number', x: point.x, y: point.y, n, color: colorRef.current, strokeWidth: strokeRef.current });
+            const n =
+                shapesRef.current.reduce((max, shape) => (shape.type === 'number' ? Math.max(max, shape.n) : max), 0) +
+                1;
+            commitShape({
+                type: 'number',
+                x: point.x,
+                y: point.y,
+                n,
+                color: colorRef.current,
+                strokeWidth: strokeRef.current,
+            });
             return;
         }
         if (active === 'text') {
@@ -842,7 +1106,7 @@ export default function Screenshot() {
         dragRef.current = { kind: 'draw', x: point.x, y: point.y };
     };
 
-        const onDrawMove = (event) => {
+    const onDrawMove = (event) => {
         const drag = dragRef.current;
         const currentDraft = draftRef.current;
         if (!drag || drag.kind !== 'draw' || !currentDraft) {
@@ -909,7 +1173,7 @@ export default function Screenshot() {
         const measure = () => {
             const w = toolbar.offsetWidth;
             const h = toolbar.offsetHeight;
-            setToolbarSize((current) => current.w === w && current.h === h ? current : { w, h });
+            setToolbarSize((current) => (current.w === w && current.h === h ? current : { w, h }));
         };
         measure();
         const observer = new ResizeObserver(measure);
@@ -917,11 +1181,13 @@ export default function Screenshot() {
         return () => observer.disconnect();
     }, [editing]);
 
-    const toolbarPosition = selection ? placeToolbar({
-        selection,
-        size: { w: toolbarSize.w, h: Math.max(toolbarSize.h, 72) },
-        viewport: { w: window.innerWidth, h: window.innerHeight },
-    }) : undefined;
+    const toolbarPosition = selection
+        ? placeToolbar({
+              selection,
+              size: { w: toolbarSize.w, h: Math.max(toolbarSize.h, 72) },
+              viewport: { w: window.innerWidth, h: window.innerHeight },
+          })
+        : undefined;
 
     useEffect(() => {
         if (!longCaptureActive) {
@@ -1043,8 +1309,20 @@ export default function Screenshot() {
                 className='absolute'
                 style={
                     layout && intentRef.current === 'edit'
-                        ? { left: layout.left, top: layout.top, width: layout.width, height: layout.height, opacity: longCaptureActive || recordActive ? 0 : 1 }
-                        : { left: 0, top: 0, width: '100%', height: '100%', opacity: longCaptureActive || recordActive ? 0 : 1 }
+                        ? {
+                              left: layout.left,
+                              top: layout.top,
+                              width: layout.width,
+                              height: layout.height,
+                              opacity: longCaptureActive || recordActive ? 0 : 1,
+                          }
+                        : {
+                              left: 0,
+                              top: 0,
+                              width: '100%',
+                              height: '100%',
+                              opacity: longCaptureActive || recordActive ? 0 : 1,
+                          }
                 }
             />
             {layout && !longCaptureActive && !recordActive && !(selection || hover) && (
@@ -1153,43 +1431,119 @@ export default function Screenshot() {
                     style={toolbarPosition}
                 >
                     {recordActive ? (
-                        <RecordControls status={recordStatus} busy={recordBusy}
+                        <RecordControls
+                            status={recordStatus}
+                            busy={recordBusy}
                             onPause={() => recordAction(recordStatus?.state === 'paused' ? 'resume' : 'pause')}
-                            onStop={() => recordAction('stop')} onCancel={() => recordAction('cancel')} />
-                    ) : <CaptureToolbar
-                        dark={dark}
-                        tool={tool}
-                        setTool={setTool}
-                        color={color}
-                        setColor={setColor}
-                        strokeWidth={strokeWidth}
-                        setStrokeWidth={setStrokeWidth}
-                        fontSize={fontSize}
-                        setFontSize={setFontSize}
-                        canUndo={shapes.length > 0}
-                        canRedo={redoCount > 0}
-                        onUndo={undo}
-                        onRedo={redo}
-                        onOcr={() => finish('ocr')}
-                        onTranslate={() => finish('translate')}
-                        onLongScreenshot={intentRef.current === 'edit' ? undefined : startLongScreenshot}
-                        recordIntent={intentRef.current === 'record'}
-                        onScreenRecord={recordSupported && intentRef.current !== 'edit' ? startScreenRecord : undefined}
-                        longCaptureActive={longCaptureActive}
-                        copyBusy={longCaptureBusy}
-                        onPin={() => finish('pin')}
-                        onSave={() => finish('save')}
-                        onCopy={() => finish('copy')}
-                        onClose={() => appWindow.close()}
-                    />}
+                            onStop={() => recordAction('stop')}
+                            onCancel={() => recordAction('cancel')}
+                        />
+                    ) : (
+                        <CaptureToolbar
+                            dark={dark}
+                            tool={tool}
+                            setTool={setTool}
+                            color={color}
+                            setColor={setColor}
+                            strokeWidth={strokeWidth}
+                            setStrokeWidth={setStrokeWidth}
+                            fontSize={fontSize}
+                            setFontSize={setFontSize}
+                            canUndo={shapes.length > 0}
+                            canRedo={redoCount > 0}
+                            onUndo={undo}
+                            onRedo={redo}
+                            onOcr={() => finish('ocr')}
+                            onTranslate={() => finish('translate')}
+                            onInlineTranslate={runInlineTranslate}
+                            onRedact={redactSensitive}
+                            onLongScreenshot={intentRef.current === 'edit' ? undefined : startLongScreenshot}
+                            recordIntent={intentRef.current === 'record'}
+                            onScreenRecord={
+                                recordSupported && intentRef.current !== 'edit' ? startScreenRecord : undefined
+                            }
+                            longCaptureActive={longCaptureActive}
+                            copyBusy={longCaptureBusy}
+                            onPin={() => finish('pin')}
+                            onSave={() => finish('save')}
+                            onCopy={() => finish('copy')}
+                            onClose={() => invoke('hide_screenshot_window')}
+                        />
+                    )}
+                </div>
+            )}
+            {inlineTranslation && (
+                <div
+                    className={`absolute z-[60] max-h-[260px] overflow-hidden rounded-lg border shadow-xl ${
+                        dark
+                            ? 'border-white/15 bg-neutral-900/95 text-white'
+                            : 'border-black/10 bg-white/95 text-neutral-900'
+                    }`}
+                    style={{
+                        left: clamp(inlineTranslation.selection.x, 8, window.innerWidth - 368),
+                        top: clamp(
+                            inlineTranslation.selection.y + inlineTranslation.selection.h + 8,
+                            8,
+                            window.innerHeight - 268
+                        ),
+                        width: 360,
+                    }}
+                    onMouseDown={(event) => event.stopPropagation()}
+                >
+                    <div
+                        className={`flex h-8 items-center justify-between border-b px-3 text-[12px] font-medium ${
+                            dark ? 'border-white/10' : 'border-black/[0.06]'
+                        }`}
+                    >
+                        <span>{t('annotate.translate_overlay')}</span>
+                        <div className='flex items-center gap-1'>
+                            <button
+                                type='button'
+                                title={t('annotate.copy')}
+                                disabled={inlineTranslation.loading}
+                                onClick={async () => {
+                                    await writeText(inlineTranslation.translated);
+                                    toast.success(t('annotate.copied'), { style: toastStyle });
+                                }}
+                                className='flex h-6 w-6 items-center justify-center rounded hover:bg-black/10 disabled:opacity-30'
+                            >
+                                <MdContentCopy size={14} />
+                            </button>
+                            <button
+                                type='button'
+                                title={t('annotate.close')}
+                                onClick={() => setInlineTranslation(null)}
+                                className='flex h-6 w-6 items-center justify-center rounded hover:bg-black/10'
+                            >
+                                <MdClose size={14} />
+                            </button>
+                        </div>
+                    </div>
+                    <div className='max-h-[220px] overflow-y-auto px-3 py-2.5'>
+                        {inlineTranslation.loading ? (
+                            <div className={`text-[12px] ${dark ? 'text-white/60' : 'text-neutral-500'}`}>
+                                {t('annotate.translating')}
+                            </div>
+                        ) : (
+                            <>
+                                <p className='whitespace-pre-wrap text-[13px] leading-5'>
+                                    {inlineTranslation.translated}
+                                </p>
+                                <details className={`mt-2 text-[11px] ${dark ? 'text-white/55' : 'text-neutral-500'}`}>
+                                    <summary className='cursor-pointer select-none'>
+                                        {t('annotate.original_text')}
+                                    </summary>
+                                    <p className='mt-1.5 whitespace-pre-wrap leading-4'>{inlineTranslation.original}</p>
+                                </details>
+                            </>
+                        )}
+                    </div>
                 </div>
             )}
             {longCaptureActive && (
                 <div className='pointer-events-none absolute inset-x-0 bottom-6 z-50 flex justify-center'>
                     <div className='rounded-full bg-black/70 px-4 py-1.5 text-[12px] text-white'>
-                        {longCaptureStatus?.message
-                            ? t(longCaptureStatus.message)
-                            : t('long_screenshot.scroll_hint')}
+                        {longCaptureStatus?.message ? t(longCaptureStatus.message) : t('long_screenshot.scroll_hint')}
                     </div>
                 </div>
             )}

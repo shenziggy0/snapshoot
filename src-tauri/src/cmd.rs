@@ -46,13 +46,12 @@ pub fn cut_image(
             return;
         }
     };
+    let _ = (screen_x, screen_y);
     let img2 = img.sub_image(left, top, width, height);
     app_cache_dir_path.pop();
     app_cache_dir_path.push("pot_screenshot_cut.png");
     match img2.to_image().save(&app_cache_dir_path) {
-        Ok(_) => {
-            crate::image_io::remember_capture_origin(screen_x, screen_y);
-        }
+        Ok(_) => {}
         Err(e) => {
             error!("{:?}", e.to_string());
         }
@@ -101,8 +100,8 @@ pub fn copy_img(app_handle: tauri::AppHandle, width: usize, height: usize) -> Re
         height,
         bytes: Cow::from(data.as_bytes()),
     };
-    let result = Clipboard::new()?.set_image(img)?;
-    Ok(result)
+    Clipboard::new()?.set_image(img)?;
+    Ok(())
 }
 
 #[tauri::command]

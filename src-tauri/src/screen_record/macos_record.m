@@ -92,13 +92,15 @@ static CMSampleBufferRef SRCopyAudioRange(CMSampleBufferRef sample, CMItemCount 
 @end
 
 API_AVAILABLE(macos(12.3))
-@interface SRRecorder : NSObject <SCStreamOutput, SCStreamDelegate> {
+@interface SRRecorder : NSObject <SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSampleBufferDelegate> {
 @public
     dispatch_queue_t queue;
     uint32_t state;
     int errorCode;
     uint64_t finalElapsed;
     SCStream *stream;
+    AVCaptureSession *micSession;
+    AVCaptureAudioDataOutput *micOutput;
     AVAssetWriter *writer;
     AVAssetWriterInput *videoInput;
     AVAssetWriterInput *audioInput;
@@ -125,6 +127,7 @@ API_AVAILABLE(macos(12.3))
 - (uint64_t)elapsed;
 - (void)fail:(int)code;
 - (void)complete;
+- (void)appendAudioSampleBuffer:(CMSampleBufferRef)sample;
 - (void)requestFinish:(BOOL)cancel completion:(void (^)(int, uint64_t))completion;
 - (void)stopCapture;
 - (void)finishWriter;
@@ -166,6 +169,11 @@ API_AVAILABLE(macos(12.3))
         }
     }
     stream = nil;
+    if (micSession) {
+        [micSession stopRunning];
+        micSession = nil;
+    }
+    micOutput = nil;
     writer = nil;
     videoInput = nil;
     audioInput = nil;
@@ -257,74 +265,96 @@ API_AVAILABLE(macos(12.3))
         if (!self->finishing && !self->finished) [self fail:SRError(error, SREncoder)];
     });
 }
+- (void)appendAudioSampleBuffer:(CMSampleBufferRef)sample {
+    @autoreleasepool {
+        if (finished || finishing || errorCode || !audioInput || !CMSampleBufferIsValid(sample) ||
+            !CMSampleBufferDataIsReady(sample) || !CMTIME_IS_NUMERIC(origin)) return;
+        CMTime pts = CMSampleBufferGetPresentationTimeStamp(sample);
+        if (!CMTIME_IS_NUMERIC(pts)) return;
+        if (paused && CMTimeCompare(pts, pausedAt) >= 0) return;
+        const AudioStreamBasicDescription *format =
+            CMAudioFormatDescriptionGetStreamBasicDescription(CMSampleBufferGetFormatDescription(sample));
+        if (!format || format->mSampleRate <= 0) { [self fail:SREncoder]; return; }
+        CMItemCount count = CMSampleBufferGetNumSamples(sample);
+        CMTime lower = CMTIME_IS_NUMERIC(intervalStart) && CMTimeCompare(intervalStart, origin) > 0 ? intervalStart : origin;
+        if (CMTIME_IS_NUMERIC(lastAudioEnd)) {
+            CMTime previousEnd = CMTimeAdd(lastAudioEnd, pausedTotal);
+            if (CMTimeCompare(previousEnd, lower) > 0) lower = previousEnd;
+        }
+        CMItemCount first = (CMItemCount)fmax(0, ceil(CMTimeGetSeconds(CMTimeSubtract(lower, pts)) * format->mSampleRate - 0.000001));
+        CMItemCount end = count;
+        if (paused) end = (CMItemCount)fmax(0, floor(CMTimeGetSeconds(CMTimeSubtract(pausedAt, pts)) * format->mSampleRate));
+        if (end > count) end = count;
+        if (first >= end) return;
+        CMSampleBufferRef clipped = NULL;
+        if (first || end != count) {
+            clipped = SRCopyAudioRange(sample, first, end - first);
+            if (!clipped) { [self fail:SREncoder]; return; }
+            sample = clipped;
+        }
+        CMSampleBufferRef adjusted = SRCopyTiming(sample, pausedTotal, kCMTimeInvalid);
+        if (clipped) CFRelease(clipped);
+        if (!adjusted) { [self fail:SREncoder]; return; }
+        CMTime adjustedPTS = CMSampleBufferGetPresentationTimeStamp(adjusted);
+        if (!audioInput.readyForMoreMediaData || ![audioInput appendSampleBuffer:adjusted]) {
+            CFRelease(adjusted);
+            [self fail:SRError(writer.error, SREncoder)];
+            return;
+        }
+        CMTime duration = CMSampleBufferGetDuration(adjusted);
+        lastAudioEnd = CMTIME_IS_NUMERIC(duration) ? CMTimeAdd(adjustedPTS, duration) : adjustedPTS;
+        CFRelease(adjusted);
+    }
+}
+
+- (void)captureOutput:(AVCaptureOutput *)output didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
+       fromConnection:(AVCaptureConnection *)connection {
+    (void)output;
+    (void)connection;
+    [self appendAudioSampleBuffer:sampleBuffer];
+}
+
 - (void)stream:(SCStream *)capture didOutputSampleBuffer:(CMSampleBufferRef)sample ofType:(SCStreamOutputType)type {
     (void)capture;
     @autoreleasepool {
         if (finished || finishing || errorCode || !CMSampleBufferIsValid(sample) || !CMSampleBufferDataIsReady(sample)) return;
         BOOL video = type == SCStreamOutputTypeScreen;
         if (!video) {
-            if (@available(macOS 13.0, *)) { if (type != SCStreamOutputTypeAudio || !audioInput) return; }
-            else return;
+            if (@available(macOS 13.0, *)) {
+                if (type == SCStreamOutputTypeAudio) [self appendAudioSampleBuffer:sample];
+            }
+            return;
         }
         CMTime pts = CMSampleBufferGetPresentationTimeStamp(sample);
         if (!CMTIME_IS_NUMERIC(pts)) return;
         if (paused && (!CMTIME_IS_NUMERIC(origin) || CMTimeCompare(pts, pausedAt) >= 0)) return;
-        if (video) {
-            CFArrayRef attachments = CMSampleBufferGetSampleAttachmentsArray(sample, false);
-            if (!attachments || CFArrayGetCount(attachments) == 0) return;
-            NSDictionary *info = (__bridge NSDictionary *)CFArrayGetValueAtIndex(attachments, 0);
-            NSNumber *status = info[SCStreamFrameInfoStatus];
-            if (!status || status.integerValue != SCFrameStatusComplete || !CMSampleBufferGetImageBuffer(sample)) return;
-            if (CMTIME_IS_NUMERIC(intervalStart) && CMTimeCompare(pts, intervalStart) < 0) return;
-            if (!CMTIME_IS_NUMERIC(origin)) {
-                if (![writer startWriting]) { [self fail:SRError(writer.error, SREncoder)]; return; }
-                origin = pts;
-                [writer startSessionAtSourceTime:origin];
-            }
-            if (!videoInput.readyForMoreMediaData) return;
-        } else if (!CMTIME_IS_NUMERIC(origin)) return;
-
-        CMSampleBufferRef clipped = NULL;
-        if (!video) {
-            const AudioStreamBasicDescription *format = CMAudioFormatDescriptionGetStreamBasicDescription(CMSampleBufferGetFormatDescription(sample));
-            if (!format || format->mSampleRate <= 0) { [self fail:SREncoder]; return; }
-            CMItemCount count = CMSampleBufferGetNumSamples(sample);
-            CMTime lower = CMTIME_IS_NUMERIC(intervalStart) && CMTimeCompare(intervalStart, origin) > 0 ? intervalStart : origin;
-            if (CMTIME_IS_NUMERIC(lastAudioEnd)) {
-                CMTime previousEnd = CMTimeAdd(lastAudioEnd, pausedTotal);
-                if (CMTimeCompare(previousEnd, lower) > 0) lower = previousEnd;
-            }
-            CMItemCount first = (CMItemCount)fmax(0, ceil(CMTimeGetSeconds(CMTimeSubtract(lower, pts)) * format->mSampleRate - 0.000001));
-            CMItemCount end = count;
-            if (paused) end = (CMItemCount)fmax(0, floor(CMTimeGetSeconds(CMTimeSubtract(pausedAt, pts)) * format->mSampleRate));
-            if (end > count) end = count;
-            if (first >= end) return;
-            if (first || end != count) {
-                clipped = SRCopyAudioRange(sample, first, end - first);
-                if (!clipped) { [self fail:SREncoder]; return; }
-                sample = clipped;
-            }
+        CFArrayRef attachments = CMSampleBufferGetSampleAttachmentsArray(sample, false);
+        if (!attachments || CFArrayGetCount(attachments) == 0) return;
+        NSDictionary *info = (__bridge NSDictionary *)CFArrayGetValueAtIndex(attachments, 0);
+        NSNumber *status = info[SCStreamFrameInfoStatus];
+        if (!status || status.integerValue != SCFrameStatusComplete || !CMSampleBufferGetImageBuffer(sample)) return;
+        if (CMTIME_IS_NUMERIC(intervalStart) && CMTimeCompare(pts, intervalStart) < 0) return;
+        if (!CMTIME_IS_NUMERIC(origin)) {
+            if (![writer startWriting]) { [self fail:SRError(writer.error, SREncoder)]; return; }
+            origin = pts;
+            [writer startSessionAtSourceTime:origin];
         }
-        CMSampleBufferRef adjusted = SRCopyTiming(sample, pausedTotal, video ? frameDuration : kCMTimeInvalid);
-        if (clipped) CFRelease(clipped);
+        if (!videoInput.readyForMoreMediaData) return;
+        CMSampleBufferRef adjusted = SRCopyTiming(sample, pausedTotal, frameDuration);
         if (!adjusted) { [self fail:SREncoder]; return; }
         CMTime adjustedPTS = CMSampleBufferGetPresentationTimeStamp(adjusted);
-        if (video && CMTIME_IS_NUMERIC(lastVideoPTS) && CMTimeCompare(adjustedPTS, lastVideoPTS) <= 0) { CFRelease(adjusted); return; }
-        AVAssetWriterInput *input = video ? videoInput : audioInput;
-        if (!input.readyForMoreMediaData || ![input appendSampleBuffer:adjusted]) {
+        if (CMTIME_IS_NUMERIC(lastVideoPTS) && CMTimeCompare(adjustedPTS, lastVideoPTS) <= 0) {
+            CFRelease(adjusted);
+            return;
+        }
+        if (!videoInput.readyForMoreMediaData || ![videoInput appendSampleBuffer:adjusted]) {
             CFRelease(adjusted);
             [self fail:SRError(writer.error, SREncoder)];
             return;
         }
-        if (video) {
-            if (lastVideo) CFRelease(lastVideo);
-            lastVideo = adjusted;
-            lastVideoPTS = adjustedPTS;
-        } else {
-            CMTime duration = CMSampleBufferGetDuration(adjusted);
-            lastAudioEnd = CMTIME_IS_NUMERIC(duration) ? CMTimeAdd(adjustedPTS, duration) : adjustedPTS;
-            CFRelease(adjusted);
-        }
+        if (lastVideo) CFRelease(lastVideo);
+        lastVideo = adjusted;
+        lastVideoPTS = adjustedPTS;
     }
 }
 @end
@@ -338,9 +368,35 @@ int32_t sr_audio_supported(void) {
     return 0;
 }
 
+int32_t sr_microphone_supported(void) {
+    if (@available(macOS 10.14, *)) {
+        if (!sr_supported()) return 0;
+        AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
+        return status != AVAuthorizationStatusDenied && [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio] != nil;
+    }
+    return 0;
+}
+
+static BOOL SRRequestMicrophoneAccess(void) {
+    if (@available(macOS 10.14, *)) {
+        AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
+        if (status == AVAuthorizationStatusAuthorized) return YES;
+        if (status == AVAuthorizationStatusDenied || status == AVAuthorizationStatusRestricted) return NO;
+        dispatch_semaphore_t gate = dispatch_semaphore_create(0);
+        __block BOOL granted = NO;
+        [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL allowed) {
+            granted = allowed;
+            dispatch_semaphore_signal(gate);
+        }];
+        dispatch_semaphore_wait(gate, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC));
+        return granted;
+    }
+    return NO;
+}
+
 int32_t sr_start(uint32_t displayID, double scale, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                  uint32_t outputWidth, uint32_t outputHeight, uint32_t fps, uint32_t bitrate,
-                 int32_t cursor, int32_t audio, const char *path, void **handle) {
+                 int32_t cursor, int32_t audio, int32_t microphone, const char *path, void **handle) {
     @autoreleasepool {
         if (!handle || !path) return SREncoder;
         *handle = NULL;
@@ -378,13 +434,18 @@ int32_t sr_start(uint32_t displayID, double scale, uint32_t x, uint32_t y, uint3
                         configuration.showsCursor = cursor != 0;
                         configuration.pixelFormat = kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange;
                         configuration.queueDepth = 5;
-                        BOOL captureAudio = NO;
+                        BOOL captureSystemAudio = NO;
+                        BOOL captureMicrophone = microphone != 0;
                         if (@available(macOS 13.0, *)) {
-                            captureAudio = audio != 0;
-                            configuration.capturesAudio = captureAudio;
+                            captureSystemAudio = audio != 0 && !captureMicrophone;
+                            configuration.capturesAudio = captureSystemAudio;
                             configuration.excludesCurrentProcessAudio = YES;
                             configuration.sampleRate = 48000;
                             configuration.channelCount = 2;
+                        }
+                        if (captureMicrophone && !SRRequestMicrophoneAccess()) {
+                            [session fail:SRPermission];
+                            return;
                         }
                         NSError *setupError = nil;
                         session->writer = [[AVAssetWriter alloc] initWithURL:session->url fileType:AVFileTypeMPEG4 error:&setupError];
@@ -399,7 +460,7 @@ int32_t sr_start(uint32_t displayID, double scale, uint32_t x, uint32_t y, uint3
                         session->videoInput.expectsMediaDataInRealTime = YES;
                         if (![session->writer canAddInput:session->videoInput]) { [session fail:SREncoder]; return; }
                         [session->writer addInput:session->videoInput];
-                        if (captureAudio) {
+                        if (captureSystemAudio || captureMicrophone) {
                             NSDictionary *audioSettings = @{AVFormatIDKey: @(kAudioFormatMPEG4AAC),
                                 AVSampleRateKey: @48000, AVNumberOfChannelsKey: @2, AVEncoderBitRateKey: @160000};
                             session->audioInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeAudio outputSettings:audioSettings];
@@ -407,10 +468,24 @@ int32_t sr_start(uint32_t displayID, double scale, uint32_t x, uint32_t y, uint3
                             if (![session->writer canAddInput:session->audioInput]) { [session fail:SREncoder]; return; }
                             [session->writer addInput:session->audioInput];
                         }
+                        if (captureMicrophone) {
+                            AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
+                            if (!device) { [session fail:SRPermission]; return; }
+                            AVCaptureDeviceInput *input = [AVCaptureDeviceInput deviceInputWithDevice:device error:&setupError];
+                            if (!input) { [session fail:SRError(setupError, SRPermission)]; return; }
+                            session->micSession = [AVCaptureSession new];
+                            if ([session->micSession canAddInput:input]) [session->micSession addInput:input];
+                            else { [session fail:SREncoder]; return; }
+                            session->micOutput = [AVCaptureAudioDataOutput new];
+                            [session->micOutput setSampleBufferDelegate:session queue:session->queue];
+                            if ([session->micSession canAddOutput:session->micOutput]) [session->micSession addOutput:session->micOutput];
+                            else { [session fail:SREncoder]; return; }
+                            [session->micSession startRunning];
+                        }
                         session->stream = [[SCStream alloc] initWithFilter:filter configuration:configuration delegate:session];
                         if (![session->stream addStreamOutput:session type:SCStreamOutputTypeScreen sampleHandlerQueue:session->queue error:&setupError]) { [session fail:SRError(setupError, SREncoder)]; return; }
                         if (@available(macOS 13.0, *)) {
-                            if (captureAudio && ![session->stream addStreamOutput:session type:SCStreamOutputTypeAudio sampleHandlerQueue:session->queue error:&setupError]) { [session fail:SRError(setupError, SREncoder)]; return; }
+                            if (captureSystemAudio && ![session->stream addStreamOutput:session type:SCStreamOutputTypeAudio sampleHandlerQueue:session->queue error:&setupError]) { [session fail:SRError(setupError, SREncoder)]; return; }
                         }
                         session->starting = YES;
                         SCStream *startingStream = session->stream;

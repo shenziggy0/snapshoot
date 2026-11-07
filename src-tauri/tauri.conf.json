@@ -47,7 +47,8 @@
                 "asset": true,
                 "assetScope": [
                     "$CACHE/**",
-                    "$CONFIG/**"
+                    "$CONFIG/**",
+                    "$APPCACHE/**"
                 ]
             },
             "fs": {
@@ -104,8 +105,8 @@
             }
         },
         "security": {
-            "csp": "default-src * data: blob: ; img-src * 'self' asset: https: data: blob: ; style-src * 'unsafe-inline'; worker-src 'self' blob: ; script-src * 'unsafe-eval';",
-            "devCsp": "default-src * data: blob: ; img-src * 'self' asset: https: data: blob: ; style-src * 'unsafe-inline'; worker-src 'self' blob: ; script-src * 'unsafe-eval';"
+            "csp": "default-src * data: blob: ; img-src * 'self' asset: https: data: blob: ; connect-src * asset: data: blob: ; style-src * 'unsafe-inline'; worker-src 'self' blob: ; script-src * 'unsafe-eval';",
+            "devCsp": "default-src * data: blob: ; img-src * 'self' asset: https: data: blob: ; connect-src * asset: data: blob: ; style-src * 'unsafe-inline'; worker-src 'self' blob: ; script-src * 'unsafe-eval';"
         },
         "windows": [
             {

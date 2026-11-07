@@ -7,9 +7,26 @@ fn main() {
             .flag("-fblocks")
             .flag("-Wunguarded-availability")
             .compile("snapshoot_screen_record");
+        println!("cargo:rerun-if-changed=src/vision_ocr.m");
+        cc::Build::new()
+            .file("src/vision_ocr.m")
+            .flag("-fobjc-arc")
+            .flag("-fblocks")
+            .flag("-Wunguarded-availability")
+            .compile("snapshoot_vision_ocr");
         // Keep the existing deployment target; ScreenCaptureKit is optional at load.
         println!("cargo:rustc-link-arg=-Wl,-weak_framework,ScreenCaptureKit");
-        for framework in ["AVFoundation", "CoreMedia", "CoreVideo", "AudioToolbox", "CoreGraphics", "Foundation", "AppKit"] {
+        for framework in [
+            "AVFoundation",
+            "CoreMedia",
+            "CoreVideo",
+            "AudioToolbox",
+            "CoreGraphics",
+            "Foundation",
+            "AppKit",
+            "ImageIO",
+            "Vision",
+        ] {
             println!("cargo:rustc-link-lib=framework={framework}");
         }
     }

@@ -1,4 +1,7 @@
-use crate::screenshot::{rgba_is_blank, rgba_spread};
+use crate::screenshot::rgba_is_blank;
+use core_foundation::base::{CFRelease, TCFType};
+use core_foundation::string::CFString;
+use core_foundation::url::CFURL;
 use core_graphics::display::CGDisplay;
 use core_graphics::event::{CGEvent, CGEventTapLocation, EventField, ScrollEventUnit};
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
@@ -9,6 +12,8 @@ use image::RgbaImage;
 use log::{info, warn};
 use objc::runtime::{Object, NO, YES};
 use objc::{class, msg_send, sel, sel_impl};
+use std::os::raw::c_void;
+use std::time::Instant;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -112,8 +117,8 @@ fn geometry_for(display: &CGDisplay, bounds: CGRect) -> CaptureGeometry {
     CaptureGeometry {
         x: (bounds.origin.x * scale).round() as i32,
         y: (bounds.origin.y * scale).round() as i32,
-        width: pixel_width as u32,
-        height: pixel_height as u32,
+        width: pixel_width,
+        height: pixel_height,
     }
 }
 
@@ -125,10 +130,6 @@ fn display_pixels_high(id: u32) -> u32 {
     unsafe { CGDisplayPixelsHigh(id) as u32 }
 }
 
-pub fn overlay_geometry() -> Option<CaptureGeometry> {
-    display_under_cursor().ok().map(|target| target.geometry)
-}
-
 pub fn exclude_from_capture(window: &tauri::Window) {
     let Some(ns_window) = ns_window(window) else {
         return;
@@ -136,6 +137,17 @@ pub fn exclude_from_capture(window: &tauri::Window) {
     unsafe {
         // NSWindowSharingNone. CGWindowListCreateImage skips this window.
         let _: () = msg_send![ns_window, setSharingType: 0isize];
+    }
+}
+
+/// Keep the first composition invisible until the WebView has painted the
+/// frozen frame. The frontend calls this only on the main thread.
+pub fn set_window_alpha(window: &tauri::Window, alpha: f64) {
+    let Some(ns_window) = ns_window(window) else {
+        return;
+    };
+    unsafe {
+        let _: () = msg_send![ns_window, setAlphaValue: alpha];
     }
 }
 
@@ -567,17 +579,6 @@ pub fn capture_target_at_mouse() -> Result<DisplayCaptureTarget, String> {
     })
 }
 
-pub fn capture_id_to(id: u32, path: &Path) -> Result<(), String> {
-    let display = CGDisplay::new(id);
-    let bounds = display.bounds();
-    let target = DisplayTarget {
-        id,
-        bounds,
-        geometry: geometry_for(&display, bounds),
-    };
-    capture_resolved(&target, path)
-}
-
 fn capture_resolved(target: &DisplayTarget, path: &Path) -> Result<(), String> {
     let allowed = screen_recording_allowed();
     info!("screen recording preflight: {allowed}");
@@ -609,7 +610,85 @@ fn capture_resolved(target: &DisplayTarget, path: &Path) -> Result<(), String> {
     }
 }
 
+#[link(name = "ImageIO", kind = "framework")]
+extern "C" {
+    fn CGImageDestinationCreateWithURL(
+        url: *const c_void,
+        image_type: *const c_void,
+        count: usize,
+        options: *const c_void,
+    ) -> *mut c_void;
+    fn CGImageDestinationAddImage(
+        destination: *mut c_void,
+        image: *mut c_void,
+        properties: *const c_void,
+    );
+    fn CGImageDestinationFinalize(destination: *mut c_void) -> u8;
+}
+
+fn write_png_via_image_io(image: &CGImage, path: &Path) -> Result<(), String> {
+    let url = CFURL::from_path(path, false).ok_or_else(|| "capture path URL".to_string())?;
+    let image_type = CFString::new("public.png");
+    unsafe {
+        let destination = CGImageDestinationCreateWithURL(
+            url.as_concrete_TypeRef() as *const c_void,
+            image_type.as_concrete_TypeRef() as *const c_void,
+            1,
+            std::ptr::null(),
+        );
+        if destination.is_null() {
+            return Err("ImageIO could not create a PNG destination".into());
+        }
+        CGImageDestinationAddImage(destination, image.as_ptr() as *mut c_void, std::ptr::null());
+        let finalised = CGImageDestinationFinalize(destination) != 0;
+        CFRelease(destination as *const c_void);
+        if !finalised {
+            return Err("ImageIO could not finalise the PNG".into());
+        }
+    }
+    Ok(())
+}
+
+fn capture_samples(image: &CGImage) -> (bool, u8) {
+    let width = image.width();
+    let height = image.height();
+    let row = image.bytes_per_row();
+    let data = image.data();
+    let bytes = data.bytes();
+    let needed = row.saturating_mul(height);
+    if width == 0 || height == 0 || bytes.len() < needed {
+        return (true, 0);
+    }
+    let mut blank = true;
+    let mut low = 255u8;
+    let mut high = 0u8;
+    for gy in 0..8usize {
+        for gx in 0..8usize {
+            let x = if width <= 1 { 0 } else { gx * (width - 1) / 7 };
+            let y = if height <= 1 {
+                0
+            } else {
+                gy * (height - 1) / 7
+            };
+            let offset = y * row + x * 4;
+            if offset + 2 >= bytes.len() {
+                return (true, 0);
+            }
+            let blue = bytes[offset];
+            let green = bytes[offset + 1];
+            let red = bytes[offset + 2];
+            if red > 12 || green > 12 || blue > 12 {
+                blank = false;
+            }
+            low = low.min(red).min(green).min(blue);
+            high = high.max(red).max(green).max(blue);
+        }
+    }
+    (blank, high.saturating_sub(low))
+}
+
 fn capture_display_image(id: u32, path: &Path) -> Result<(), String> {
+    let started = Instant::now();
     let image = CGDisplay::new(id)
         .image()
         .ok_or_else(|| "CGDisplayCreateImage returned nothing".to_string())?;
@@ -618,37 +697,26 @@ fn capture_display_image(id: u32, path: &Path) -> Result<(), String> {
     }
     let width = image.width() as u32;
     let height = image.height() as u32;
-    crate::image_io::diag_log(
-        "capture_display_image",
-        &format!("CGDisplayCreateImage => {width}x{height}"),
-    );
     if width == 0 || height == 0 {
         return Err("empty display image".into());
     }
-    let row = image.bytes_per_row();
-    let bgra = image.data();
-    let src = bgra.bytes();
-    let mut rgba = vec![0u8; (width as usize) * (height as usize) * 4];
-    for y in 0..height as usize {
-        for x in 0..width as usize {
-            let i = y * row + x * 4;
-            let o = (y * width as usize + x) * 4;
-            if i + 3 >= src.len() {
-                return Err("display image buffer is short".into());
-            }
-            rgba[o] = src[i + 2];
-            rgba[o + 1] = src[i + 1];
-            rgba[o + 2] = src[i];
-            rgba[o + 3] = 255;
-        }
-    }
-    if rgba_is_blank(&rgba, width, height) || rgba_spread(&rgba, width, height) < 8 {
+    let grabbed = started.elapsed();
+    let (blank, spread) = capture_samples(&image);
+    if blank || spread < 8 {
         return Err("display image has no desktop detail".into());
     }
-    RgbaImage::from_raw(width, height, rgba)
-        .ok_or_else(|| "rgba buffer".to_string())?
-        .save(path)
-        .map_err(|err| format!("save capture: {err}"))?;
+    let validated = started.elapsed();
+    write_png_via_image_io(&image, path)?;
+    crate::image_io::diag_log(
+        "capture_png",
+        &format!(
+            "request_size={width}x{height} grab={}ms validate={}ms encode={}ms total={}ms",
+            grabbed.as_millis(),
+            (validated - grabbed).as_millis(),
+            started.elapsed().saturating_sub(validated).as_millis(),
+            started.elapsed().as_millis()
+        ),
+    );
     Ok(())
 }
 

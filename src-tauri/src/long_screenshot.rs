@@ -22,8 +22,6 @@ const CAPTURE_INTERVAL: Duration = Duration::from_millis(32);
 
 const MSG_CAPTURE_FAILED: &str = "long_screenshot.capture_failed";
 const MSG_SIZE_CHANGED: &str = "long_screenshot.size_changed";
-const MSG_NO_OVERLAP: &str = "long_screenshot.no_overlap";
-const MSG_AMBIGUOUS: &str = "long_screenshot.ambiguous";
 const MSG_LIMIT: &str = "long_screenshot.limit";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
@@ -101,7 +99,7 @@ fn crop_region(image: &RgbaImage, region: CaptureRegion) -> Result<RgbaImage, St
     let (width, height) = image.dimensions();
     let right = region.x.checked_add(region.width);
     let bottom = region.y.checked_add(region.height);
-    if right.map_or(true, |value| value > width) || bottom.map_or(true, |value| value > height) {
+    if right.is_none_or(|value| value > width) || bottom.is_none_or(|value| value > height) {
         return Err("selected region is outside the captured screen".into());
     }
     Ok(imageops::crop_imm(image, region.x, region.y, region.width, region.height).to_image())
@@ -409,9 +407,8 @@ pub fn long_capture_start(
             region.x, region.y, region.width, region.height
         ),
     );
-    let status = manager.start(region).map_err(|e| {
-        crate::image_io::diag_log("start_err", &e);
-        e
+    let status = manager.start(region).inspect_err(|e| {
+        crate::image_io::diag_log("start_err", e);
     })?;
     crate::image_io::diag_log("start_ok", &format!("{}x{}", status.width, status.height));
     Ok(status)

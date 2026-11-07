@@ -69,6 +69,12 @@ window-shadows = "0.2"
 # DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
 
+[lints.rust]
+# objc's msg_send! macro expands to `cfg(cargo-clippy)` on newer rustc.
+# rustc rejects that hyphenated name in a check-cfg value, so suppress the
+# false positive for these dependency macros.
+unexpected_cfgs = "allow"
+
 # Rust 1.78+ debug builds run UB checks; single-instance v1 dereferences a null
 # pointer on Windows and aborts at startup. Release builds are unaffected.
 [profile.dev.package.tauri-plugin-single-instance]

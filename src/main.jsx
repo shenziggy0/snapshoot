@@ -14,9 +14,9 @@ if (import.meta.env.PROD) {
     });
 }
 
-initStore().then(async () => {
-    await initEnv();
-    const rootElement = document.getElementById('root');
+const rootElement = document.getElementById('root');
+
+function renderApp() {
     const root = ReactDOM.createRoot(rootElement);
     root.render(
         <NextUIProvider>
@@ -25,4 +25,12 @@ initStore().then(async () => {
             </NextThemesProvider>
         </NextUIProvider>
     );
-});
+}
+
+Promise.all([initStore(), initEnv()])
+    .catch((error) => {
+        // A slow or failed watcher must not leave a hidden capture webview
+        // mounted with no React tree at all.
+        console.error('app bootstrap failed', error);
+    })
+    .finally(renderApp);

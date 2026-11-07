@@ -9,8 +9,10 @@ export async function initStore() {
     const appConfigDirPath = await appConfigDir();
     const appConfigPath = await join(appConfigDirPath, 'config.json');
     store = new Store(appConfigPath);
-    const _ = await watch(appConfigPath, async () => {
+    // File watching is only needed for external config edits. Do not hold the
+    // first render behind another IPC round-trip.
+    void watch(appConfigPath, async () => {
         await store.load();
         await invoke('reload_store');
-    });
+    }).catch((error) => console.error('config watch failed', error));
 }

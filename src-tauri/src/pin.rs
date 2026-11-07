@@ -21,6 +21,7 @@ use tauri::{PhysicalPosition, PhysicalSize, WindowEvent};
 static NEXT_PIN: AtomicU64 = AtomicU64::new(1);
 static CASCADE: AtomicI32 = AtomicI32::new(0);
 static PINS: OnceLock<Mutex<HashMap<String, PinMeta>>> = OnceLock::new();
+static PIN_TEXT: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 
 #[derive(Clone)]
 struct PinMeta {
@@ -44,6 +45,13 @@ fn pins() -> std::sync::MutexGuard<'static, HashMap<String, PinMeta>> {
         .unwrap()
 }
 
+fn pin_texts() -> std::sync::MutexGuard<'static, HashMap<String, String>> {
+    PIN_TEXT
+        .get_or_init(|| Mutex::new(HashMap::new()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 pub fn cleanup_stale_pins() {
     let dir = crate::image_io::app_cache_dir();
     let Ok(entries) = std::fs::read_dir(&dir) else {
@@ -61,9 +69,23 @@ pub fn pin_clipboard() {
     match read_clipboard_rgba() {
         Ok(image) => open_pin_rgba(image),
         Err(err) => {
-            warn!("pin clipboard failed: {}", err);
-            notify_no_image();
+            warn!("pin clipboard image failed: {}", err);
+            match read_clipboard_text() {
+                Some(text) => open_pin_text(text),
+                None => notify_no_image(),
+            }
         }
+    }
+}
+
+fn read_clipboard_text() -> Option<String> {
+    let mut clipboard = arboard::Clipboard::new().ok()?;
+    let text = clipboard.get_text().ok()?;
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
     }
 }
 
@@ -175,6 +197,66 @@ fn open_pin_rgba(image: RgbaImage) {
     info!("Pin {} {}x{} zoom {:.2}", label, width, height, zoom);
 }
 
+pub(crate) fn open_pin_text(text: String) {
+    let text = text.trim().to_string();
+    if text.is_empty() {
+        notify_no_image();
+        return;
+    }
+    let id = NEXT_PIN.fetch_add(1, Ordering::Relaxed);
+    let label = format!("pin_text_{id}");
+    let chars = text.chars().count().max(1);
+    let explicit_lines = text.lines().count().max(1);
+    let visual_lines = explicit_lines + chars / 36;
+    let width = 380.0;
+    let height = (64.0 + visual_lines as f64 * 22.0).clamp(140.0, 520.0);
+    let monitor = monitor_at_mouse();
+    let scale = monitor.scale_factor().max(1.0);
+    let mon_pos = monitor.position();
+    let mon_size = monitor.size();
+    let (mouse_x, mouse_y) = mouse_physical_position();
+    let cascade = CASCADE.fetch_add(28, Ordering::Relaxed) % 160;
+    let win_w = (width * scale).round() as i32;
+    let win_h = (height * scale).round() as i32;
+    let x = (mouse_x + cascade).clamp(
+        mon_pos.x,
+        (mon_pos.x + mon_size.width as i32 - win_w).max(mon_pos.x),
+    );
+    let y = (mouse_y + cascade).clamp(
+        mon_pos.y,
+        (mon_pos.y + mon_size.height as i32 - win_h).max(mon_pos.y),
+    );
+
+    pin_texts().insert(label.clone(), text);
+    let window = match new_overlay_builder(&label, "Snapshoot").build() {
+        Ok(window) => window,
+        Err(err) => {
+            warn!("create text pin window failed: {}", err);
+            pin_texts().remove(&label);
+            return;
+        }
+    };
+    let _ = window.set_position(PhysicalPosition::new(x, y));
+    let _ = window.set_size(PhysicalSize::new(win_w as u32, win_h as u32));
+    let _ = window.set_always_on_top(true);
+    let label_for_close = label.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::Destroyed = event {
+            pin_texts().remove(&label_for_close);
+        }
+    });
+    info!("Pin text {} lines {}", label, explicit_lines);
+}
+
+#[tauri::command]
+pub fn pin_text_content(window: tauri::Window) -> Result<String, String> {
+    let label = window.label().to_string();
+    pin_texts()
+        .get(&label)
+        .cloned()
+        .ok_or_else(|| format!("text pin not found: {label}"))
+}
+
 fn meta_for(window: &tauri::Window) -> Result<PinMeta, String> {
     let label = window.label().to_string();
     pins()
@@ -207,8 +289,7 @@ fn notify_no_image() {
 #[tauri::command]
 pub fn annotate_pin(window: tauri::Window) -> Result<(), String> {
     let meta = meta_for(&window)?;
-    crate::screenshot::prepare_edit_image(&meta.path);
-    let _ = crate::window::screenshot_window();
+    let _ = crate::window::open_edit_overlay(&meta.path);
     Ok(())
 }
 
@@ -263,12 +344,12 @@ pub fn save_pin_image(window: tauri::Window, path: String) -> Result<(), String>
 pub fn ocr_pin_image(window: tauri::Window) -> Result<(), String> {
     let meta = meta_for(&window)?;
     copy_pin_file_to_cut(&meta)?;
-    spawn_main(|| recognize_window())
+    spawn_main(recognize_window)
 }
 
 #[tauri::command]
 pub fn translate_pin_image(window: tauri::Window) -> Result<(), String> {
     let meta = meta_for(&window)?;
     copy_pin_file_to_cut(&meta)?;
-    spawn_main(|| image_translate())
+    spawn_main(image_translate)
 }
