@@ -17,7 +17,7 @@ Snapshoot는 Windows와 macOS에서 사용할 수 있는 크로스플랫폼 스�
 - **번역**: 선택 영역 번역, 입력 번역, 스크린샷 번역, OCR 번역을 지원하며, 설정에서 여러 번역 서비스를 추가하고 바꿀 수 있습니다.
 - **기록**: 번역과 인식 기록을 검색하고 내보낼 수 있습니다.
 - **백업**: 설정을 로컬, WebDAV, 알리윤 드라이브에 백업할 수 있습니다.
-- **외부 호출**: 같은 컴퓨터의 다른 앱이 `http://127.0.0.1:60828`을 통해 번역, OCR 등을 호출할 수 있습니다. 포트는 설정에서 바꿀 수 있습니다.
+- **외부 호출**: 같은 컴퓨터의 다른 앱이 `http://127.0.0.1:60828`을 통해 번역, OCR 등을 호출할 수 있습니다. 요청에는 설정의 로컬 토큰을 `X-Snapshoot-Token` 헤더 또는 `token` 매개변수로 넣어야 합니다. 포트는 설정에서 바꿀 수 있습니다.
 
 ## 단축키
 
@@ -41,19 +41,19 @@ Snapshoot는 Windows와 macOS에서 사용할 수 있는 크로스플랫폼 스�
 
 https://github.com/shenziggy0/snapshoot/releases
 
-v1.0.0은 설치 파일 세 개를 제공합니다.
+v1.2.0은 설치 파일 세 개를 제공합니다.
 
 | 시스템 | 파일 |
 | --- | --- |
-| Windows 64비트 | `Snapshoot_1.0.0_x64-setup.exe` |
-| macOS Apple silicon (M 시리즈 칩) | `Snapshoot_1.0.0_aarch64.dmg` |
-| macOS Intel | `Snapshoot_1.0.0_x64.dmg` |
+| Windows 64비트 | `Snapshoot_1.2.0_x64-setup.exe` |
+| macOS Apple silicon (M 시리즈 칩) | `Snapshoot_1.2.0_aarch64.dmg` |
+| macOS Intel | `Snapshoot_1.2.0_x64.dmg` |
 
 정확한 파일 이름은 Release에 첨부된 파일을 기준으로 합니다.
 
 ### Windows
 
-`Snapshoot_1.0.0_x64-setup.exe`를 실행하고 설치 마법사를 따라 주세요.
+`Snapshoot_1.2.0_x64-setup.exe`를 실행하고 설치 마법사를 따라 주세요.
 
 ### macOS
 
@@ -69,9 +69,11 @@ v1.0.0은 설치 파일 세 개를 제공합니다.
 
 ## 개인정보 안내
 
-번역과 OCR 서비스 키는 설정에서 직접 입력하며 로컬에 저장됩니다. Snapshoot 서버로 업로드되지 않습니다. 기본 번역 서비스는 키가 필요 없는 무료 서비스입니다.
+번역과 OCR 서비스 키는 설정에서 직접 입력하며 로컬에 저장됩니다. Snapshoot 서버로 업로드되지 않습니다.
 
-다음 세 가지는 켜기 전에 꼭 확인해 주세요.
+기본 번역 서비스는 Volcengine 무료 번역입니다. API 키는 필요 없지만, 번역할 텍스트를 Snapshoot 서버가 아니라 Volcengine(ByteDance)의 `translate.volcengine.com`으로 보냅니다. 스크린샷 위 즉시 번역도 이 기본 서비스를 사용합니다.
+
+다음 세 가지도 Snapshoot 서버가 아니며, 설정에서 직접 선택하기 전에는 켜지지 않습니다.
 
 - Lingva 번역: 번역할 텍스트가 `lingva.pot-app.com`으로 전송됩니다. Snapshoot 서버가 아니라 상류 서버입니다.
 - ECDICT 사전: 찾을 텍스트가 `pot-app.com/api/dict`으로 전송됩니다. 역시 상류 서버입니다.

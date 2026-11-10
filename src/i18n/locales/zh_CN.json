@@ -48,6 +48,8 @@
                 "title": "常规设置",
                 "auto_start": "开机时启动应用",
                 "check_update": "启动时检查更新",
+                "server_token": "本机调用令牌",
+                "server_token_hint": "本机其他程序调用翻译或 OCR 时，必须在请求头 X-Snapshoot-Token 或参数 token 里带上这个令牌。",
                 "server_port": "监听端口",
                 "server_port_change": "监听端口已更改，重启应用生效",
                 "app_language": "显示语言",
@@ -362,7 +364,8 @@
                 },
                 "volcengine_free": {
                     "title": "火山翻译（免密钥）",
-                    "hint": "不需要 API Key。走火山引擎网页公开接口，中国大陆可直接访问。"
+                    "hint": "不需要 API Key。待翻译文本会发送到火山引擎（字节跳动）的公开接口 translate.volcengine.com，不是 Snapshoot 的服务器。",
+                    "privacy": "当前使用的默认翻译是火山翻译（免密钥）。原文会发送到火山引擎（字节跳动）的 translate.volcengine.com，不是 Snapshoot 的服务器。截图上的就地翻译也会走这项服务。"
                 },
                 "niutrans": {
                     "title": "小牛翻译",

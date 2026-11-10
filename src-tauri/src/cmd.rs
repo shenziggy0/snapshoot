@@ -195,20 +195,51 @@ pub fn run_binary(
     use std::os::windows::process::CommandExt;
     use std::process::Command;
 
+    if plugin_type.contains(['/', '\\'])
+        || plugin_name.contains(['/', '\\'])
+        || plugin_type.split(['/', '\\']).any(|part| part == "..")
+        || plugin_name.split(['/', '\\']).any(|part| part == "..")
+    {
+        return Err(Error::Error("plugin path escapes its directory".into()));
+    }
     let config_path = dirs::config_dir().unwrap();
     let config_path = config_path.join(APP.get().unwrap().config().tauri.bundle.identifier.clone());
     let config_path = config_path.join("plugins");
-    let config_path = config_path.join(plugin_type);
-    let plugin_path = config_path.join(plugin_name);
+    let plugin_path = config_path.join(&plugin_type).join(&plugin_name);
+    let plugin_root = plugin_path
+        .canonicalize()
+        .map_err(|_| Error::Error("plugin directory is missing".into()))?;
+    let requested = std::path::Path::new(&cmd_name);
+    if requested
+        .components()
+        .any(|part| matches!(part, std::path::Component::ParentDir))
+    {
+        return Err(Error::Error(
+            "plugin command must stay inside the plugin directory".into(),
+        ));
+    }
+    let command_path = if requested.is_absolute() {
+        requested.to_path_buf()
+    } else {
+        plugin_root.join(requested)
+    };
+    let command_path = command_path
+        .canonicalize()
+        .map_err(|_| Error::Error("plugin command was not found in the plugin directory".into()))?;
+    if !command_path.starts_with(&plugin_root) {
+        return Err(Error::Error(
+            "plugin command must stay inside the plugin directory".into(),
+        ));
+    }
 
     #[cfg(target_os = "windows")]
-    let mut cmd = Command::new(&cmd_name);
+    let mut cmd = Command::new(&command_path);
     #[cfg(target_os = "windows")]
     let cmd = cmd.creation_flags(0x08000000);
     #[cfg(not(target_os = "windows"))]
-    let mut cmd = Command::new(&cmd_name);
+    let mut cmd = Command::new(&command_path);
 
-    let output = cmd.args(args).current_dir(plugin_path).output()?;
+    let output = cmd.args(args).current_dir(&plugin_root).output()?;
     Ok(json!({
         "stdout": String::from_utf8_lossy(&output.stdout).to_string(),
         "stderr": String::from_utf8_lossy(&output.stderr).to_string(),

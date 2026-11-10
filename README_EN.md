@@ -20,7 +20,7 @@ Snapshoot is a cross-platform screenshot tool for Windows and macOS. Take a scre
 -   **Sharing**: with WebDAV configured, upload a capture from Quick Access and copy its share link.
 -   **History**: translation and recognition history can be searched and exported.
 -   **Backup**: back up your configuration locally, to WebDAV, or to Aliyun Drive.
--   **External call**: other apps on the same machine can call translation, OCR, and more through `http://127.0.0.1:60828`. The port can be changed in Settings.
+-   **External call**: other apps on the same machine can call translation, OCR, and more through `http://127.0.0.1:60828`. Each request must include the local token from Settings, in the `X-Snapshoot-Token` header or the `token` query parameter. The port can be changed in Settings.
 
 ## Shortcuts
 
@@ -44,19 +44,19 @@ Installers are on the GitHub Releases page:
 
 https://github.com/shenziggy0/snapshoot/releases
 
-v1.0.0 provides three installers:
+v1.2.0 provides three installers:
 
 | System                              | File                            |
 | ----------------------------------- | ------------------------------- |
-| Windows 64-bit                      | `Snapshoot_1.0.0_x64-setup.exe` |
-| macOS Apple silicon (M-series chip) | `Snapshoot_1.0.0_aarch64.dmg`   |
-| macOS Intel                         | `Snapshoot_1.0.0_x64.dmg`       |
+| Windows 64-bit                      | `Snapshoot_1.2.0_x64-setup.exe` |
+| macOS Apple silicon (M-series chip) | `Snapshoot_1.2.0_aarch64.dmg`   |
+| macOS Intel                         | `Snapshoot_1.2.0_x64.dmg`       |
 
 The exact file names are the ones attached to the Release.
 
 ### Windows
 
-Run `Snapshoot_1.0.0_x64-setup.exe` and follow the installer.
+Run `Snapshoot_1.2.0_x64-setup.exe` and follow the installer.
 
 ### macOS
 
@@ -72,9 +72,11 @@ First check your chip: Apple menu -> About This Mac, look at the "Chip" line. Do
 
 ## Privacy note
 
-Translation and OCR service keys are entered by you in Settings and stored locally. They are not uploaded to a Snapshoot server. The default translation service is a keyless free service.
+Translation and OCR service keys are entered by you in Settings and stored locally. They are not uploaded to a Snapshoot server.
 
-Three exceptions, please read before you turn them on:
+The default translation service is Volcengine free. It does not need an API key, but it sends the text to Volcengine (ByteDance) at `translate.volcengine.com`, not to a Snapshoot server. In-place translation on a screenshot uses this default service too.
+
+These three also are not Snapshoot servers, and they stay off until you select them in Settings:
 
 -   Lingva translate: the text to translate is sent to `lingva.pot-app.com`, an upstream server, not a Snapshoot server.
 -   ECDICT dictionary: the text to look up is sent to `pot-app.com/api/dict`, also an upstream server.

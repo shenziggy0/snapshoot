@@ -48,6 +48,8 @@
                 "title": "General Settings",
                 "auto_start": "Auto Startup",
                 "check_update": "Check Update",
+                "server_token": "Local API token",
+                "server_token_hint": "Other programs on this computer must send this token in the X-Snapshoot-Token header or the token query parameter.",
                 "server_port": "Listening Port",
                 "server_port_change": "The listening port has been changed, Please restart the application for the changes to take effect",
                 "app_language": "Display Language",
@@ -362,7 +364,8 @@
                 },
                 "volcengine_free": {
                     "title": "Volcengine (no key)",
-                    "hint": "No API key. Uses Volcengine's public web translator, which is reachable from mainland China."
+                    "hint": "No API key. Text is sent to Volcengine (ByteDance) at translate.volcengine.com, not to a Snapshoot server.",
+                    "privacy": "The default translator is Volcengine free. Your text is sent to Volcengine (ByteDance) at translate.volcengine.com, not to a Snapshoot server. In-place translation on a screenshot uses this service too."
                 },
                 "niutrans": {
                     "title": "NiuTrans",

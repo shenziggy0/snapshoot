@@ -20,7 +20,7 @@ Snapshoot 是一款跨平台截图工具，支持 Windows 和 macOS。它可以�
 -   **分享**：配置 WebDAV 后，可从 Quick Access 上传截图并复制分享链接。
 -   **历史记录**：翻译和识别记录可回看、搜索、导出。
 -   **备份**：配置可备份到本地、WebDAV 或阿里云盘。
--   **外部调用**：本机通过 `http://127.0.0.1:60828` 调用翻译、OCR 等功能，端口可在设置里改。
+-   **外部调用**：本机其他程序通过 `http://127.0.0.1:60828` 调用翻译、OCR 等功能。请求必须带上设置里的本机令牌（请求头 `X-Snapshoot-Token` 或参数 `token`）。端口可在设置里改。
 
 ## 快捷键
 
@@ -44,19 +44,19 @@ Snapshoot 是一款跨平台截图工具，支持 Windows 和 macOS。它可以�
 
 https://github.com/shenziggy0/snapshoot/releases
 
-v1.0.0 提供三个安装包：
+v1.2.0 提供三个安装包：
 
 | 系统                              | 文件                            |
 | --------------------------------- | ------------------------------- |
-| Windows 64 位                     | `Snapshoot_1.0.0_x64-setup.exe` |
-| macOS Apple silicon（M 系列芯片） | `Snapshoot_1.0.0_aarch64.dmg`   |
-| macOS Intel                       | `Snapshoot_1.0.0_x64.dmg`       |
+| Windows 64 位                     | `Snapshoot_1.2.0_x64-setup.exe` |
+| macOS Apple silicon（M 系列芯片） | `Snapshoot_1.2.0_aarch64.dmg`   |
+| macOS Intel                       | `Snapshoot_1.2.0_x64.dmg`       |
 
 下载后按下面对应系统的方法安装。实际文件名以 Releases 页面的附件为准。
 
 ### Windows
 
-直接运行 `Snapshoot_1.0.0_x64-setup.exe`，按安装向导完成即可。
+直接运行 `Snapshoot_1.2.0_x64-setup.exe`，按安装向导完成即可。
 
 ### macOS
 
@@ -83,9 +83,11 @@ Intel 构建将 target 改为 `x86_64-apple-darwin`、arch 改为 `x64`。此流
 
 ## 隐私提示
 
-翻译和 OCR 的服务密钥由你自己在设置里填写，存在本地，不会上传到 Snapshoot 的服务器。默认翻译服务是不需要密钥的火山免费服务。
+翻译和 OCR 的服务密钥由你自己在设置里填写，存在本地，不会上传到 Snapshoot 的服务器。
 
-下面这三项例外，启用前请先看清楚：
+默认翻译服务是火山翻译（免密钥）。它不需要 API Key，但会把待翻译文本发送到火山引擎（字节跳动）的公开接口 `translate.volcengine.com`，不是 Snapshoot 的服务器。截图上的就地翻译也走这个默认服务。
+
+下面这三项同样不是 Snapshoot 的服务器，而且默认不开启，只有你在设置里选了才会用到：
 
 -   Lingva 翻译：待翻译文本会发到 `lingva.pot-app.com`，那是上游的服务器，不是 Snapshoot 的。
 -   ECDICT 词典：待查文本会发到 `pot-app.com/api/dict`，同样是上游的服务器。

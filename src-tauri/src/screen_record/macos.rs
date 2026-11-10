@@ -71,6 +71,7 @@ pub fn microphone_supported() -> bool {
 pub struct Recorder {
     handle: Option<NonNull<c_void>>,
     options: RecordOptions,
+    partial: std::path::PathBuf,
 }
 
 // The opaque object owns a serial dispatch queue. Its C entry points marshal
@@ -82,12 +83,22 @@ impl Recorder {
         if !supported() {
             return Err("screen_record.unsupported".into());
         }
-        let path = file_name(&options.path)?;
-        // The manager reserves an empty file. AVAssetWriter requires a path
-        // which does not exist; never overwrite a nonempty recording.
+        let partial = super::partial_output_path(&options.path);
+        let path = file_name(&partial)?;
+        // The manager reserves an empty final file. AVAssetWriter requires a
+        // path which does not exist; the real bytes go to the partial path
+        // and are renamed only after the movie is finalized.
         match std::fs::metadata(&options.path) {
             Ok(metadata) if metadata.len() == 0 => {
                 std::fs::remove_file(&options.path).map_err(|_| DISK_FAILED)?
+            }
+            Ok(_) => return Err(DISK_FAILED.into()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(DISK_FAILED.into()),
+        }
+        match std::fs::metadata(&partial) {
+            Ok(metadata) if metadata.len() == 0 => {
+                std::fs::remove_file(&partial).map_err(|_| DISK_FAILED)?
             }
             Ok(_) => return Err(DISK_FAILED.into()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
@@ -118,6 +129,7 @@ impl Recorder {
         Ok(Self {
             handle: Some(handle),
             options,
+            partial,
         })
     }
 
@@ -170,9 +182,10 @@ impl Recorder {
             sr_release(handle.as_ptr());
         }
         if let Err(err) = check(code) {
-            let _ = std::fs::remove_file(&self.options.path);
+            let _ = super::discard_recording(&self.partial, &self.options.path);
             return Err(err);
         }
+        super::publish_recording(&self.partial, &self.options.path)?;
         Ok(RecordResult {
             path: self.options.path.to_string_lossy().into_owned(),
             width: self.options.width,
@@ -197,11 +210,7 @@ impl Recorder {
             native_result = check(code);
         }
         // Even a native timeout must not skip unlinking our partial output.
-        match std::fs::remove_file(&self.options.path) {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(_) => return Err(DISK_FAILED.into()),
-        }
+        super::discard_recording(&self.partial, &self.options.path)?;
         native_result
     }
 }

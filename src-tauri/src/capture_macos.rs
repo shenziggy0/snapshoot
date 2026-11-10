@@ -87,6 +87,32 @@ fn display_under_cursor() -> Result<DisplayTarget, String> {
     fallback.ok_or_else(|| "no display".to_string())
 }
 
+/// Cursor in physical pixels. `CGEvent` locations and `CGDisplay` bounds are
+/// points; Tauri monitor origins are physical, and the two must not be mixed
+/// on a Retina or secondary display.
+pub fn cursor_physical_position() -> Option<(i32, i32)> {
+    let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok()?;
+    let point = CGEvent::new(source).ok()?.location();
+    let ids = CGDisplay::active_displays().ok()?;
+    for id in ids {
+        let display = CGDisplay::new(id);
+        let bounds = display.bounds();
+        let inside = point.x >= bounds.origin.x
+            && point.y >= bounds.origin.y
+            && point.x < bounds.origin.x + bounds.size.width
+            && point.y < bounds.origin.y + bounds.size.height;
+        if !inside {
+            continue;
+        }
+        let pixel_width = display_pixels_wide(id).max(1) as f64;
+        let scale = pixel_width / bounds.size.width.max(1.0);
+        let x = (bounds.origin.x * scale + (point.x - bounds.origin.x) * scale).round() as i32;
+        let y = (bounds.origin.y * scale + (point.y - bounds.origin.y) * scale).round() as i32;
+        return Some((x, y));
+    }
+    None
+}
+
 fn target_clone(target: &DisplayTarget) -> DisplayTarget {
     DisplayTarget {
         id: target.id,

@@ -51,11 +51,30 @@ fn read_hotkey(name: &str, explicit: &str) -> String {
     }
 }
 
-fn register<F>(app_handle: &AppHandle, name: &str, handler: F, key: &str) -> Result<(), String>
+fn register<F>(
+    app_handle: &AppHandle,
+    name: &str,
+    handler: F,
+    key: &str,
+    overwrite: bool,
+) -> Result<(), String>
 where
     F: Fn() + Send + 'static,
 {
-    let hotkey = read_hotkey(name, key);
+    let hotkey = if overwrite {
+        // The settings page sends the desired shortcut, including an empty
+        // string when the user clears it. An empty value must stick.
+        let previous = get(name)
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or_default();
+        if !previous.is_empty() {
+            let _ = app_handle.global_shortcut_manager().unregister(&previous);
+        }
+        set(name, key);
+        key.to_string()
+    } else {
+        read_hotkey(name, "")
+    };
 
     if !hotkey.is_empty() {
         match app_handle
@@ -83,32 +102,55 @@ pub fn register_shortcut(shortcut: &str) -> Result<(), String> {
             "hotkey_selection_translate",
             selection_translate,
             "",
+            false,
         )?,
-        "hotkey_input_translate" => {
-            register(app_handle, "hotkey_input_translate", input_translate, "")?
+        "hotkey_input_translate" => register(
+            app_handle,
+            "hotkey_input_translate",
+            input_translate,
+            "",
+            false,
+        )?,
+        "hotkey_ocr_recognize" => {
+            register(app_handle, "hotkey_ocr_recognize", ocr_recognize, "", false)?
         }
-        "hotkey_ocr_recognize" => register(app_handle, "hotkey_ocr_recognize", ocr_recognize, "")?,
-        "hotkey_ocr_translate" => register(app_handle, "hotkey_ocr_translate", ocr_translate, "")?,
+        "hotkey_ocr_translate" => {
+            register(app_handle, "hotkey_ocr_translate", ocr_translate, "", false)?
+        }
         "hotkey_screenshot_annotate" => register(
             app_handle,
             "hotkey_screenshot_annotate",
             screenshot_annotate,
             "",
+            false,
         )?,
-        "hotkey_pin_clipboard" => register(app_handle, "hotkey_pin_clipboard", pin_clipboard, "")?,
-        "hotkey_screen_record" => {
-            register(app_handle, "hotkey_screen_record", screen_record_hotkey, "")?
+        "hotkey_pin_clipboard" => {
+            register(app_handle, "hotkey_pin_clipboard", pin_clipboard, "", false)?
         }
+        "hotkey_screen_record" => register(
+            app_handle,
+            "hotkey_screen_record",
+            screen_record_hotkey,
+            "",
+            false,
+        )?,
         "all" => {
             register(
                 app_handle,
                 "hotkey_selection_translate",
                 selection_translate,
                 "",
+                false,
             )?;
-            register(app_handle, "hotkey_input_translate", input_translate, "")?;
-            register(app_handle, "hotkey_ocr_recognize", ocr_recognize, "")?;
-            register(app_handle, "hotkey_ocr_translate", ocr_translate, "")?;
+            register(
+                app_handle,
+                "hotkey_input_translate",
+                input_translate,
+                "",
+                false,
+            )?;
+            register(app_handle, "hotkey_ocr_recognize", ocr_recognize, "", false)?;
+            register(app_handle, "hotkey_ocr_translate", ocr_translate, "", false)?;
             // A failure here should not unregister the shortcuts above.
             let mut shortcut_errors = Vec::new();
             if let Err(err) = register(
@@ -116,14 +158,21 @@ pub fn register_shortcut(shortcut: &str) -> Result<(), String> {
                 "hotkey_screenshot_annotate",
                 screenshot_annotate,
                 "",
+                false,
             ) {
                 shortcut_errors.push(err);
             }
-            if let Err(err) = register(app_handle, "hotkey_pin_clipboard", pin_clipboard, "") {
+            if let Err(err) = register(app_handle, "hotkey_pin_clipboard", pin_clipboard, "", false)
+            {
                 shortcut_errors.push(err);
             }
-            if let Err(err) = register(app_handle, "hotkey_screen_record", screen_record_hotkey, "")
-            {
+            if let Err(err) = register(
+                app_handle,
+                "hotkey_screen_record",
+                screen_record_hotkey,
+                "",
+                false,
+            ) {
                 shortcut_errors.push(err);
             }
             if !shortcut_errors.is_empty() {
@@ -144,33 +193,49 @@ pub fn register_shortcut_by_frontend(name: &str, shortcut: &str) -> Result<(), S
             "hotkey_selection_translate",
             selection_translate,
             shortcut,
+            true,
         )?,
         "hotkey_input_translate" => register(
             app_handle,
             "hotkey_input_translate",
             input_translate,
             shortcut,
+            true,
         )?,
-        "hotkey_ocr_recognize" => {
-            register(app_handle, "hotkey_ocr_recognize", ocr_recognize, shortcut)?
-        }
-        "hotkey_ocr_translate" => {
-            register(app_handle, "hotkey_ocr_translate", ocr_translate, shortcut)?
-        }
+        "hotkey_ocr_recognize" => register(
+            app_handle,
+            "hotkey_ocr_recognize",
+            ocr_recognize,
+            shortcut,
+            true,
+        )?,
+        "hotkey_ocr_translate" => register(
+            app_handle,
+            "hotkey_ocr_translate",
+            ocr_translate,
+            shortcut,
+            true,
+        )?,
         "hotkey_screenshot_annotate" => register(
             app_handle,
             "hotkey_screenshot_annotate",
             screenshot_annotate,
             shortcut,
+            true,
         )?,
-        "hotkey_pin_clipboard" => {
-            register(app_handle, "hotkey_pin_clipboard", pin_clipboard, shortcut)?
-        }
+        "hotkey_pin_clipboard" => register(
+            app_handle,
+            "hotkey_pin_clipboard",
+            pin_clipboard,
+            shortcut,
+            true,
+        )?,
         "hotkey_screen_record" => register(
             app_handle,
             "hotkey_screen_record",
             screen_record_hotkey,
             shortcut,
+            true,
         )?,
         _ => {}
     }
