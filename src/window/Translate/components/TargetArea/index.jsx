@@ -36,6 +36,7 @@ import { sourceLanguageAtom, targetLanguageAtom } from '../LanguageArea';
 import { useConfig, useToastStyle, useVoice } from '../../../../hooks';
 import { sourceTextAtom, detectLanguageAtom } from '../SourceArea';
 import { invoke_plugin } from '../../../../utils/invoke_plugin';
+import { sanitizeHtml } from '../../../../utils/sanitize_html';
 import * as builtinServices from '../../../../services/translate';
 import * as builtinTtsServices from '../../../../services/tts';
 
@@ -604,7 +605,7 @@ export default function TargetArea(props) {
                                                         <span
                                                             className={`text-[${appFontSize}px] select-text`}
                                                             dangerouslySetInnerHTML={{
-                                                                __html: sentence['source'],
+                                                                __html: sanitizeHtml(sentence['source']),
                                                             }}
                                                         />
                                                     )}
@@ -614,7 +615,7 @@ export default function TargetArea(props) {
                                                         <div
                                                             className={`text-[${appFontSize}px] select-text text-default-500`}
                                                             dangerouslySetInnerHTML={{
-                                                                __html: sentence['target'],
+                                                                __html: sanitizeHtml(sentence['target']),
                                                             }}
                                                         />
                                                     )}

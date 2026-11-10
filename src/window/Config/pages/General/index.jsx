@@ -30,6 +30,7 @@ export default function General() {
     const [captureAutoCopy, setCaptureAutoCopy] = useConfig('capture_auto_copy', true);
     const [quickAccess, setQuickAccess] = useConfig('quick_access_enabled', true);
     const [serverPort, setServerPort] = useConfig('server_port', 60828);
+    const [serverToken] = useConfig('server_token', '');
     const [appLanguage, setAppLanguage] = useConfig('app_language', 'en');
     const [appTheme, setAppTheme] = useConfig('app_theme', 'system');
     const [appFont, setAppFont] = useConfig('app_font', 'default');
@@ -135,6 +136,22 @@ export default function General() {
                                         invoke('hide_quick_access_window');
                                     }
                                 }}
+                            />
+                        )}
+                    </div>
+                    <div className='config-item'>
+                        <div>
+                            <h3 className='my-auto'>{t('config.general.server_token')}</h3>
+                            <p className='max-w-[420px] text-sm text-default-500'>
+                                {t('config.general.server_token_hint')}
+                            </p>
+                        </div>
+                        {serverToken !== null && (
+                            <Input
+                                isReadOnly
+                                variant='bordered'
+                                value={serverToken || ''}
+                                className='max-w-[360px]'
                             />
                         )}
                     </div>

@@ -62,7 +62,7 @@ fn main() {
                 .body(cwd)
                 .icon("snapshoot")
                 .show()
-                .unwrap();
+                .ok();
         }))
         .plugin(
             tauri_plugin_log::Builder::default()

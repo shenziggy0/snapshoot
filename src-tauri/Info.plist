@@ -4,5 +4,7 @@
 <dict>
     <key>NSMicrophoneUsageDescription</key>
     <string>Snapshoot uses the microphone when you choose microphone audio for a screen recording.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Snapshoot needs screen recording access to capture the screen, take scrolling screenshots, and record a selected area.</string>
 </dict>
 </plist>

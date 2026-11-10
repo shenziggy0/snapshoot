@@ -75,6 +75,10 @@ export default function Translate(props) {
     return (
         <>
             <Toaster />
+            {Array.isArray(translateServiceInstanceList) &&
+                translateServiceInstanceList.some((key) => String(key).split('@')[0] === 'volcengine_free') && (
+                    <p className='mb-3 text-sm text-default-500'>{t('services.translate.volcengine_free.privacy')}</p>
+                )}
             <Card
                 className={`${
                     osType === 'Linux' ? 'h-[calc(100vh-140px)]' : 'h-[calc(100vh-120px)]'

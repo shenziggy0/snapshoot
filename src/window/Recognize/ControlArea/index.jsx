@@ -29,6 +29,7 @@ export default function ControlArea(props) {
     const pluginList = useAtomValue(pluginListAtom);
     const [recognizeLanguage] = useConfig('recognize_language', 'auto');
     const [serverPort] = useConfig('server_port', 60828);
+    const [serverToken] = useConfig('server_token', '');
     const setRecognizeFlag = useSetAtom(recognizeFlagAtom);
     const [currentServiceInstanceKey, setCurrentServiceInstanceKey] = useAtom(currentServiceInstanceKeyAtom);
     const [language, setLanguage] = useAtom(languageAtom);
@@ -167,6 +168,7 @@ export default function ControlArea(props) {
                     if (text) {
                         void fetch(`http://127.0.0.1:${serverPort}/translate`, {
                             method: 'POST',
+                            headers: { 'X-Snapshoot-Token': serverToken || '' },
                             body: Body.text(text),
                             responseType: 2,
                         });

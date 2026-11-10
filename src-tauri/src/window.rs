@@ -25,7 +25,6 @@ fn get_daemon_window() -> Window {
                 tauri::WindowUrl::App("daemon.html".into()),
             )
             .title("Daemon")
-            .additional_browser_args("--disable-web-security")
             .visible(false)
             .build()
             .unwrap()
@@ -57,6 +56,10 @@ fn get_current_monitor(x: i32, y: i32) -> Monitor {
 }
 
 pub(crate) fn mouse_physical_position() -> (i32, i32) {
+    #[cfg(target_os = "macos")]
+    if let Some(position) = crate::capture_macos::cursor_physical_position() {
+        return position;
+    }
     use mouse_position::mouse_position::Mouse;
 
     match Mouse::get_mouse_position() {
@@ -90,8 +93,7 @@ pub(crate) fn new_overlay_builder(
     .focused(true)
     .resizable(false)
     .skip_taskbar(true)
-    .always_on_top(true)
-    .additional_browser_args("--disable-web-security");
+    .always_on_top(true);
 
     #[cfg(target_os = "macos")]
     {
@@ -111,16 +113,8 @@ pub(crate) fn new_overlay_builder(
 
 // Creating a window on the mouse monitor
 fn build_window(label: &str, title: &str) -> (Window, bool) {
-    use mouse_position::mouse_position::{Mouse, Position};
-
-    let mouse_position = match Mouse::get_mouse_position() {
-        Mouse::Position { x, y } => Position { x, y },
-        Mouse::Error => {
-            warn!("Mouse position not found, using (0, 0) as default");
-            Position { x: 0, y: 0 }
-        }
-    };
-    let current_monitor = get_current_monitor(mouse_position.x, mouse_position.y);
+    let (mouse_x, mouse_y) = mouse_physical_position();
+    let current_monitor = get_current_monitor(mouse_x, mouse_y);
     let position = current_monitor.position();
 
     let app_handle = APP.get().unwrap();
@@ -130,7 +124,7 @@ fn build_window(label: &str, title: &str) -> (Window, bool) {
             // set_focus alone leaves a minimized window minimized.
             let _ = v.unminimize();
             let _ = v.show();
-            v.set_focus().unwrap();
+            let _ = v.set_focus();
             (v, true)
         }
         None => {
@@ -141,7 +135,6 @@ fn build_window(label: &str, title: &str) -> (Window, bool) {
                 tauri::WindowUrl::App("index.html".into()),
             )
             .position(position.x.into(), position.y.into())
-            .additional_browser_args("--disable-web-security")
             .focused(true)
             .title(title)
             .visible(false);
@@ -178,15 +171,9 @@ pub fn config_window() {
 }
 
 fn translate_window() -> Window {
-    use mouse_position::mouse_position::{Mouse, Position};
-    // Mouse physical position
-    let mut mouse_position = match Mouse::get_mouse_position() {
-        Mouse::Position { x, y } => Position { x, y },
-        Mouse::Error => {
-            warn!("Mouse position not found, using (0, 0) as default");
-            Position { x: 0, y: 0 }
-        }
-    };
+    use mouse_position::mouse_position::Position;
+    let (x, y) = mouse_physical_position();
+    let mut mouse_position = Position { x, y };
     let (window, exists) = build_window("translate", "Snapshoot");
     if exists {
         return window;
@@ -658,8 +645,7 @@ fn build_screenshot_window() -> Result<Window, tauri::Error> {
     .skip_taskbar(true)
     .always_on_top(true)
     .decorations(false)
-    .transparent(true)
-    .additional_browser_args("--disable-web-security");
+    .transparent(true);
 
     #[cfg(target_os = "macos")]
     let builder = builder
@@ -992,18 +978,8 @@ fn cursor_over_controls(window: &Window) -> bool {
         return false;
     };
     let scale = window.scale_factor().unwrap_or(1.0).max(0.5);
-    // `mouse_position` reports Quartz points on macOS and physical pixels on
-    // Windows. The window origin and the CSS rects are converted into the
-    // same space as the cursor.
-    #[cfg(target_os = "macos")]
-    let (cursor_x, cursor_y, origin_x, origin_y, scale) = (
-        cursor_x as f64,
-        cursor_y as f64,
-        origin.x as f64 / scale,
-        origin.y as f64 / scale,
-        1.0,
-    );
-    #[cfg(not(target_os = "macos"))]
+    // Cursor and window origin are physical pixels. CSS hit rects are scaled
+    // by the window's backing factor so a Retina toolbar still matches.
     let (cursor_x, cursor_y, origin_x, origin_y) = (
         cursor_x as f64,
         cursor_y as f64,
@@ -1187,8 +1163,7 @@ pub(crate) fn forward_long_capture_scroll(
     }
     #[cfg(windows)]
     {
-        let _ = (center_x, center_y);
-        return forward_scroll_windows(&window, delta_y);
+        return forward_scroll_windows(&window, delta_y, center_x, center_y);
     }
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     {
@@ -1198,17 +1173,28 @@ pub(crate) fn forward_long_capture_scroll(
 }
 
 #[cfg(windows)]
-fn forward_scroll_windows(window: &Window, delta_y: i32) -> Result<(), String> {
+fn forward_scroll_windows(
+    window: &Window,
+    delta_y: i32,
+    center_x: f64,
+    center_y: f64,
+) -> Result<(), String> {
+    use windows::Win32::Foundation::POINT;
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         SendInput, INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_WHEEL, MOUSEINPUT,
     };
+    use windows::Win32::UI::WindowsAndMessaging::{GetCursorPos, SetCursorPos};
     if delta_y == 0 {
         return Ok(());
     }
-    // The overlay consumed this wheel event. Let the next hit test fall
-    // through, then replay the same distance. DOM deltaY is positive when
-    // content moves down; WM_MOUSEWHEEL is positive for the opposite direction.
+    // The overlay consumed this wheel event while the pointer was on the
+    // toolbar. Move to the selection center so the replay hits the page, then
+    // put the pointer back. DOM deltaY is positive when content moves down;
+    // WM_MOUSEWHEEL is positive for the opposite direction.
     apply_click_through(window, true);
+    let mut previous = POINT { x: 0, y: 0 };
+    let had_cursor = unsafe { GetCursorPos(&mut previous) }.is_ok();
+    let moved = unsafe { SetCursorPos(center_x.round() as i32, center_y.round() as i32) }.is_ok();
     let input = INPUT {
         r#type: INPUT_MOUSE,
         Anonymous: INPUT_0 {
@@ -1223,7 +1209,10 @@ fn forward_scroll_windows(window: &Window, delta_y: i32) -> Result<(), String> {
         },
     };
     let sent = unsafe { SendInput(&[input], std::mem::size_of::<INPUT>() as i32) };
-    if sent == 0 {
+    if had_cursor {
+        let _ = unsafe { SetCursorPos(previous.x, previous.y) };
+    }
+    if !moved || sent == 0 {
         return Err("scroll input was not delivered".into());
     }
     Ok(())

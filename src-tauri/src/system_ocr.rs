@@ -68,47 +68,58 @@ pub fn system_ocr(app_handle: tauri::AppHandle, lang: &str) -> Result<String, St
     use windows::Media::Ocr::OcrEngine;
     use windows::Storage::{FileAccessMode, StorageFile};
 
-    let mut app_cache_dir_path = cache_dir().expect("Get Cache Dir Failed");
+    fn win_err(err: impl ToString) -> String {
+        err.to_string()
+    }
+
+    let mut app_cache_dir_path = cache_dir().ok_or_else(|| "Get Cache Dir Failed".to_string())?;
     app_cache_dir_path.push(&app_handle.config().tauri.bundle.identifier);
     app_cache_dir_path.push("pot_screenshot_cut.png");
+    if !app_cache_dir_path.exists() {
+        return Err("OCR image is missing".into());
+    }
 
     let path = app_cache_dir_path.to_string_lossy().replace("\\\\?\\", "");
 
     let file = StorageFile::GetFileFromPathAsync(&HSTRING::from(path))
-        .unwrap()
+        .map_err(win_err)?
         .get()
-        .unwrap();
+        .map_err(win_err)?;
 
-    let bitmap = BitmapDecoder::CreateWithIdAsync(
-        BitmapDecoder::PngDecoderId().unwrap(),
-        &file.OpenAsync(FileAccessMode::Read).unwrap().get().unwrap(),
-    )
-    .unwrap()
-    .get()
-    .unwrap();
+    let decoder_id = BitmapDecoder::PngDecoderId().map_err(win_err)?;
+    let stream = file
+        .OpenAsync(FileAccessMode::Read)
+        .map_err(win_err)?
+        .get()
+        .map_err(win_err)?;
+    let bitmap = BitmapDecoder::CreateWithIdAsync(decoder_id, &stream)
+        .map_err(win_err)?
+        .get()
+        .map_err(win_err)?;
 
-    let bitmap = bitmap.GetSoftwareBitmapAsync().unwrap().get().unwrap();
+    let bitmap = bitmap
+        .GetSoftwareBitmapAsync()
+        .map_err(win_err)?
+        .get()
+        .map_err(win_err)?;
 
     let engine = match lang {
         "auto" => OcrEngine::TryCreateFromUserProfileLanguages(),
         _ => {
-            if let Ok(language) = Language::CreateLanguage(&HSTRING::from(lang)) {
-                OcrEngine::TryCreateFromLanguage(&language)
-            } else {
-                return Err("Language Error".to_string());
-            }
+            let language = Language::CreateLanguage(&HSTRING::from(lang)).map_err(win_err)?;
+            OcrEngine::TryCreateFromLanguage(&language)
         }
     };
 
     match engine {
-        Ok(v) => Ok(v
-            .RecognizeAsync(&bitmap)
-            .unwrap()
-            .get()
-            .unwrap()
-            .Text()
-            .unwrap()
-            .to_string_lossy()),
+        Ok(engine) => {
+            let result = engine
+                .RecognizeAsync(&bitmap)
+                .map_err(win_err)?
+                .get()
+                .map_err(win_err)?;
+            Ok(result.Text().map_err(win_err)?.to_string_lossy())
+        }
         Err(e) => {
             if e.to_string().contains("0x00000000") {
                 Err("Language package not installed!\n\nSee: https://learn.microsoft.com/zh-cn/windows/powertoys/text-extractor#supported-languages".to_string())

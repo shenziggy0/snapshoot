@@ -58,6 +58,51 @@ mod platform {
 pub(super) const ENCODER_FAILED: &str = "screen_record.encoder_failed";
 pub(super) const DISK_FAILED: &str = "screen_record.disk_write_failed";
 
+/// Encoders write here until the container is finalized. A crash then leaves
+/// `name.mp4.partial` instead of an unplayable `.mp4`.
+#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
+pub(super) fn partial_output_path(path: &std::path::Path) -> std::path::PathBuf {
+    let mut name = path
+        .file_name()
+        .map(|n| n.to_os_string())
+        .unwrap_or_else(|| "recording.mp4".into());
+    name.push(".partial");
+    path.with_file_name(name)
+}
+
+#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
+pub(super) fn publish_recording(
+    partial: &std::path::Path,
+    final_path: &std::path::Path,
+) -> Result<(), String> {
+    if let Ok(meta) = std::fs::metadata(final_path) {
+        if meta.len() == 0 {
+            std::fs::remove_file(final_path).map_err(|_| DISK_FAILED.to_string())?;
+        } else if partial != final_path {
+            return Err(DISK_FAILED.into());
+        }
+    }
+    if partial != final_path {
+        std::fs::rename(partial, final_path).map_err(|_| DISK_FAILED.to_string())?;
+    }
+    Ok(())
+}
+
+#[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
+pub(super) fn discard_recording(
+    partial: &std::path::Path,
+    final_path: &std::path::Path,
+) -> Result<(), String> {
+    for path in [partial, final_path] {
+        match std::fs::remove_file(path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(_) => return Err(DISK_FAILED.into()),
+        }
+    }
+    Ok(())
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RecordState {

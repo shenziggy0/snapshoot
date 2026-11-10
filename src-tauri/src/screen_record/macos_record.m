@@ -95,6 +95,7 @@ API_AVAILABLE(macos(12.3))
 @interface SRRecorder : NSObject <SCStreamOutput, SCStreamDelegate, AVCaptureAudioDataOutputSampleBufferDelegate> {
 @public
     dispatch_queue_t queue;
+    dispatch_queue_t audioQueue;
     uint32_t state;
     int errorCode;
     uint64_t finalElapsed;
@@ -137,6 +138,9 @@ API_AVAILABLE(macos(12.3))
 - (instancetype)init {
     if ((self = [super init])) {
         queue = dispatch_queue_create("top.shenziggy.snapshoot.screen-record",
+            dispatch_queue_attr_make_with_autorelease_frequency(DISPATCH_QUEUE_SERIAL, DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM));
+        // Sample callbacks must not share the queue that calls startRunning.
+        audioQueue = dispatch_queue_create("top.shenziggy.snapshoot.screen-record.audio",
             dispatch_queue_attr_make_with_autorelease_frequency(DISPATCH_QUEUE_SERIAL, DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM));
         origin = pausedAt = intervalStart = finishAt = lastVideoPTS = lastAudioEnd = kCMTimeInvalid;
         pausedTotal = kCMTimeZero;
@@ -311,7 +315,11 @@ API_AVAILABLE(macos(12.3))
        fromConnection:(AVCaptureConnection *)connection {
     (void)output;
     (void)connection;
-    [self appendAudioSampleBuffer:sampleBuffer];
+    CFRetain(sampleBuffer);
+    dispatch_async(queue, ^{
+        [self appendAudioSampleBuffer:sampleBuffer];
+        CFRelease(sampleBuffer);
+    });
 }
 
 - (void)stream:(SCStream *)capture didOutputSampleBuffer:(CMSampleBufferRef)sample ofType:(SCStreamOutputType)type {
@@ -377,23 +385,6 @@ int32_t sr_microphone_supported(void) {
     return 0;
 }
 
-static BOOL SRRequestMicrophoneAccess(void) {
-    if (@available(macOS 10.14, *)) {
-        AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
-        if (status == AVAuthorizationStatusAuthorized) return YES;
-        if (status == AVAuthorizationStatusDenied || status == AVAuthorizationStatusRestricted) return NO;
-        dispatch_semaphore_t gate = dispatch_semaphore_create(0);
-        __block BOOL granted = NO;
-        [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL allowed) {
-            granted = allowed;
-            dispatch_semaphore_signal(gate);
-        }];
-        dispatch_semaphore_wait(gate, dispatch_time(DISPATCH_TIME_NOW, 30 * NSEC_PER_SEC));
-        return granted;
-    }
-    return NO;
-}
-
 int32_t sr_start(uint32_t displayID, double scale, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                  uint32_t outputWidth, uint32_t outputHeight, uint32_t fps, uint32_t bitrate,
                  int32_t cursor, int32_t audio, int32_t microphone, const char *path, void **handle) {
@@ -443,10 +434,8 @@ int32_t sr_start(uint32_t displayID, double scale, uint32_t x, uint32_t y, uint3
                             configuration.sampleRate = 48000;
                             configuration.channelCount = 2;
                         }
-                        if (captureMicrophone && !SRRequestMicrophoneAccess()) {
-                            [session fail:SRPermission];
-                            return;
-                        }
+                        void (^build)(void) = ^{
+                        if (session->finished || session->finishing) return;
                         NSError *setupError = nil;
                         session->writer = [[AVAssetWriter alloc] initWithURL:session->url fileType:AVFileTypeMPEG4 error:&setupError];
                         if (!session->writer) { [session fail:SRError(setupError, SRDisk)]; return; }
@@ -477,7 +466,7 @@ int32_t sr_start(uint32_t displayID, double scale, uint32_t x, uint32_t y, uint3
                             if ([session->micSession canAddInput:input]) [session->micSession addInput:input];
                             else { [session fail:SREncoder]; return; }
                             session->micOutput = [AVCaptureAudioDataOutput new];
-                            [session->micOutput setSampleBufferDelegate:session queue:session->queue];
+                            [session->micOutput setSampleBufferDelegate:session queue:session->audioQueue];
                             if ([session->micSession canAddOutput:session->micOutput]) [session->micSession addOutput:session->micOutput];
                             else { [session fail:SREncoder]; return; }
                             [session->micSession startRunning];
@@ -498,11 +487,33 @@ int32_t sr_start(uint32_t displayID, double scale, uint32_t x, uint32_t y, uint3
                                 if (session->finishing) [session stopCapture];
                             });
                         }];
+                        // Count the first-frame timeout from the moment capture
+                        // is asked to start, not from permission or enumeration.
+                        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC), session->queue, ^{
+                            if (!session->finished && !session->finishing && !session->lastVideo) [session fail:SREncoder];
+                        });
+                        };
+                        if (captureMicrophone) {
+                            AVAuthorizationStatus status = [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio];
+                            if (status == AVAuthorizationStatusDenied || status == AVAuthorizationStatusRestricted) {
+                                [session fail:SRPermission];
+                                return;
+                            }
+                            if (status != AVAuthorizationStatusAuthorized) {
+                                // Ask off this queue so pause/stop/status are not stuck behind the dialog.
+                                [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio completionHandler:^(BOOL allowed) {
+                                    dispatch_async(session->queue, ^{
+                                        if (session->finished || session->finishing) return;
+                                        if (!allowed) { [session fail:SRPermission]; return; }
+                                        build();
+                                    });
+                                }];
+                                return;
+                            }
+                        }
+                        build();
                     });
                 }];
-                dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC), session->queue, ^{
-                    if (!session->finished && !session->finishing && !session->lastVideo) [session fail:SREncoder];
-                });
             });
             return SROk;
         }

@@ -77,6 +77,7 @@ pub struct Recorder {
     worker: Option<JoinHandle<Result<u64, String>>>,
     status: Arc<Mutex<RecordStatus>>,
     options: RecordOptions,
+    partial: std::path::PathBuf,
 }
 
 impl Recorder {
@@ -94,7 +95,10 @@ impl Recorder {
         let (sender, receiver) = mpsc::channel();
         let (ready_tx, ready_rx) = mpsc::sync_channel(1);
         let shared = status.clone();
-        let opts = options.clone();
+        let partial = super::partial_output_path(&options.path);
+        let _ = std::fs::remove_file(&partial);
+        let mut opts = options.clone();
+        opts.path = partial.clone();
         let worker = thread::spawn(move || {
             let result = unsafe { record(&opts, receiver, &shared, &ready_tx) }.map_err(failure);
             if let Err(err) = &result {
@@ -111,9 +115,11 @@ impl Recorder {
                 worker: Some(worker),
                 status,
                 options,
+                partial,
             }),
             other => {
                 let _ = worker.join();
+                let _ = std::fs::remove_file(&partial);
                 Err(other
                     .ok()
                     .and_then(Result::err)
@@ -148,19 +154,22 @@ impl Recorder {
             .join()
             .map_err(|_| ENCODER_FAILED)?;
         match result {
-            Ok(duration_ms) => Ok(RecordResult {
-                path: self.options.path.to_string_lossy().into_owned(),
-                width: self.options.width,
-                height: self.options.height,
-                fps: self.options.fps,
-                duration_ms,
-                size_bytes: std::fs::metadata(&self.options.path)
-                    .map_err(|_| DISK_FAILED)?
-                    .len(),
-                clipboard_copied: false,
-            }),
+            Ok(duration_ms) => {
+                super::publish_recording(&self.partial, &self.options.path)?;
+                Ok(RecordResult {
+                    path: self.options.path.to_string_lossy().into_owned(),
+                    width: self.options.width,
+                    height: self.options.height,
+                    fps: self.options.fps,
+                    duration_ms,
+                    size_bytes: std::fs::metadata(&self.options.path)
+                        .map_err(|_| DISK_FAILED)?
+                        .len(),
+                    clipboard_copied: false,
+                })
+            }
             Err(err) => {
-                let _ = std::fs::remove_file(&self.options.path);
+                let _ = super::discard_recording(&self.partial, &self.options.path);
                 Err(err)
             }
         }
@@ -170,11 +179,7 @@ impl Recorder {
         if let Some(worker) = self.worker.take() {
             let _ = worker.join();
         }
-        match std::fs::remove_file(&self.options.path) {
-            Ok(()) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-            Err(_) => Err(DISK_FAILED.into()),
-        }
+        super::discard_recording(&self.partial, &self.options.path)
     }
 }
 

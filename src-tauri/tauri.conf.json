@@ -8,14 +8,13 @@
     },
     "package": {
         "productName": "Snapshoot",
-        "version": "1.1.1"
+        "version": "1.2.0"
     },
     "tauri": {
         "allowlist": {
             "all": false,
             "shell": {
-                "all": true,
-                "open": ".*"
+                "open": "^(https?://|file://|[A-Za-z]:[\\\\/]|/).+"
             },
             "path": {
                 "all": true
@@ -33,7 +32,6 @@
                 "all": true
             },
             "http": {
-                "all": true,
                 "request": true,
                 "scope": [
                     "http://**",
@@ -52,7 +50,10 @@
                 ]
             },
             "fs": {
-                "all": true,
+                "readFile": true,
+                "readDir": true,
+                "exists": true,
+                "removeDir": true,
                 "scope": [
                     "$APPCONFIG/**",
                     "$APPCACHE/**"
@@ -105,16 +106,15 @@
             }
         },
         "security": {
-            "csp": "default-src * data: blob: ; img-src * 'self' asset: https: data: blob: ; connect-src * asset: data: blob: ; style-src * 'unsafe-inline'; worker-src 'self' blob: ; script-src * 'unsafe-eval';",
-            "devCsp": "default-src * data: blob: ; img-src * 'self' asset: https: data: blob: ; connect-src * asset: data: blob: ; style-src * 'unsafe-inline'; worker-src 'self' blob: ; script-src * 'unsafe-eval';"
+            "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: blob: https://asset.localhost http://asset.localhost; font-src 'self' data:; worker-src 'self' blob:; media-src 'self' asset: blob:; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost http://127.0.0.1:* http://localhost:*",
+            "devCsp": "default-src 'self' http://localhost:1420; script-src 'self' 'unsafe-eval' http://localhost:1420; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data: blob: https://asset.localhost http://asset.localhost http://localhost:1420; font-src 'self' data:; worker-src 'self' blob:; media-src 'self' asset: blob:; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost http://127.0.0.1:* http://localhost:* ws://localhost:1420"
         },
         "windows": [
             {
                 "title": "Daemon",
                 "label": "daemon",
                 "visible": false,
-                "url": "daemon.html",
-                "additionalBrowserArgs": "--disable-web-security"
+                "url": "daemon.html"
             }
         ],
         "macOSPrivateApi": true,

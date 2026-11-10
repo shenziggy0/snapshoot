@@ -6,6 +6,9 @@ import { http } from "@tauri-apps/api";
 import CryptoJS from "crypto-js";
 import { osType } from "./env";
 
+// Plugins are still evaluated in this webview, so a malicious main.js can call
+// other Tauri commands. run() can only execute a file that lives inside that
+// plugin's own directory.
 export async function invoke_plugin(pluginType, pluginName) {
     let configDir = await appConfigDir();
     let cacheDir = await appCacheDir();
