@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1793597162670,
-  "projectRoot": "D:\\workspace\\Snapshoot\\snapshoot",
+  "lastScanned": 1794447439247,
+  "projectRoot": "D:\\workspace\\Snapshoot",
   "techStack": {
     "languages": [
       {
@@ -52,7 +52,7 @@
     "fileOrganization": "type-based"
   },
   "structure": {
-    "isMonorepo": false,
+    "isMonorepo": true,
     "workspaces": [],
     "mainDirectories": [
       "docs",
@@ -67,24 +67,11 @@
   },
   "customNotes": [],
   "directoryMap": {
-    "asset": {
-      "path": "asset",
-      "purpose": null,
-      "fileCount": 10,
-      "lastAccessed": 1793597162631,
-      "keyFiles": [
-        "1.png",
-        "2.png",
-        "3.png",
-        "eg1.gif",
-        "eg2.gif"
-      ]
-    },
     "dist": {
       "path": "dist",
       "purpose": "Distribution/build output",
       "fileCount": 6,
-      "lastAccessed": 1793597162631,
+      "lastAccessed": 1794447438933,
       "keyFiles": [
         "daemon.html",
         "icon.png",
@@ -97,14 +84,14 @@
       "path": "docs",
       "purpose": "Documentation",
       "fileCount": 0,
-      "lastAccessed": 1793597162640,
+      "lastAccessed": 1794447438958,
       "keyFiles": []
     },
     "patches": {
       "path": "patches",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1793597162641,
+      "lastAccessed": 1794447438959,
       "keyFiles": [
         "hyprland.patch"
       ]
@@ -113,7 +100,7 @@
       "path": "public",
       "purpose": "Public files",
       "fileCount": 4,
-      "lastAccessed": 1793597162641,
+      "lastAccessed": 1794447438961,
       "keyFiles": [
         "icon.png",
         "icon.svg",
@@ -125,16 +112,23 @@
       "path": "scripts",
       "purpose": "Build/utility scripts",
       "fileCount": 1,
-      "lastAccessed": 1793597162642,
+      "lastAccessed": 1794447438962,
       "keyFiles": [
         "smoke_check.py"
       ]
+    },
+    "smoke-artifacts": {
+      "path": "smoke-artifacts",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1794447438964,
+      "keyFiles": []
     },
     "src": {
       "path": "src",
       "purpose": "Source code",
       "fileCount": 3,
-      "lastAccessed": 1793597162642,
+      "lastAccessed": 1794447438965,
       "keyFiles": [
         "App.jsx",
         "main.jsx",
@@ -145,7 +139,7 @@
       "path": "src-tauri",
       "purpose": null,
       "fileCount": 11,
-      "lastAccessed": 1793597162643,
+      "lastAccessed": 1794447438967,
       "keyFiles": [
         "build.rs",
         "Cargo.lock",
@@ -158,7 +152,7 @@
       "path": "dist\\assets",
       "purpose": "Static assets",
       "fileCount": 144,
-      "lastAccessed": 1793597162645,
+      "lastAccessed": 1794447438971,
       "keyFiles": [
         "ad-BOo-tPI4.svg",
         "ad-CDtWnnSA.svg",
@@ -169,68 +163,171 @@
       "path": "src\\components",
       "purpose": "UI components",
       "fileCount": 0,
-      "lastAccessed": 1793597162647,
+      "lastAccessed": 1794447438976,
       "keyFiles": []
     },
     "src\\services": {
       "path": "src\\services",
       "purpose": "Business logic services",
       "fileCount": 0,
-      "lastAccessed": 1793597162647,
+      "lastAccessed": 1794447438978,
       "keyFiles": []
     },
     "src\\utils": {
       "path": "src\\utils",
       "purpose": "Utility functions",
       "fileCount": 8,
-      "lastAccessed": 1793597162648,
+      "lastAccessed": 1794447438979,
       "keyFiles": [
         "env.js",
         "index.js",
         "invoke_plugin.js"
       ]
-    },
-    "src-tauri\\src": {
-      "path": "src-tauri\\src",
-      "purpose": "Source code",
-      "fileCount": 21,
-      "lastAccessed": 1793597162649,
-      "keyFiles": [
-        "annotate.rs",
-        "backup.rs",
-        "capture_macos.rs"
-      ]
     }
   },
   "hotPaths": [
     {
-      "path": "src-tauri\\tauri.conf.json",
-      "accessCount": 1,
-      "lastAccessed": 1793597173429,
+      "path": "src-tauri\\src\\window.rs",
+      "accessCount": 7,
+      "lastAccessed": 1794448844585,
+      "type": "file"
+    },
+    {
+      "path": "src\\window\\Screenshot\\index.jsx",
+      "accessCount": 6,
+      "lastAccessed": 1794448236223,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\src\\screenshot.rs",
+      "accessCount": 6,
+      "lastAccessed": 1794448830165,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\icons_mac\\128x128.png",
+      "accessCount": 2,
+      "lastAccessed": 1793708896618,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\src\\smoke.rs",
+      "accessCount": 2,
+      "lastAccessed": 1794448831939,
       "type": "directory"
     },
     {
-      "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\claude\\D--workspace-Snapshoot\\1cec5ba7-4275-4a59-bcde-77aac6c65b0c\\scratchpad\\updater.png",
+      "path": "docs\\design\\0003-区域录屏.md",
       "accessCount": 1,
-      "lastAccessed": 1793597405829,
+      "lastAccessed": 1793706562446,
       "type": "file"
     },
     {
-      "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\claude\\D--workspace-Snapshoot\\1cec5ba7-4275-4a59-bcde-77aac6c65b0c\\scratchpad\\screen.png",
+      "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\claude\\D--workspace-Snapshoot\\fc1bc98b-46f5-4341-9631-a7b06252fff0\\scratchpad\\merge-msg.txt",
       "accessCount": 1,
-      "lastAccessed": 1793597458655,
+      "lastAccessed": 1793706921556,
       "type": "file"
     },
     {
-      "path": "src\\window\\Updater\\index.jsx",
+      "path": "src-tauri\\icons\\128x128.png",
       "accessCount": 1,
-      "lastAccessed": 1793597509701,
+      "lastAccessed": 1793708237453,
       "type": "file"
     },
     {
-      "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\claude\\D--workspace-Snapshoot\\1cec5ba7-4275-4a59-bcde-77aac6c65b0c\\scratchpad\\screen2.png",
+      "path": "src-tauri\\icons\\tray_recording.png",
       "accessCount": 1,
-      "lastAccessed": 1793597860590,
+      "lastAccessed": 1793708827468,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\icons_mac\\tray_recording.png",
+      "accessCount": 1,
+      "lastAccessed": 1793708827528,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\icons\\32x32.png",
+      "accessCount": 1,
+      "lastAccessed": 1793708896087,
+      "type": "file"
+    },
+    {
+      "path": "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\claude\\D--workspace-Snapshoot\\fc1bc98b-46f5-4341-9631-a7b06252fff0\\scratchpad\\icon-render\\tray\\16x16.png",
+      "accessCount": 1,
+      "lastAccessed": 1793708897707,
+      "type": "file"
+    },
+    {
+      "path": "asset\\header.png",
+      "accessCount": 1,
+      "lastAccessed": 1793709967530,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\src\\hotkey.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794447478343,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\src\\annotate.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794447490775,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\src\\capture_macos.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794447491942,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\src\\image_io.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794447492448,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\src\\main.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794447492530,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\src\\windows_list.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794447500353,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 1,
+      "lastAccessed": 1794448472613,
+      "type": "directory"
+    },
+    {
+      "path": "src-tauri\\src\\quick_access.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794448482652,
+      "type": "file"
+    },
+    {
+      "path": "src\\window\\Config\\pages\\General\\index.jsx",
+      "accessCount": 1,
+      "lastAccessed": 1794448483988,
+      "type": "file"
+    },
+    {
+      "path": "src-tauri\\src",
+      "accessCount": 1,
+      "lastAccessed": 1794448780455,
+      "type": "directory"
+    },
+    {
+      "path": "src-tauri\\src\\long_screenshot.rs",
+      "accessCount": 1,
+      "lastAccessed": 1794448830830,
       "type": "file"
     }
   ],

@@ -1,0 +1,7 @@
+{
+  "tool_name": "PowerShell",
+  "tool_input_preview": "{\"command\":\"Get-ChildItem C:\\\\,D:\\\\ -Directory -ErrorAction SilentlyContinue | Where-Object Name -match 'Visual|BuildTools|MSVC' | Select-Object FullName; Get-ChildItem \\\"C:\\\\Program Files (x86)\\\\Wind...",
+  "error": "Exit code 1\nC:\\Program Files\\Git\\usr\\bin\\link.exe\r\nC:\\Program Files\\Go\\pkg\\tool\\windows_amd64\\link.exe\r\n\r\nFullName\r\n--------\r\nC:\\Users\\Administrator\\.cargo\\config.toml",
+  "timestamp": "2026-11-12T02:02:35.621Z",
+  "retry_count": 2
+}
