@@ -41,19 +41,19 @@ Snapshoot는 Windows와 macOS에서 사용할 수 있는 크로스플랫폼 스�
 
 https://github.com/shenziggy0/snapshoot/releases
 
-v1.2.0은 설치 파일 세 개를 제공합니다.
+v1.2.1은 설치 파일 세 개를 제공합니다.
 
 | 시스템 | 파일 |
 | --- | --- |
-| Windows 64비트 | `Snapshoot_1.2.0_x64-setup.exe` |
-| macOS Apple silicon (M 시리즈 칩) | `Snapshoot_1.2.0_aarch64.dmg` |
-| macOS Intel | `Snapshoot_1.2.0_x64.dmg` |
+| Windows 64비트 | `Snapshoot_1.2.1_x64-setup.exe` |
+| macOS Apple silicon (M 시리즈 칩) | `Snapshoot_1.2.1_aarch64.dmg` |
+| macOS Intel | `Snapshoot_1.2.1_x64.dmg` |
 
 정확한 파일 이름은 Release에 첨부된 파일을 기준으로 합니다.
 
 ### Windows
 
-`Snapshoot_1.2.0_x64-setup.exe`를 실행하고 설치 마법사를 따라 주세요.
+`Snapshoot_1.2.1_x64-setup.exe`를 실행하고 설치 마법사를 따라 주세요.
 
 ### macOS
 

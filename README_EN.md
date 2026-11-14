@@ -44,19 +44,19 @@ Installers are on the GitHub Releases page:
 
 https://github.com/shenziggy0/snapshoot/releases
 
-v1.2.0 provides three installers:
+v1.2.1 provides three installers:
 
 | System                              | File                            |
 | ----------------------------------- | ------------------------------- |
-| Windows 64-bit                      | `Snapshoot_1.2.0_x64-setup.exe` |
-| macOS Apple silicon (M-series chip) | `Snapshoot_1.2.0_aarch64.dmg`   |
-| macOS Intel                         | `Snapshoot_1.2.0_x64.dmg`       |
+| Windows 64-bit                      | `Snapshoot_1.2.1_x64-setup.exe` |
+| macOS Apple silicon (M-series chip) | `Snapshoot_1.2.1_aarch64.dmg`   |
+| macOS Intel                         | `Snapshoot_1.2.1_x64.dmg`       |
 
 The exact file names are the ones attached to the Release.
 
 ### Windows
 
-Run `Snapshoot_1.2.0_x64-setup.exe` and follow the installer.
+Run `Snapshoot_1.2.1_x64-setup.exe` and follow the installer.
 
 ### macOS
 

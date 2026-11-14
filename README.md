@@ -44,19 +44,19 @@ Snapshoot 是一款跨平台截图工具，支持 Windows 和 macOS。它可以�
 
 https://github.com/shenziggy0/snapshoot/releases
 
-v1.2.0 提供三个安装包：
+v1.2.1 提供三个安装包：
 
 | 系统                              | 文件                            |
 | --------------------------------- | ------------------------------- |
-| Windows 64 位                     | `Snapshoot_1.2.0_x64-setup.exe` |
-| macOS Apple silicon（M 系列芯片） | `Snapshoot_1.2.0_aarch64.dmg`   |
-| macOS Intel                       | `Snapshoot_1.2.0_x64.dmg`       |
+| Windows 64 位                     | `Snapshoot_1.2.1_x64-setup.exe` |
+| macOS Apple silicon（M 系列芯片） | `Snapshoot_1.2.1_aarch64.dmg`   |
+| macOS Intel                       | `Snapshoot_1.2.1_x64.dmg`       |
 
 下载后按下面对应系统的方法安装。实际文件名以 Releases 页面的附件为准。
 
 ### Windows
 
-直接运行 `Snapshoot_1.2.0_x64-setup.exe`，按安装向导完成即可。
+直接运行 `Snapshoot_1.2.1_x64-setup.exe`，按安装向导完成即可。
 
 ### macOS
 
