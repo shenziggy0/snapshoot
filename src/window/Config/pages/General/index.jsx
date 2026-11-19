@@ -27,7 +27,6 @@ export default function General() {
     const [autoStart, setAutoStart] = useState(false);
     const [fontList, setFontList] = useState(null);
     const [checkUpdate, setCheckUpdate] = useConfig('check_update', true);
-    const [captureAutoCopy, setCaptureAutoCopy] = useConfig('capture_auto_copy', true);
     const [quickAccess, setQuickAccess] = useConfig('quick_access_enabled', true);
     const [serverPort, setServerPort] = useConfig('server_port', 60828);
     const [serverToken] = useConfig('server_token', '');
@@ -110,17 +109,6 @@ export default function General() {
                                 isSelected={checkUpdate}
                                 onValueChange={(v) => {
                                     setCheckUpdate(v);
-                                }}
-                            />
-                        )}
-                    </div>
-                    <div className='config-item'>
-                        <h3>{t('config.general.capture_auto_copy')}</h3>
-                        {captureAutoCopy !== null && (
-                            <Switch
-                                isSelected={captureAutoCopy}
-                                onValueChange={(v) => {
-                                    setCaptureAutoCopy(v);
                                 }}
                             />
                         )}

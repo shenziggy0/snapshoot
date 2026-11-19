@@ -67,7 +67,11 @@ pub fn cleanup_stale_pins() {
 
 pub fn pin_clipboard() {
     match read_clipboard_rgba() {
-        Ok(image) => open_pin_rgba(image),
+        Ok(image) => {
+            if let Err(err) = open_pin_rgba(image) {
+                warn!("pin clipboard image failed: {err}");
+            }
+        }
         Err(err) => {
             warn!("pin clipboard image failed: {}", err);
             match read_clipboard_text() {
@@ -109,24 +113,23 @@ fn read_clipboard_rgba() -> Result<RgbaImage, String> {
 }
 
 pub fn open_pin_dynamic(image: image::DynamicImage) {
-    open_pin_rgba(image.to_rgba8());
+    if let Err(err) = open_pin_rgba(image.to_rgba8()) {
+        warn!("pin image failed: {err}");
+    }
 }
 
-fn open_pin_rgba(image: RgbaImage) {
+fn open_pin_rgba(image: RgbaImage) -> Result<(), String> {
     let width = image.width();
     let height = image.height();
     if width == 0 || height == 0 {
         notify_no_image();
-        return;
+        return Err("pin image has no pixels".into());
     }
     let id = NEXT_PIN.fetch_add(1, Ordering::Relaxed);
     let label = format!("pin_{id}");
     let filename = format!("pin_{id}.png");
     let path = cache_file(&filename);
-    if let Err(err) = write_png(&path, &image::DynamicImage::ImageRgba8(image)) {
-        warn!("write pin image failed: {}", err);
-        return;
-    }
+    write_png(&path, &image::DynamicImage::ImageRgba8(image)).map_err(|err| err.to_string())?;
 
     let monitor = monitor_at_mouse();
     let scale = monitor.scale_factor().max(1.0);
@@ -168,10 +171,9 @@ fn open_pin_rgba(image: RgbaImage) {
     let window = match builder.build() {
         Ok(window) => window,
         Err(err) => {
-            warn!("create pin window failed: {}", err);
             pins().remove(&label);
             let _ = std::fs::remove_file(&path);
-            return;
+            return Err(err.to_string());
         }
     };
     let _ = window.set_position(PhysicalPosition::new(x, y));
@@ -195,6 +197,7 @@ fn open_pin_rgba(image: RgbaImage) {
         }
     });
     info!("Pin {} {}x{} zoom {:.2}", label, width, height, zoom);
+    Ok(())
 }
 
 pub(crate) fn open_pin_text(text: String) {
@@ -294,9 +297,16 @@ pub fn annotate_pin(window: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn pin_png_base64(data: String) -> Result<(), String> {
+pub async fn pin_png_base64(data: String) -> Result<(), String> {
     let image = crate::image_io::decode_base64_image(&data).map_err(|err| err.to_string())?;
-    spawn_main(move || open_pin_dynamic(image))
+    let (result, mut reply) = tauri::async_runtime::channel(1);
+    spawn_main(move || {
+        let _ = result.try_send(open_pin_rgba(image.to_rgba8()));
+    })?;
+    reply
+        .recv()
+        .await
+        .ok_or_else(|| "pin window creation was interrupted".to_string())?
 }
 
 #[tauri::command]

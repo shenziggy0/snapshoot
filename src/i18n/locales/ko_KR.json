@@ -15,7 +15,7 @@
                 "volcengine_free": {
                     "title": "Volcengine (키 없음)",
                     "hint": "API 키가 필요 없습니다. 번역할 텍스트는 Snapshoot 서버가 아니라 Volcengine(ByteDance)의 translate.volcengine.com으로 전송됩니다.",
-                    "privacy": "기본 번역은 Volcengine 무료 서비스입니다. 원문은 ByteDance의 translate.volcengine.com으로 전송되며 Snapshoot 서버로 가지 않습니다. 스크린샷 위 즉시 번역도 이 서비스를 사용합니다."
+                    "privacy": "Volcengine 무료 번역을 사용하면 원문이 translate.volcengine.com으로 전송됩니다."
                 },
                 "deepl": {
                     "title": "DeepL",

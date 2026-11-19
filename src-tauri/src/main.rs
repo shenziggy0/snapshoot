@@ -23,6 +23,7 @@ mod server;
 mod smoke;
 mod system_ocr;
 mod tray;
+mod translate_stream;
 mod updater;
 mod window;
 mod windows_list;
@@ -165,6 +166,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            translate_stream::translate_stream,
             reload_store,
             get_text,
             cut_image,

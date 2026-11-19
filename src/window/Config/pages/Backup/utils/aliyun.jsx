@@ -13,7 +13,7 @@ export async function backup(token, name) {
     const dir_id = await createDir(token, drive_id);
     const { file_id, upload_id, upload_url } = await createFile(token, drive_id, dir_id, name);
     await invoke('aliyun', { operate: 'put', path: filePath, url: upload_url });
-    await fetch('https://openapi.alipan.com/adrive/v1.0/openFile/complete', {
+    const completed = await fetch('https://openapi.alipan.com/adrive/v1.0/openFile/complete', {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${token}`,
@@ -24,6 +24,9 @@ export async function backup(token, name) {
             upload_id,
         }),
     });
+    if (!completed.ok) {
+        throw new Error(`阿里云盘备份提交失败（HTTP ${completed.status}）`);
+    }
 }
 
 export async function list(token) {

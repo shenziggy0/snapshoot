@@ -23,7 +23,6 @@ import { semanticColors } from '@nextui-org/theme';
 import toast, { Toaster } from 'react-hot-toast';
 import { MdContentCopy } from 'react-icons/md';
 import { useTranslation } from 'react-i18next';
-import Database from 'tauri-plugin-sql-api';
 import { GiCycle } from 'react-icons/gi';
 import { useTheme } from 'next-themes';
 import { useAtomValue } from 'jotai';
@@ -37,6 +36,7 @@ import { useConfig, useToastStyle, useVoice } from '../../../../hooks';
 import { sourceTextAtom, detectLanguageAtom } from '../SourceArea';
 import { invoke_plugin } from '../../../../utils/invoke_plugin';
 import { sanitizeHtml } from '../../../../utils/sanitize_html';
+import { openHistory } from '../../../../utils/history';
 import * as builtinServices from '../../../../services/translate';
 import * as builtinTtsServices from '../../../../services/tts';
 
@@ -50,10 +50,12 @@ import {
     whetherPluginService,
 } from '../../../../utils/service_instance';
 
-let translateID = [];
-
 function describeTranslateError(error, t) {
     const detail = error?.detail || error?.message || String(error ?? '');
+    const streamError = /^(translate\.stream_[a-z_]+)(?: (\(\d+\)))?$/.exec(detail);
+    if (streamError) {
+        return [t(streamError[1]), streamError[2]].filter(Boolean).join(' ');
+    }
     if (error?.kind === 'timeout') {
         return t('translate.request_timeout', { detail });
     }
@@ -66,7 +68,11 @@ function describeTranslateError(error, t) {
 export default function TargetArea(props) {
     const { index, name, translateServiceInstanceList, pluginList, serviceInstanceConfigMap, ...drag } = props;
 
-    const [currentTranslateServiceInstanceKey, setCurrentTranslateServiceInstanceKey] = useState(name);
+    const [selectedServiceInstanceKey, setCurrentTranslateServiceInstanceKey] = useState(name);
+    const enabledServices = translateServiceInstanceList.filter((key) => serviceInstanceConfigMap[key]?.enable !== false);
+    const currentTranslateServiceInstanceKey = enabledServices.includes(selectedServiceInstanceKey)
+        ? selectedServiceInstanceKey
+        : name;
     function getInstanceName(instanceKey, serviceNameSupplier) {
         const instanceConfig = serviceInstanceConfigMap[instanceKey] ?? {};
         return getDisplayInstanceName(instanceConfig[INSTANCE_NAME_CONFIG_KEY], serviceNameSupplier);
@@ -94,6 +100,7 @@ export default function TargetArea(props) {
     const [ttsPluginInfo, setTtsPluginInfo] = useState();
     const { t } = useTranslation();
     const textAreaRef = useRef();
+    const translateId = useRef(null);
     const toastStyle = useToastStyle();
     const speak = useVoice();
     const theme = useTheme();
@@ -106,8 +113,10 @@ export default function TargetArea(props) {
 
     // listen to translation
     useEffect(() => {
+        translateId.current = null;
         setResult('');
         setError('');
+        setIsLoading(false);
         if (
             sourceText.trim() !== '' &&
             sourceLanguage &&
@@ -125,6 +134,9 @@ export default function TargetArea(props) {
             }
             translate();
         }
+        return () => {
+            translateId.current = null;
+        };
     }, [
         sourceText,
         sourceLanguage,
@@ -137,26 +149,15 @@ export default function TargetArea(props) {
 
     // todo: history panel use service instance key
     const addToHistory = async (text, source, target, serviceInstanceKey, result) => {
-        const db = await Database.load('sqlite:history.db');
-
-        await db
-            .execute(
+        try {
+            const db = await openHistory();
+            await db.execute(
                 'INSERT into history (text, source, target, service, result, timestamp) VALUES ($1, $2, $3, $4, $5, $6)',
                 [text, source, target, serviceInstanceKey, result, Date.now()]
-            )
-            .then(
-                (v) => {
-                    db.close();
-                },
-                (e) => {
-                    db.execute(
-                        'CREATE TABLE history(id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT NOT NULL,source TEXT NOT NULL,target TEXT NOT NULL,service TEXT NOT NULL, result TEXT NOT NULL,timestamp INTEGER NOT NULL)'
-                    ).then(() => {
-                        db.close();
-                        addToHistory(text, source, target, serviceInstanceKey, result);
-                    });
-                }
             );
+        } catch (error) {
+            void logError(`写入翻译历史失败：${error}`);
+        }
     };
 
     function invokeOnce(fn) {
@@ -174,7 +175,7 @@ export default function TargetArea(props) {
 
     const translate = async () => {
         let id = nanoid();
-        translateID[index] = id;
+        translateId.current = id;
 
         const translateServiceName = getServiceName(currentTranslateServiceInstanceKey);
 
@@ -195,7 +196,7 @@ export default function TargetArea(props) {
                     config: instanceConfig,
                     detect: detectLanguage,
                     setResult: (v) => {
-                        if (translateID[index] !== id) return;
+                        if (translateId.current !== id) return;
                         setResult(v);
                         setHideOnce(false);
                     },
@@ -203,7 +204,7 @@ export default function TargetArea(props) {
                 }).then(
                     (v) => {
                         info(`[${currentTranslateServiceInstanceKey}]resolve:` + v);
-                        if (translateID[index] !== id) return;
+                        if (translateId.current !== id) return;
                         setResult(typeof v === 'string' ? v.trim() : v);
                         setIsLoading(false);
                         if (v !== '') {
@@ -244,7 +245,7 @@ export default function TargetArea(props) {
                     },
                     (e) => {
                         info(`[${currentTranslateServiceInstanceKey}]reject:` + e);
-                        if (translateID[index] !== id) return;
+                        if (translateId.current !== id) return;
                         setError(describeTranslateError(e, t));
                         setIsLoading(false);
                     }
@@ -266,9 +267,10 @@ export default function TargetArea(props) {
                 builtinServices[translateServiceName]
                     .translate(sourceText.trim(), LanguageEnum[sourceLanguage], LanguageEnum[newTargetLanguage], {
                         config: instanceConfig,
+                        instanceKey: currentTranslateServiceInstanceKey,
                         detect: detectLanguage,
                         setResult: (v) => {
-                            if (translateID[index] !== id) return;
+                            if (translateId.current !== id) return;
                             setResult(v);
                             setHideOnce(false);
                         },
@@ -276,7 +278,7 @@ export default function TargetArea(props) {
                     .then(
                         (v) => {
                             info(`[${currentTranslateServiceInstanceKey}]resolve:` + v);
-                            if (translateID[index] !== id) return;
+                            if (translateId.current !== id) return;
                             setResult(typeof v === 'string' ? v.trim() : v);
                             setIsLoading(false);
                             if (v !== '') {
@@ -317,7 +319,7 @@ export default function TargetArea(props) {
                         },
                         (e) => {
                             info(`[${currentTranslateServiceInstanceKey}]reject:` + e);
-                            if (translateID[index] !== id) return;
+                            if (translateId.current !== id) return;
                             setError(describeTranslateError(e, t));
                             setIsLoading(false);
                         }
@@ -444,7 +446,7 @@ export default function TargetArea(props) {
                                 setCurrentTranslateServiceInstanceKey(key);
                             }}
                         >
-                            {translateServiceInstanceList.map((instanceKey) => {
+                            {enabledServices.map((instanceKey) => {
                                 return (
                                     <DropdownItem
                                         key={instanceKey}
@@ -682,6 +684,8 @@ export default function TargetArea(props) {
                                     size='sm'
                                     isDisabled={typeof result !== 'string' || result === ''}
                                     onPress={async () => {
+                                        const id = nanoid();
+                                        translateId.current = id;
                                         setError('');
                                         let newTargetLanguage = sourceLanguage;
                                         if (sourceLanguage === 'auto') {
@@ -718,6 +722,7 @@ export default function TargetArea(props) {
                                                         config: instanceConfig,
                                                         detect: detectLanguage,
                                                         setResult: (v) => {
+                                                            if (translateId.current !== id) return;
                                                             setResult(v);
                                                             setHideOnce(false);
                                                         },
@@ -725,6 +730,7 @@ export default function TargetArea(props) {
                                                     }
                                                 ).then(
                                                     (v) => {
+                                                        if (translateId.current !== id) return;
                                                         if (v === result) {
                                                             setResult(v + ' ');
                                                         } else {
@@ -736,6 +742,7 @@ export default function TargetArea(props) {
                                                         }
                                                     },
                                                     (e) => {
+                                                        if (translateId.current !== id) return;
                                                         setError(describeTranslateError(e, t));
                                                         setIsLoading(false);
                                                     }
@@ -763,8 +770,10 @@ export default function TargetArea(props) {
                                                         LanguageEnum[newTargetLanguage],
                                                         {
                                                             config: instanceConfig,
+                                                            instanceKey: currentTranslateServiceInstanceKey,
                                                             detect: newSourceLanguage,
                                                             setResult: (v) => {
+                                                                if (translateId.current !== id) return;
                                                                 setResult(v);
                                                                 setHideOnce(false);
                                                             },
@@ -772,6 +781,7 @@ export default function TargetArea(props) {
                                                     )
                                                     .then(
                                                         (v) => {
+                                                            if (translateId.current !== id) return;
                                                             if (v === result) {
                                                                 setResult(v + ' ');
                                                             } else {
@@ -783,6 +793,7 @@ export default function TargetArea(props) {
                                                             }
                                                         },
                                                         (e) => {
+                                                            if (translateId.current !== id) return;
                                                             setError(describeTranslateError(e, t));
                                                             setIsLoading(false);
                                                         }

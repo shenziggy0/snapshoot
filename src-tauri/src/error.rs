@@ -15,6 +15,8 @@ pub enum Error {
     #[error(transparent)]
     Zip(#[from] zip::result::ZipError),
     #[error(transparent)]
+    Sql(#[from] sqlx::Error),
+    #[error(transparent)]
     WalkDir(#[from] walkdir::Error),
     #[error(transparent)]
     Tauri(#[from] tauri::Error),

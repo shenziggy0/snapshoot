@@ -3,11 +3,11 @@ use crate::image_io::{
 };
 use crate::screenshot::{capture_target_at_mouse, CaptureTarget};
 use crate::APP;
-use image::{imageops, RgbaImage};
+use image::{imageops, DynamicImage, RgbaImage};
 use log::{info, warn};
 use long_stitch::{integrate, AppendResult, StitchedImage};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -23,6 +23,8 @@ const CAPTURE_INTERVAL: Duration = Duration::from_millis(32);
 const MSG_CAPTURE_FAILED: &str = "long_screenshot.capture_failed";
 const MSG_SIZE_CHANGED: &str = "long_screenshot.size_changed";
 const MSG_LIMIT: &str = "long_screenshot.limit";
+const MSG_COPY_RETRY: &str = "long_screenshot.copy_retry";
+const MSG_FINISH_FAILED: &str = "long_screenshot.finish_failed";
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct CaptureRegion {
@@ -41,6 +43,7 @@ pub enum LongCaptureState {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct LongCaptureStatus {
+    pub session_id: u64,
     pub state: LongCaptureState,
     pub width: u32,
     pub height: u32,
@@ -48,8 +51,9 @@ pub struct LongCaptureStatus {
 }
 
 impl LongCaptureStatus {
-    fn capturing(width: u32, height: u32) -> Self {
+    fn capturing(session_id: u64, width: u32, height: u32) -> Self {
         Self {
+            session_id,
             state: LongCaptureState::Capturing,
             width,
             height,
@@ -59,6 +63,7 @@ impl LongCaptureStatus {
 }
 
 struct SharedSession {
+    id: u64,
     target: CaptureTarget,
     region: CaptureRegion,
     full_width: u32,
@@ -75,9 +80,16 @@ struct ActiveSession {
     worker: JoinHandle<()>,
 }
 
+enum Session {
+    Capturing(ActiveSession),
+    Outputting(Arc<AtomicBool>),
+    Frozen(Arc<DynamicImage>),
+}
+
 #[derive(Default)]
 pub struct LongCaptureManager {
-    active: Mutex<Option<ActiveSession>>,
+    active: Mutex<Option<Session>>,
+    next_id: AtomicU64,
 }
 
 pub fn is_active() -> bool {
@@ -120,6 +132,7 @@ fn publish_status(app: &AppHandle, shared: &SharedSession, next: LongCaptureStat
 fn error_status(shared: &SharedSession, message: &str) -> LongCaptureStatus {
     let status = shared.status.lock().unwrap();
     LongCaptureStatus {
+        session_id: shared.id,
         state: LongCaptureState::Error,
         width: status.width,
         height: status.height,
@@ -162,7 +175,11 @@ fn process_frame(app: &AppHandle, shared: &Arc<SharedSession>) {
     };
     match result {
         AppendResult::Appended(_) => {
-            publish_status(app, shared, LongCaptureStatus::capturing(width, height));
+            publish_status(
+                app,
+                shared,
+                LongCaptureStatus::capturing(shared.id, width, height),
+            );
         }
         AppendResult::Unchanged => {
             // A single missed grab should not leave the hint stuck on an error
@@ -171,7 +188,11 @@ fn process_frame(app: &AppHandle, shared: &Arc<SharedSession>) {
             if status.state == LongCaptureState::Error
                 && status.message.as_deref() == Some(MSG_CAPTURE_FAILED)
             {
-                publish_status(app, shared, LongCaptureStatus::capturing(width, height));
+                publish_status(
+                    app,
+                    shared,
+                    LongCaptureStatus::capturing(shared.id, width, height),
+                );
             }
         }
         // A frame captured during a compositor transition can be unrelated
@@ -183,6 +204,7 @@ fn process_frame(app: &AppHandle, shared: &Arc<SharedSession>) {
                 app,
                 shared,
                 LongCaptureStatus {
+                    session_id: shared.id,
                     state: LongCaptureState::Error,
                     width,
                     height,
@@ -233,19 +255,37 @@ pub fn abandon_active() {
         return;
     };
     let manager = app.state::<LongCaptureManager>();
-    let active = manager.active.lock().unwrap().take();
-    if let Some(active) = active {
-        stop_worker(&active.shared);
-        crate::window::leave_long_screenshot_mode();
-        thread::spawn(move || {
-            let _ = active.worker.join();
-            remove_frame_cache();
-        });
-    }
+    let mut slot = manager.active.lock().unwrap();
+    let Some(session) = slot.take() else {
+        return;
+    };
+    let active = match session {
+        Session::Capturing(active) => active,
+        Session::Outputting(cancelled) => {
+            cancelled.store(true, Ordering::SeqCst);
+            *slot = Some(Session::Outputting(cancelled));
+            return;
+        }
+        Session::Frozen(_) => return,
+    };
+    // 清理完成前仍占用会话，避免新截图先启动并被旧会话的清理影响。
+    *slot = Some(Session::Outputting(Arc::new(AtomicBool::new(true))));
+    drop(slot);
+    stop_worker(&active.shared);
+    crate::window::leave_long_screenshot_mode();
+    let app = app.clone();
+    thread::spawn(move || {
+        let _ = active.worker.join();
+        remove_frame_cache();
+        *app.state::<LongCaptureManager>().active.lock().unwrap() = None;
+    });
 }
 
 impl LongCaptureManager {
     pub fn start(&self, region: CaptureRegion) -> Result<LongCaptureStatus, String> {
+        if !crate::window::overlay_boot_state().1 {
+            return Err(MSG_FINISH_FAILED.into());
+        }
         if self.active.lock().unwrap().is_some() {
             return Err("a long capture is already running".into());
         }
@@ -256,8 +296,10 @@ impl LongCaptureManager {
             .to_rgba8();
         let first = crop_region(&source, region)?;
         let target = capture_target_at_mouse()?;
-        let status = LongCaptureStatus::capturing(first.width(), first.height());
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed) + 1;
+        let status = LongCaptureStatus::capturing(id, first.width(), first.height());
         let shared = Arc::new(SharedSession {
+            id,
             target,
             region,
             full_width: source.width(),
@@ -285,24 +327,16 @@ impl LongCaptureManager {
             region.width,
             region.height
         );
-        let mut active = self.active.lock().unwrap();
-        if active.is_some() {
-            drop(active);
-            stop_worker(&shared);
-            crate::window::leave_long_screenshot_mode();
-            let _ = worker.join();
-            remove_frame_cache();
-            return Err("a long capture is already running".into());
-        }
-        *active = Some(ActiveSession { shared, worker });
+        // 启动命令在 UI 线程串行运行，只有启动能在空槽中创建会话。
+        *self.active.lock().unwrap() = Some(Session::Capturing(ActiveSession { shared, worker }));
         Ok(status)
     }
 
     pub fn status(&self) -> Result<LongCaptureStatus, String> {
         let active = self.active.lock().unwrap();
-        let session = active
-            .as_ref()
-            .ok_or_else(|| "no active long capture".to_string())?;
+        let Some(Session::Capturing(session)) = active.as_ref() else {
+            return Err("no active long capture".into());
+        };
         let status = session.shared.status.lock().unwrap().clone();
         Ok(status)
     }
@@ -310,11 +344,10 @@ impl LongCaptureManager {
     pub fn scroll(&self, delta_y: i32) -> Result<(), String> {
         let shared = {
             let active = self.active.lock().unwrap();
-            active
-                .as_ref()
-                .ok_or_else(|| "no active long capture".to_string())?
-                .shared
-                .clone()
+            let Some(Session::Capturing(session)) = active.as_ref() else {
+                return Ok(());
+            };
+            session.shared.clone()
         };
         if delta_y != 0 {
             // The selection is normally click-through, so the page already
@@ -350,47 +383,99 @@ impl LongCaptureManager {
     }
 
     pub fn finish_copy(&self) -> Result<(), String> {
-        let shared = self.take_active()?;
-        let (width, height, pixels) = {
-            let output = shared.output.lock().unwrap();
-            (output.width, output.height, output.pixels.clone())
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let session = {
+            let mut slot = self.active.lock().unwrap();
+            match slot.as_ref() {
+                Some(Session::Outputting(_)) => {
+                    return Err("a long capture is already finishing".into())
+                }
+                None => return Err(MSG_FINISH_FAILED.into()),
+                _ => slot
+                    .replace(Session::Outputting(cancelled.clone()))
+                    .unwrap(),
+            }
         };
-        let image = RgbaImage::from_raw(width, height, pixels)
-            .ok_or_else(|| "long capture buffer is invalid".to_string())?;
-        let image = image::DynamicImage::ImageRgba8(image);
-        write_png(&cut_image_path(), &image).map_err(|err| err.to_string())?;
-        clipboard_on_main(move || copy_to_clipboard(&image).map_err(|err| err.to_string()))?;
-        remove_frame_cache();
-        crate::window::leave_long_screenshot_mode();
-        info!("long capture copied: {}x{}", width, height);
-        Ok(())
-    }
 
-    pub fn cancel(&self) -> Result<(), String> {
-        let active = self.active.lock().unwrap().take();
-        if let Some(active) = active {
-            stop_worker(&active.shared);
-            let _ = active.worker.join();
+        let image = match session {
+            Session::Capturing(active) => {
+                let image = freeze_capture(active);
+                remove_frame_cache();
+                crate::window::leave_long_screenshot_mode();
+                match image {
+                    Ok(image) => Arc::new(image),
+                    Err(error) => {
+                        warn!("long capture freeze failed: {error}");
+                        *self.active.lock().unwrap() = None;
+                        return Err(MSG_FINISH_FAILED.into());
+                    }
+                }
+            }
+            Session::Frozen(image) => image,
+            Session::Outputting(_) => unreachable!(),
+        };
+
+        let output = output_capture(&image, &cancelled);
+        let mut slot = self.active.lock().unwrap();
+        if let Err(error) = output {
+            if cancelled.load(Ordering::SeqCst) {
+                *slot = None;
+                return Err(MSG_FINISH_FAILED.into());
+            }
+            warn!("long capture output failed: {error}");
+            *slot = Some(Session::Frozen(image));
+            return Err(MSG_COPY_RETRY.into());
         }
-        remove_frame_cache();
-        crate::window::leave_long_screenshot_mode();
+        info!("long capture copied: {}x{}", image.width(), image.height());
+        *slot = None;
         Ok(())
     }
+}
 
-    fn take_active(&self) -> Result<Arc<SharedSession>, String> {
-        let active = self
-            .active
-            .lock()
-            .unwrap()
-            .take()
-            .ok_or_else(|| "no active long capture".to_string())?;
-        stop_worker(&active.shared);
-        active
-            .worker
-            .join()
-            .map_err(|_| "long capture worker stopped unexpectedly".to_string())?;
-        Ok(active.shared)
+fn freeze_capture(active: ActiveSession) -> Result<DynamicImage, String> {
+    stop_worker(&active.shared);
+    active
+        .worker
+        .join()
+        .map_err(|_| "capture worker stopped unexpectedly")?;
+    let mut output = active
+        .shared
+        .output
+        .lock()
+        .map_err(|_| "capture buffer is unavailable")?;
+    let (width, height) = (output.width, output.height);
+    RgbaImage::from_raw(width, height, std::mem::take(&mut output.pixels))
+        .map(DynamicImage::ImageRgba8)
+        .ok_or_else(|| "long capture buffer is invalid".into())
+}
+
+fn output_capture(image: &Arc<DynamicImage>, cancelled: &Arc<AtomicBool>) -> Result<(), String> {
+    let (request_id, _) = crate::window::overlay_boot_state();
+    if cancelled.load(Ordering::SeqCst) {
+        return Err("long capture cancelled".into());
     }
+    write_png(&cut_image_path(), image).map_err(|err| err.to_string())?;
+    let pending = Arc::new(AtomicBool::new(true));
+    let image = image.clone();
+    let cancelled = cancelled.clone();
+    let queued = pending.clone();
+    let result = clipboard_on_main(move || {
+        // UI 线程排队超时或取消后，晚到的任务不能覆盖下一次截图的剪贴板。
+        if !queued.load(Ordering::SeqCst)
+            || cancelled.load(Ordering::SeqCst)
+            || crate::window::overlay_boot_state().0 != request_id
+        {
+            return Err("long capture output abandoned".into());
+        }
+        copy_to_clipboard(&image).map_err(|err| err.to_string())?;
+        // 在释放会话槽位前隐藏当前覆盖层，避免前端等待回执期间关闭了下一次截图。
+        if queued.load(Ordering::SeqCst) {
+            crate::window::hide_screenshot_window();
+        }
+        Ok(())
+    });
+    pending.store(false, Ordering::SeqCst);
+    result
 }
 
 /// Runs on the main thread: `enter_long_screenshot_mode` performs AppKit
@@ -453,7 +538,7 @@ pub fn long_capture_finish_copy(manager: State<'_, LongCaptureManager>) -> Resul
     manager.finish_copy()
 }
 
-#[tauri::command(async)]
-pub fn long_capture_cancel(manager: State<'_, LongCaptureManager>) -> Result<(), String> {
-    manager.cancel()
+#[tauri::command]
+pub fn long_capture_cancel() {
+    abandon_active();
 }

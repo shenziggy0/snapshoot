@@ -16,7 +16,7 @@ import { osType } from '../../utils/env';
 import { useConfig } from '../../hooks';
 import { store } from '../../utils/store';
 import { info } from 'tauri-plugin-log-api';
-import { DEFAULT_TRANSLATE_SERVICES, migrateTranslateServices } from '../../services/translate/defaults';
+import { useTranslation } from 'react-i18next';
 
 let blurTimeout = null;
 let resizeTimeout = null;
@@ -65,13 +65,14 @@ void listen('tauri://move', () => {
 });
 
 export default function Translate() {
+    const { t } = useTranslation();
     const [closeOnBlur] = useConfig('translate_close_on_blur', true);
     const [alwaysOnTop] = useConfig('translate_always_on_top', false);
     const [windowPosition] = useConfig('translate_window_position', 'mouse');
     const [rememberWindowSize] = useConfig('translate_remember_window_size', false);
     const [translateServiceInstanceList, setTranslateServiceInstanceList] = useConfig(
         'translate_service_list',
-        DEFAULT_TRANSLATE_SERVICES
+        []
     );
     const [recognizeServiceInstanceList] = useConfig('recognize_service_list', ['system', 'tesseract']);
     const [ttsServiceInstanceList] = useConfig('tts_service_list', ['lingva_tts']);
@@ -92,15 +93,6 @@ export default function Translate() {
         const items = reorder(translateServiceInstanceList, result.source.index, result.destination.index);
         setTranslateServiceInstanceList(items);
     };
-    useEffect(() => {
-        if (!translateServiceInstanceList) {
-            return;
-        }
-        const next = migrateTranslateServices(translateServiceInstanceList);
-        if (next.join('\n') !== translateServiceInstanceList.join('\n')) {
-            setTranslateServiceInstanceList(next);
-        }
-    }, [translateServiceInstanceList]);
     // 是否自动关闭窗口
     useEffect(() => {
         if (closeOnBlur !== null && !closeOnBlur) {
@@ -295,6 +287,9 @@ export default function Translate() {
                             <Spacer y={2} />
                         </div>
                         <DragDropContext onDragEnd={onDragEnd}>
+                            {translateServiceInstanceList?.length === 0 && (
+                                <p className='px-3 py-2 text-sm text-default-500'>{t('translate.no_service')}</p>
+                            )}
                             <Droppable
                                 droppableId='droppable'
                                 direction='vertical'

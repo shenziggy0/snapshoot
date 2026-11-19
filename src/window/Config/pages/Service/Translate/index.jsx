@@ -1,14 +1,12 @@
 import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
 import { Card, Spacer, Button, useDisclosure } from '@nextui-org/react';
-import toast, { Toaster } from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
-import { useToastStyle } from '../../../../../hooks';
 import SelectPluginModal from '../SelectPluginModal';
 import { osType } from '../../../../../utils/env';
 import { useConfig, deleteKey } from '../../../../../hooks';
-import { DEFAULT_TRANSLATE_SERVICES, migrateTranslateServices } from '../../../../../services/translate/defaults';
 import ServiceItem from './ServiceItem';
 import SelectModal from './SelectModal';
 import ConfigModal from './ConfigModal';
@@ -26,21 +24,10 @@ export default function Translate(props) {
     // now it's service instance list
     const [translateServiceInstanceList, setTranslateServiceInstanceList] = useConfig(
         'translate_service_list',
-        DEFAULT_TRANSLATE_SERVICES
+        []
     );
 
-    useEffect(() => {
-        if (!translateServiceInstanceList) {
-            return;
-        }
-        const next = migrateTranslateServices(translateServiceInstanceList);
-        if (next.join('\n') !== translateServiceInstanceList.join('\n')) {
-            setTranslateServiceInstanceList(next);
-        }
-    }, [translateServiceInstanceList]);
-
     const { t } = useTranslation();
-    const toastStyle = useToastStyle();
 
     const reorder = (list, startIndex, endIndex) => {
         const result = Array.from(list);
@@ -55,13 +42,8 @@ export default function Translate(props) {
     };
 
     const deleteServiceInstance = (instanceKey) => {
-        if (translateServiceInstanceList.length === 1) {
-            toast.error(t('config.service.least'), { style: toastStyle });
-            return;
-        } else {
-            setTranslateServiceInstanceList(translateServiceInstanceList.filter((x) => x !== instanceKey));
-            deleteKey(instanceKey);
-        }
+        setTranslateServiceInstanceList(translateServiceInstanceList.filter((x) => x !== instanceKey));
+        deleteKey(instanceKey);
     };
     const updateServiceInstanceList = (instanceKey) => {
         if (translateServiceInstanceList.includes(instanceKey)) {

@@ -84,6 +84,7 @@ export default function CaptureToolbar(props) {
         onTranslate,
         onInlineTranslate,
         onRedact,
+        redactPending = false,
         onLongScreenshot,
         onScreenRecord,
         recordIntent = false,
@@ -177,7 +178,7 @@ export default function CaptureToolbar(props) {
                 )}
                 <IconButton
                     title={t('annotate.ocr')}
-                    disabled={longCaptureActive}
+                    disabled={longCaptureActive || redactPending}
                     dark={dark}
                     onClick={onOcr}
                 >
@@ -185,31 +186,35 @@ export default function CaptureToolbar(props) {
                 </IconButton>
                 <IconButton
                     title={t('annotate.translate')}
-                    disabled={longCaptureActive}
+                    disabled={longCaptureActive || redactPending}
                     dark={dark}
                     onClick={onTranslate}
                 >
                     <MdTranslate size={16} />
                 </IconButton>
-                <IconButton
-                    title={t('annotate.translate_overlay')}
-                    disabled={longCaptureActive}
-                    dark={dark}
-                    onClick={onInlineTranslate}
-                >
-                    <MdGTranslate size={16} />
-                </IconButton>
-                <IconButton
-                    title={t('annotate.privacy')}
-                    disabled={longCaptureActive}
-                    dark={dark}
-                    onClick={onRedact}
-                >
-                    <MdPrivacyTip size={16} />
-                </IconButton>
+                {onInlineTranslate && (
+                    <IconButton
+                        title={t('annotate.translate_overlay')}
+                        disabled={longCaptureActive || redactPending}
+                        dark={dark}
+                        onClick={onInlineTranslate}
+                    >
+                        <MdGTranslate size={16} />
+                    </IconButton>
+                )}
+                {onRedact && (
+                    <IconButton
+                        title={t(redactPending ? 'annotate.redacting' : 'annotate.privacy')}
+                        disabled={longCaptureActive || redactPending}
+                        dark={dark}
+                        onClick={onRedact}
+                    >
+                        <MdPrivacyTip size={16} />
+                    </IconButton>
+                )}
                 <IconButton
                     title={t('annotate.pin')}
-                    disabled={longCaptureActive}
+                    disabled={longCaptureActive || redactPending}
                     dark={dark}
                     onClick={onPin}
                 >
@@ -217,7 +222,7 @@ export default function CaptureToolbar(props) {
                 </IconButton>
                 <IconButton
                     title={t('annotate.save')}
-                    disabled={longCaptureActive}
+                    disabled={longCaptureActive || redactPending}
                     dark={dark}
                     onClick={onSave}
                 >
@@ -225,7 +230,7 @@ export default function CaptureToolbar(props) {
                 </IconButton>
                 <IconButton
                     title={`${t('annotate.copy')} (Enter)`}
-                    disabled={copyBusy}
+                    disabled={copyBusy || redactPending}
                     dark={dark}
                     onClick={onCopy}
                 >

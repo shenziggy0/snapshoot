@@ -805,6 +805,9 @@ pub fn hide_screenshot_window() {
 }
 
 pub(crate) fn open_edit_overlay(path: &std::path::Path) -> Option<Window> {
+    if crate::long_screenshot::is_active() {
+        return None;
+    }
     let request_id = begin_overlay_request()?;
     crate::screenshot::prepare_edit_image(path);
     screenshot_window_for_request(request_id)
@@ -1070,6 +1073,9 @@ pub(crate) fn leave_long_screenshot_mode() {
     OVERLAY_PASS_STOP.store(true, Ordering::SeqCst);
     OVERLAY_HIT_RECTS.lock().unwrap().clear();
     let _ = crate::image_io::spawn_main(|| {
+        if !OVERLAY_PASS_STOP.load(Ordering::SeqCst) {
+            return;
+        }
         #[cfg(target_os = "macos")]
         crate::capture_macos::clear_scroll_overlay_window();
         if let Some(window) = screenshot_handle() {

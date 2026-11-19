@@ -79,7 +79,9 @@ export function Config(props) {
                 onSubmit={(e) => {
                     e.preventDefault();
                     setIsLoading(true);
-                    translate('hello', Language.auto, Language.zh_cn, { config: openaiConfig }).then(
+                    translate('hello', Language.auto, Language.zh_cn, {
+                        config: { ...openaiConfig, stream: false },
+                    }).then(
                         () => {
                             setIsLoading(false);
                             setOpenaiConfig(openaiConfig, true);

@@ -8,7 +8,6 @@ import React, { useEffect, useState } from 'react';
 import toast, { Toaster } from 'react-hot-toast';
 import { Pagination } from '@nextui-org/react';
 import { useTranslation } from 'react-i18next';
-import Database from 'tauri-plugin-sql-api';
 
 import * as builtinCollectionServices from '../../../../services/collection';
 import { invoke_plugin } from '../../../../utils/invoke_plugin';
@@ -17,6 +16,7 @@ import { useConfig, useToastStyle } from '../../../../hooks';
 import { LanguageFlag } from '../../../../utils/language';
 import { store } from '../../../../utils/store';
 import { osType } from '../../../../utils/env';
+import { openHistory } from '../../../../utils/history';
 import {
     ServiceSourceType,
     ServiceType,
@@ -35,43 +35,48 @@ export default function History() {
     const [items, setItems] = useState([]);
     const toastStyle = useToastStyle();
     const { t } = useTranslation();
+    const reportHistoryError = (error) => toast.error(String(error), { style: toastStyle });
     useEffect(() => {
-        init();
+        init().catch(reportHistoryError);
         loadPluginList();
     }, []);
 
     useEffect(() => {
-        getData();
+        getData().catch(reportHistoryError);
     }, [total, page]);
 
     const init = async () => {
-        const db = await Database.load('sqlite:history.db');
+        const db = await openHistory();
         const result = await db.select('SELECT COUNT(*) FROM history');
         if (result[0] && result[0]['COUNT(*)']) {
             setTotal(result[0]['COUNT(*)']);
         }
     };
     const getData = async () => {
-        const db = await Database.load('sqlite:history.db');
+        const db = await openHistory();
         let result = await db.select('SELECT * FROM history ORDER BY id DESC LIMIT 20 OFFSET $1', [20 * (page - 1)]);
         setItems(result);
     };
 
     const getSelectedData = async (id) => {
-        const db = await Database.load('sqlite:history.db');
+        const db = await openHistory();
         let result = await db.select('SELECT * FROM history WHERE id=$1', [id]);
         setSelectItem(result[0]);
     };
     const clearData = async () => {
-        const db = await Database.load('sqlite:history.db');
-        await db.execute('DROP TABLE history');
-        await db.execute('VACUUM');
-        setItems([]);
-        setTotal(0);
-        setPage(1);
+        try {
+            const db = await openHistory();
+            await db.execute('DELETE FROM history');
+            setItems([]);
+            setSelectItem(null);
+            setTotal(0);
+            setPage(1);
+        } catch (error) {
+            reportHistoryError(error);
+        }
     };
     const updateData = async () => {
-        const db = await Database.load('sqlite:history.db');
+        const db = await openHistory();
         await db.execute('UPDATE history SET text=$1, result=$2 WHERE id=$3', [
             selectedItem.text,
             selectedItem.result,
@@ -135,9 +140,13 @@ export default function History() {
                         } overflow-y-auto`,
                         td: 'px-0',
                     }}
-                    onRowAction={(id) => {
-                        getSelectedData(id);
-                        onOpen();
+                    onRowAction={async (id) => {
+                        try {
+                            await getSelectedData(id);
+                            onOpen();
+                        } catch (error) {
+                            reportHistoryError(error);
+                        }
                     }}
                 >
                     <TableHeader>

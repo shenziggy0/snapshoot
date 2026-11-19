@@ -76,7 +76,9 @@ export function Config(props) {
                 onSubmit={(e) => {
                     e.preventDefault();
                     setIsLoading(true);
-                    translate('hello', Language.auto, Language.zh_cn, { config: serviceConfig }).then(
+                    translate('hello', Language.auto, Language.zh_cn, {
+                        config: { ...serviceConfig, stream: false },
+                    }).then(
                         () => {
                             setIsLoading(false);
                             setServiceConfig(serviceConfig, true);

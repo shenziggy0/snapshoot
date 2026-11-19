@@ -9,16 +9,16 @@ Snapshoot is a cross-platform screenshot tool for Windows and macOS. Take a scre
 ## Features
 
 -   **Screenshot**: capture any selected area, with multi-monitor support.
--   **Quick capture**: optionally copy automatically once a selection settles. Copying, saving, or pinning opens a Quick Access overlay, and the latest 60 captures stay in local history for copy, save, share, OCR, or annotation.
+-   **Quick Access**: after you copy, save, or pin a capture, it is stored in local history. Open Quick Access to copy, save, share, run OCR on, or annotate any of the latest 60 captures.
 -   **Annotate**: draw boxes, arrows, lines, mosaics, and text right on the screenshot, with crop and undo.
 -   **Pin**: pin a screenshot or clipboard text on top of other windows. Image pins support zoom and opacity.
 -   **Long screenshot**: automatically scroll and stitch a page, useful for web pages and long documents.
 -   **Screen recording**: record a selected area to MP4 with adjustable resolution, frame rate, and quality. System audio or microphone, pause, and resume are supported. The file is saved automatically and copied to the clipboard. Requires macOS 12.3 or later; system audio needs macOS 13 or later.
 -   **OCR**: recognize text in images with local and online services. On macOS, Apple Vision runs locally and returns text positions and QR codes.
--   **Translate**: selection, input, screenshot, OCR, and in-place translation over the frozen screenshot, with many translation services.
--   **Privacy redaction**: detect emails, phone numbers, keys, and tokens in a screenshot and mosaic them in one action.
+-   **Translate**: translate selected text, typed text, screenshots, or OCR results. macOS also supports showing translations directly over the frozen screenshot. Add and switch translation services in Settings.
+-   **Automatic redaction (macOS)**: detect and mosaic emails, phone numbers, keys, and tokens in a screenshot. Windows supports manual mosaics through the annotation toolbar.
 -   **Sharing**: with WebDAV configured, upload a capture from Quick Access and copy its share link.
--   **History**: translation and recognition history can be searched and exported.
+-   **History**: browse, edit, or clear translation history.
 -   **Backup**: back up your configuration locally, to WebDAV, or to Aliyun Drive.
 -   **External call**: other apps on the same machine can call translation, OCR, and more through `http://127.0.0.1:60828`. Each request must include the local token from Settings, in the `X-Snapshoot-Token` header or the `token` query parameter. The port can be changed in Settings.
 
@@ -74,7 +74,7 @@ First check your chip: Apple menu -> About This Mac, look at the "Chip" line. Do
 
 Translation and OCR service keys are entered by you in Settings and stored locally. They are not uploaded to a Snapshoot server.
 
-The default translation service is Volcengine free. It does not need an API key, but it sends the text to Volcengine (ByteDance) at `translate.volcengine.com`, not to a Snapshoot server. In-place translation on a screenshot uses this default service too.
+Enable the translation services you want to use in Settings. In-place screenshot translation only uses enabled built-in services that support the target language. Choosing Volcengine (no key) sends the text to `translate.volcengine.com`. After upgrading, review your existing services and remove any you no longer want to use. Language detection for regular translation has its own setting. Choose Local to detect languages on your device.
 
 These three also are not Snapshoot servers, and they stay off until you select them in Settings:
 

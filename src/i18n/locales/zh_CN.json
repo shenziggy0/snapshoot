@@ -74,7 +74,6 @@
                 },
                 "transparent": "透明效果",
                 "dev_mode": "开发模式",
-                "capture_auto_copy": "截图后自动复制",
                 "quick_access": "显示快速访问浮层",
                 "proxy": {
                     "title": "网络代理",
@@ -365,7 +364,7 @@
                 "volcengine_free": {
                     "title": "火山翻译（免密钥）",
                     "hint": "不需要 API Key。待翻译文本会发送到火山引擎（字节跳动）的公开接口 translate.volcengine.com，不是 Snapshoot 的服务器。",
-                    "privacy": "当前使用的默认翻译是火山翻译（免密钥）。原文会发送到火山引擎（字节跳动）的 translate.volcengine.com，不是 Snapshoot 的服务器。截图上的就地翻译也会走这项服务。"
+                    "privacy": "启用火山翻译（免密钥）后，使用这项服务会将原文发送到火山引擎的 translate.volcengine.com。"
                 },
                 "niutrans": {
                     "title": "小牛翻译",
@@ -489,7 +488,15 @@
             "delete_newline": "删除换行",
             "translate_back": "翻译回原文",
             "request_timeout": "翻译请求在 8 秒后超时。该服务在中国大陆经常无法访问。{{detail}}",
-            "request_network": "网络错误：无法连接该翻译服务。DeepL、必应、谷歌在中国大陆经常被阻断。请使用默认的「火山翻译（免密钥）」，或自行填写国内服务的 API Key。{{detail}}"
+            "stream_config_invalid": "流式服务配置不可用，请检查并保存服务设置。",
+            "stream_response_invalid": "服务返回的流式译文无效或不完整。",
+            "stream_upstream_failed": "流式翻译服务请求失败。",
+            "stream_timeout": "等待流式译文超时。",
+            "request_network": "无法连接该翻译服务。请检查网络或在设置中选择其他服务。{{detail}}",
+            "no_service": "请先在设置的翻译服务中添加服务。",
+            "inline_no_service": "截图内翻译需要在设置中启用至少一个内置翻译服务。",
+            "target_not_supported": "已启用的内置服务不支持目标语言。",
+            "inline_empty_result": "翻译服务未返回文本译文。"
         },
         "recognize": {
             "recognize": "重新识别",
@@ -535,12 +542,15 @@
             "translating": "正在识别并翻译…",
             "original_text": "原文",
             "no_sensitive": "没有识别到需要打码的敏感信息",
-            "redacted": "已打码 {count} 处敏感信息"
+            "redacting": "正在识别敏感信息…",
+            "redacted": "已打码 {{count}} 处敏感信息"
         },
         "long_screenshot": {
             "title": "截长图",
             "hint": "在选区内滚动页面",
             "scroll_hint": "请缓慢向下滚动，重叠内容会自动拼接。",
+            "copy_retry": "长图已保留，请再次点击复制重试。",
+            "finish_failed": "未能完成长截图，请重新开始。",
             "pause": "暂停",
             "resume": "继续",
             "finish": "完成",

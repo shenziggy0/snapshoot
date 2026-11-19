@@ -12,7 +12,8 @@ import { MdClose, MdContentCopy } from 'react-icons/md';
 
 import { drawShape } from '../Annotate/render';
 import { translateOnce } from '../../utils/translate_once';
-import { useConfig, useToastStyle } from '../../hooks';
+import { useToastStyle } from '../../hooks';
+import { osType } from '../../utils/env';
 import { useSystemDark } from '../useSystemDark';
 import CaptureToolbar from './Toolbar';
 import RecordControls from './RecordControls';
@@ -117,10 +118,6 @@ export default function Screenshot() {
     const { t } = useTranslation();
     const toastStyle = useToastStyle();
     const dark = useSystemDark();
-    const [autoCopy] = useConfig('capture_auto_copy', true);
-    const autoCopyRef = useRef(Boolean(autoCopy));
-    const autoCopiedRef = useRef(false);
-    autoCopyRef.current = Boolean(autoCopy);
     const canvasRef = useRef(null);
     const sampleRef = useRef(null);
     const loupeRef = useRef(null);
@@ -137,6 +134,8 @@ export default function Screenshot() {
     const framesRef = useRef([]);
     const originRef = useRef({ x: 0, y: 0 });
     const bootSeqRef = useRef(0);
+    const inlineRequestRef = useRef(0);
+    const redactPendingRef = useRef(false);
     const colorRef = useRef('#e11d48');
     const strokeRef = useRef(4);
     const fontRef = useRef(24);
@@ -149,12 +148,14 @@ export default function Screenshot() {
     const [recordSupported, setRecordSupported] = useState(false);
     const longCaptureRef = useRef(false);
     const longCaptureBusyRef = useRef(false);
-    const longCaptureMessageRef = useRef('');
+    const longCaptureSessionRef = useRef(null);
+    const longCaptureFrozenRef = useRef(false);
 
     const [image, setImage] = useState(null);
     const [longCaptureActive, setLongCaptureActive] = useState(false);
     const [longCaptureBusy, setLongCaptureBusy] = useState(false);
     const [longCaptureStatus, setLongCaptureStatus] = useState(null);
+    const [longCaptureFrozen, setLongCaptureFrozen] = useState(false);
     const [layout, setLayout] = useState(null);
     const [selection, setSelection] = useState(null);
     const [hover, setHover] = useState(null);
@@ -168,6 +169,7 @@ export default function Screenshot() {
     const [textDraft, setTextDraft] = useState(null);
     const [loadError, setLoadError] = useState('');
     const [inlineTranslation, setInlineTranslation] = useState(null);
+    const [redactPending, setRedactPending] = useState(false);
     const [cursor, setCursor] = useState({ x: 0, y: 0 });
     const [loupe, setLoupe] = useState(null);
     const [toolbarSize, setToolbarSize] = useState({ w: 566, h: 72 });
@@ -185,6 +187,12 @@ export default function Screenshot() {
     const setLongCaptureMode = (active) => {
         longCaptureRef.current = active;
         setLongCaptureActive(active);
+        if (!active) {
+            longCaptureSessionRef.current = null;
+            longCaptureFrozenRef.current = false;
+            setLongCaptureFrozen(false);
+            setLongCaptureStatus(null);
+        }
     };
 
     const showLongCaptureError = (error) => {
@@ -265,15 +273,18 @@ export default function Screenshot() {
         let requestId = 0;
         setLoadError('');
         setInlineTranslation(null);
+        inlineRequestRef.current += 1;
+        redactPendingRef.current = false;
+        setRedactPending(false);
         setSelection(null);
         setHover(null);
         setTool('');
         publish([], []);
         setDraft(null);
         setLongCaptureMode(false);
-        setLongCaptureStatus(null);
+        longCaptureBusyRef.current = false;
+        setLongCaptureBusy(false);
         framesRef.current = [];
-        autoCopiedRef.current = false;
         imageRef.current = null;
         layoutRef.current = null;
         selectionRef.current = null;
@@ -623,6 +634,8 @@ export default function Screenshot() {
         if (!canvas || !region) {
             return '';
         }
+        // 导出前绘制最新标注，避免异步打码刚完成时复制上一帧原图。
+        paint();
         const out = document.createElement('canvas');
         out.width = region.width;
         out.height = region.height;
@@ -639,36 +652,6 @@ export default function Screenshot() {
         );
         return out.toDataURL('image/png').split(',')[1];
     };
-
-    useEffect(() => {
-        if (
-            !autoCopyRef.current ||
-            autoCopiedRef.current ||
-            !image ||
-            !selection ||
-            selection.w < 8 ||
-            selection.h < 8 ||
-            intentRef.current !== 'annotate'
-        ) {
-            return undefined;
-        }
-        // Wait until a drag/resize has settled before touching the clipboard.
-        const timer = setTimeout(() => {
-            if (autoCopiedRef.current) {
-                return;
-            }
-            const data = exportBase64(selection);
-            if (!data) {
-                return;
-            }
-            autoCopiedRef.current = true;
-            void invoke('copy_png_base64', { data }).catch((error) => {
-                console.error('auto copy failed', error);
-            });
-            recordHistory(data, 'auto', true);
-        }, 450);
-        return () => clearTimeout(timer);
-    }, [selection, image]);
 
     useEffect(() => {
         let alive = true;
@@ -766,25 +749,33 @@ export default function Screenshot() {
     };
 
     const startLongScreenshot = async () => {
+        if (longCaptureRef.current || longCaptureBusyRef.current) return;
         const region = selectionImageRect(selectionRef.current);
         if (!region) {
             console.error('[long-capture] no selection rect');
             toast.error('no selection', { style: toastStyle });
             return;
         }
-        console.log('[long-capture] invoking start with region', region);
+        const sequence = bootSeqRef.current;
+        longCaptureBusyRef.current = true;
+        setLongCaptureBusy(true);
         try {
             const status = await invoke('long_capture_start', { region });
-            console.log('[long-capture] start ok', status);
+            if (sequence !== bootSeqRef.current) return;
+            longCaptureSessionRef.current = status.session_id;
             setLongCaptureMode(true);
             setLongCaptureStatus(status);
             // Re-assert focus so macOS keeps routing wheel events to this
             // overlay instead of the application underneath it.
-            await appWindow.setFocus();
+            void appWindow.setFocus().catch(console.error);
             toast.success(t('long_screenshot.scroll_hint'), { style: toastStyle });
         } catch (error) {
-            console.error('[long-capture] start failed', error);
-            showLongCaptureError(error);
+            if (sequence === bootSeqRef.current) showLongCaptureError(error);
+        } finally {
+            if (sequence === bootSeqRef.current) {
+                longCaptureBusyRef.current = false;
+                setLongCaptureBusy(false);
+            }
         }
     };
 
@@ -792,53 +783,77 @@ export default function Screenshot() {
         if (longCaptureBusyRef.current) {
             return;
         }
+        const sequence = bootSeqRef.current;
+        const session = longCaptureSessionRef.current;
+        const live = () => sequence === bootSeqRef.current && session === longCaptureSessionRef.current;
         longCaptureBusyRef.current = true;
         setLongCaptureBusy(true);
         try {
             await invoke('long_capture_finish_copy');
+            if (!live()) return;
+            setLongCaptureMode(false);
             toast.success(t('annotate.copied'), { style: toastStyle });
-            await invoke('hide_screenshot_window');
         } catch (error) {
+            if (!live()) return;
+            if (String(error) === 'long_screenshot.copy_retry') {
+                longCaptureFrozenRef.current = true;
+                setLongCaptureFrozen(true);
+            } else {
+                setLongCaptureMode(false);
+            }
             showLongCaptureError(error);
         } finally {
-            longCaptureBusyRef.current = false;
-            setLongCaptureBusy(false);
+            if (sequence === bootSeqRef.current) {
+                longCaptureBusyRef.current = false;
+                setLongCaptureBusy(false);
+            }
         }
     };
 
     const cancelLongCapture = async () => {
-        if (!longCaptureRef.current) {
-            return;
-        }
-        try {
-            await invoke('long_capture_cancel');
-        } catch {
-            // No active session left to cancel.
-        }
+        // 关闭覆盖层会在原生端取消会话。先作废前端回调，再等待窗口隐藏。
+        bootSeqRef.current += 1;
         setLongCaptureMode(false);
-        setLongCaptureStatus(null);
+        longCaptureBusyRef.current = false;
+        setLongCaptureBusy(false);
+        try {
+            await invoke('hide_screenshot_window');
+        } catch (error) {
+            showLongCaptureError(error);
+        }
     };
 
-    const recordHistory = (data, action, showQuick = true) => {
-        void invoke('capture_history_add', { data, action, showQuick }).catch((error) => {
+    const recordHistory = (data, action) => {
+        void invoke('capture_history_add', { data, action, showQuick: true }).catch((error) => {
             console.error('capture history failed', error);
         });
     };
 
+    const closeCapture = () => {
+        inlineRequestRef.current += 1;
+        setInlineTranslation(null);
+        return invoke('hide_screenshot_window');
+    };
+
     const finish = async (action, rect) => {
+        if (longCaptureBusyRef.current) return;
         if (longCaptureRef.current) {
             await finishLongCapture();
             return;
         }
-        autoCopiedRef.current = true;
+        if (redactPendingRef.current) {
+            return;
+        }
         const data = exportBase64(rect || selectionRef.current);
         if (!data) {
             return;
         }
+        inlineRequestRef.current += 1;
+        setInlineTranslation(null);
         try {
             if (action === 'copy') {
                 await invoke('copy_png_base64', { data });
-                recordHistory(data, 'copy', true);
+                recordHistory(data, 'copy');
             } else if (action === 'save') {
                 const path = await save({
                     defaultPath: 'snapshoot-screenshot.png',
@@ -848,18 +863,16 @@ export default function Screenshot() {
                     return;
                 }
                 await invoke('save_png_base64', { path, data });
-                recordHistory(data, 'save', true);
+                recordHistory(data, 'save');
                 toast.success(t('annotate.saved'), { style: toastStyle });
                 return;
             } else if (action === 'pin') {
                 await invoke('pin_png_base64', { data });
-                recordHistory(data, 'pin', true);
+                recordHistory(data, 'pin');
             } else if (action === 'ocr') {
                 await invoke('open_ocr_from_png_base64', { data });
-                recordHistory(data, 'ocr', false);
             } else if (action === 'translate') {
                 await invoke('open_translate_from_png_base64', { data });
-                recordHistory(data, 'translate', false);
             }
             await invoke('hide_screenshot_window');
         } catch (error) {
@@ -869,13 +882,15 @@ export default function Screenshot() {
 
     const runInlineTranslate = async () => {
         const current = selectionRef.current;
-        if (!current) {
+        if (!current || redactPendingRef.current) {
             return;
         }
+        const request = ++inlineRequestRef.current;
         setInlineTranslation({ selection: { ...current }, loading: true, original: '', translated: '', error: '' });
         try {
             const data = exportBase64(current);
             const layout = await invoke('system_ocr_layout', { data });
+            if (request !== inlineRequestRef.current) return;
             const original = (layout.lines || [])
                 .map((line) => line.text)
                 .join('\n')
@@ -898,6 +913,7 @@ export default function Screenshot() {
                 throw new Error(t('annotate.empty'));
             }
             const translated = await translateOnce(original);
+            if (request !== inlineRequestRef.current) return;
             setInlineTranslation({
                 selection: { ...current },
                 loading: false,
@@ -906,8 +922,10 @@ export default function Screenshot() {
                 error: '',
             });
         } catch (error) {
+            if (request !== inlineRequestRef.current) return;
             setInlineTranslation(null);
-            toast.error(String(error), { style: toastStyle });
+            const message = error instanceof Error ? error.message : String(error);
+            toast.error(t(message, { defaultValue: message }), { style: toastStyle });
         }
     };
 
@@ -928,14 +946,19 @@ export default function Screenshot() {
 
     const redactSensitive = async () => {
         const current = selectionRef.current;
-        if (!current) {
+        const region = selectionImageRect(current);
+        if (!region || redactPendingRef.current) {
             return;
         }
+        const capture = bootSeqRef.current;
+        inlineRequestRef.current += 1;
+        setInlineTranslation(null);
+        redactPendingRef.current = true;
+        setRedactPending(true);
         try {
             const data = exportBase64(current);
             const layout = await invoke('system_ocr_layout', { data });
-            const region = selectionImageRect(current);
-            if (!region) {
+            if (capture !== bootSeqRef.current) {
                 return;
             }
             const redactions = (layout.lines || [])
@@ -955,7 +978,14 @@ export default function Screenshot() {
             publish([...shapesRef.current, ...redactions], []);
             toast.success(t('annotate.redacted', { count: redactions.length }), { style: toastStyle });
         } catch (error) {
-            toast.error(String(error), { style: toastStyle });
+            if (capture === bootSeqRef.current) {
+                toast.error(String(error), { style: toastStyle });
+            }
+        } finally {
+            if (capture === bootSeqRef.current) {
+                redactPendingRef.current = false;
+                setRedactPending(false);
+            }
         }
     };
 
@@ -981,9 +1011,14 @@ export default function Screenshot() {
             if (event.key === 'Enter' && selectionRef.current) {
                 event.preventDefault();
                 await finish('copy');
-            } else if (event.key === 'Escape' && longCaptureRef.current) {
+            } else if (event.key === 'Escape') {
                 event.preventDefault();
-                await cancelLongCapture();
+                event.stopImmediatePropagation();
+                if (longCaptureRef.current || longCaptureBusyRef.current) {
+                    await cancelLongCapture();
+                } else {
+                    await closeCapture();
+                }
             } else if (event.key.toLowerCase() === 'c' && loupe && !event.metaKey && !event.ctrlKey) {
                 event.preventDefault();
                 await writeText(loupe.hex);
@@ -1190,16 +1225,16 @@ export default function Screenshot() {
         : undefined;
 
     useEffect(() => {
-        if (!longCaptureActive) {
+        if (!longCaptureActive || longCaptureFrozen || longCaptureBusy) {
             return undefined;
         }
         // The selection is click-through, so these events only arrive when the
         // pointer is over the toolbar. Coalesce one gesture frame into a
         // single pixel delta instead of forwarding every trackpad tick.
         let pending = 0;
-        let scheduled = false;
+        let frame = null;
         const flush = () => {
-            scheduled = false;
+            frame = null;
             const deltaY = Math.trunc(pending);
             pending -= deltaY;
             if (deltaY === 0) {
@@ -1210,23 +1245,25 @@ export default function Screenshot() {
             });
         };
         const onWheel = (event) => {
-            if (!longCaptureRef.current) {
+            if (!longCaptureRef.current || longCaptureBusyRef.current || longCaptureFrozenRef.current) {
                 return;
             }
             event.preventDefault();
             const unit = event.deltaMode === 1 ? 48 : event.deltaMode === 2 ? window.innerHeight : 1;
             pending += event.deltaY * unit;
-            if (!scheduled) {
-                scheduled = true;
-                requestAnimationFrame(flush);
+            if (frame === null) {
+                frame = requestAnimationFrame(flush);
             }
         };
         window.addEventListener('wheel', onWheel, { passive: false });
-        return () => window.removeEventListener('wheel', onWheel);
-    }, [longCaptureActive]);
+        return () => {
+            window.removeEventListener('wheel', onWheel);
+            if (frame !== null) cancelAnimationFrame(frame);
+        };
+    }, [longCaptureActive, longCaptureFrozen, longCaptureBusy]);
 
     useEffect(() => {
-        if (!longCaptureActive && !recordActive) {
+        if ((!longCaptureActive || longCaptureFrozen || longCaptureBusy) && !recordActive) {
             return undefined;
         }
         let alive = true;
@@ -1251,7 +1288,7 @@ export default function Screenshot() {
             clearInterval(timer);
             window.removeEventListener('resize', publish);
         };
-    }, [longCaptureActive, recordActive]);
+    }, [longCaptureActive, longCaptureFrozen, longCaptureBusy, recordActive]);
 
     useEffect(() => {
         let active = true;
@@ -1259,12 +1296,20 @@ export default function Screenshot() {
         (async () => {
             try {
                 unlisten = await listen('long-capture-status', (event) => {
-                    if (active && longCaptureRef.current) {
+                    if (
+                        active &&
+                        !longCaptureFrozenRef.current &&
+                        event.payload.session_id === longCaptureSessionRef.current
+                    ) {
                         setLongCaptureStatus(event.payload);
                     }
                 });
                 const current = await invoke('long_capture_status');
-                if (active && longCaptureRef.current) {
+                if (
+                    active &&
+                    !longCaptureFrozenRef.current &&
+                    current.session_id === longCaptureSessionRef.current
+                ) {
                     setLongCaptureStatus(current);
                 }
             } catch {
@@ -1278,7 +1323,7 @@ export default function Screenshot() {
     }, []);
 
     const onRootWheel = (event) => {
-        if (!longCaptureRef.current) {
+        if (!longCaptureRef.current || longCaptureFrozenRef.current) {
             return;
         }
         event.preventDefault();
@@ -1455,8 +1500,9 @@ export default function Screenshot() {
                             onRedo={redo}
                             onOcr={() => finish('ocr')}
                             onTranslate={() => finish('translate')}
-                            onInlineTranslate={runInlineTranslate}
-                            onRedact={redactSensitive}
+                            onInlineTranslate={osType === 'Darwin' ? runInlineTranslate : undefined}
+                            onRedact={osType === 'Darwin' ? redactSensitive : undefined}
+                            redactPending={redactPending}
                             onLongScreenshot={intentRef.current === 'edit' ? undefined : startLongScreenshot}
                             recordIntent={intentRef.current === 'record'}
                             onScreenRecord={
@@ -1467,7 +1513,11 @@ export default function Screenshot() {
                             onPin={() => finish('pin')}
                             onSave={() => finish('save')}
                             onCopy={() => finish('copy')}
-                            onClose={() => invoke('hide_screenshot_window')}
+                            onClose={() =>
+                                longCaptureRef.current || longCaptureBusyRef.current
+                                    ? cancelLongCapture()
+                                    : closeCapture()
+                            }
                         />
                     )}
                 </div>
@@ -1512,7 +1562,10 @@ export default function Screenshot() {
                             <button
                                 type='button'
                                 title={t('annotate.close')}
-                                onClick={() => setInlineTranslation(null)}
+                                onClick={() => {
+                                    inlineRequestRef.current += 1;
+                                    setInlineTranslation(null);
+                                }}
                                 className='flex h-6 w-6 items-center justify-center rounded hover:bg-black/10'
                             >
                                 <MdClose size={14} />
@@ -1543,7 +1596,9 @@ export default function Screenshot() {
             {longCaptureActive && (
                 <div className='pointer-events-none absolute inset-x-0 bottom-6 z-50 flex justify-center'>
                     <div className='rounded-full bg-black/70 px-4 py-1.5 text-[12px] text-white'>
-                        {longCaptureStatus?.message ? t(longCaptureStatus.message) : t('long_screenshot.scroll_hint')}
+                        {longCaptureFrozen
+                            ? t('long_screenshot.copy_retry')
+                            : t(longCaptureStatus?.message || 'long_screenshot.scroll_hint')}
                     </div>
                 </div>
             )}

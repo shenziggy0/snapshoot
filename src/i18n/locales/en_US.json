@@ -74,7 +74,6 @@
                 },
                 "transparent": "Transparent Effect",
                 "dev_mode": "Developer Mode",
-                "capture_auto_copy": "Auto copy after capture",
                 "quick_access": "Show quick access overlay",
                 "proxy": {
                     "title": "Proxy",
@@ -365,7 +364,7 @@
                 "volcengine_free": {
                     "title": "Volcengine (no key)",
                     "hint": "No API key. Text is sent to Volcengine (ByteDance) at translate.volcengine.com, not to a Snapshoot server.",
-                    "privacy": "The default translator is Volcengine free. Your text is sent to Volcengine (ByteDance) at translate.volcengine.com, not to a Snapshoot server. In-place translation on a screenshot uses this service too."
+                    "privacy": "Using Volcengine (no key) sends your text to Volcengine at translate.volcengine.com."
                 },
                 "niutrans": {
                     "title": "NiuTrans",
@@ -489,7 +488,15 @@
             "delete_newline": "Delete Newline",
             "translate_back": "Translation back to the original",
             "request_timeout": "Request timed out after 8 seconds. This service is often unreachable from mainland China. {{detail}}",
-            "request_network": "Network error. DeepL, Bing, and Google are often blocked in mainland China. Use Volcengine (no key), which is enabled by default, or add a domestic API key. {{detail}}"
+            "stream_config_invalid": "Streaming service configuration is unavailable. Check and save the service settings.",
+            "stream_response_invalid": "The service returned an invalid or incomplete streaming response.",
+            "stream_upstream_failed": "The streaming translation request failed.",
+            "stream_timeout": "Timed out waiting for the streaming translation.",
+            "request_network": "Could not reach this translation service. Check your connection or select another service in Settings. {{detail}}",
+            "no_service": "Add a translation service in Settings to get started.",
+            "inline_no_service": "Enable a built-in translation service in Settings to translate within screenshots.",
+            "target_not_supported": "The enabled built-in services do not support the target language.",
+            "inline_empty_result": "The translation service returned no text translation."
         },
         "recognize": {
             "recognize": "Recognize",
@@ -535,12 +542,15 @@
             "translating": "Recognizing and translating…",
             "original_text": "Original",
             "no_sensitive": "No sensitive text was detected",
-            "redacted": "Redacted {count} sensitive item(s)"
+            "redacting": "Detecting sensitive information…",
+            "redacted": "Redacted {{count}} sensitive item(s)"
         },
         "long_screenshot": {
             "title": "Scroll capture",
             "hint": "Scroll inside the selected area",
             "scroll_hint": "Scroll down slowly. Overlapping content is stitched automatically.",
+            "copy_retry": "The stitched image is ready. Click Copy to retry.",
+            "finish_failed": "Could not finish the scroll capture. Start a new capture.",
             "pause": "Pause",
             "resume": "Resume",
             "finish": "Finish",
