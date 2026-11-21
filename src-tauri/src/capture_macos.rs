@@ -104,8 +104,8 @@ pub fn cursor_physical_position() -> Option<(i32, i32)> {
         if !inside {
             continue;
         }
-        let pixel_width = display_pixels_wide(id).max(1) as f64;
-        let scale = pixel_width / bounds.size.width.max(1.0);
+        let (pixel_width, _) = display_pixel_size(id);
+        let scale = f64::from(pixel_width.max(1)) / bounds.size.width.max(1.0);
         let x = (bounds.origin.x * scale + (point.x - bounds.origin.x) * scale).round() as i32;
         let y = (bounds.origin.y * scale + (point.y - bounds.origin.y) * scale).round() as i32;
         return Some((x, y));
@@ -127,17 +127,17 @@ fn target_clone(target: &DisplayTarget) -> DisplayTarget {
 }
 
 fn geometry_for(display: &CGDisplay, bounds: CGRect) -> CaptureGeometry {
-    // `CGDisplay::pixels_wide()` reports the *point* width on some macOS
-    // versions (1470 on a 2940-pixel Retina panel), so it cannot be trusted to
-    // derive the backing scale. Use the real backing pixel dimensions instead.
-    let pixel_width = display_pixels_wide(display.id).max(1);
-    let pixel_height = display_pixels_high(display.id).max(1);
-    let scale = pixel_width as f64 / bounds.size.width.max(1.0);
+    // `CGDisplayPixelsWide` reports points on macOS 27 (1470 on a 2940-pixel
+    // panel). The toolbar hit test multiplies CSS pixels by the real backing
+    // scale, so a point-sized cursor never lands on the copy button and the
+    // click-through overlay cannot be dismissed.
+    let (pixel_width, pixel_height) = display_pixel_size(display.id);
+    let scale = f64::from(pixel_width.max(1)) / bounds.size.width.max(1.0);
     crate::image_io::diag_log(
         "geometry_for",
         &format!(
-            "id={} pixels_wide={} pixels_high={} bounds_w={:.1} scale={scale}",
-            display.id, pixel_width, pixel_height, bounds.size.width
+            "id={} pixels={pixel_width}x{pixel_height} bounds_w={:.1} scale={scale:.3}",
+            display.id, bounds.size.width
         ),
     );
     CaptureGeometry {
@@ -148,12 +148,25 @@ fn geometry_for(display: &CGDisplay, bounds: CGRect) -> CaptureGeometry {
     }
 }
 
-fn display_pixels_wide(id: u32) -> u32 {
-    unsafe { CGDisplayPixelsWide(id) as u32 }
-}
-
-fn display_pixels_high(id: u32) -> u32 {
-    unsafe { CGDisplayPixelsHigh(id) as u32 }
+/// Hardware pixels of the current display mode. This matches the buffer
+/// returned by `CGDisplayCreateImage` (2940x1912 here). `CGDisplayPixelsWide`
+/// does not: on this OS it returns the point size.
+fn display_pixel_size(id: u32) -> (u32, u32) {
+    unsafe {
+        let mode = CGDisplayCopyDisplayMode(id);
+        if !mode.is_null() {
+            let width = CGDisplayModeGetPixelWidth(mode) as u32;
+            let height = CGDisplayModeGetPixelHeight(mode) as u32;
+            CGDisplayModeRelease(mode);
+            if width > 0 && height > 0 {
+                return (width, height);
+            }
+        }
+        (
+            CGDisplayPixelsWide(id) as u32,
+            CGDisplayPixelsHigh(id) as u32,
+        )
+    }
 }
 
 pub fn exclude_from_capture(window: &tauri::Window) {
@@ -449,6 +462,10 @@ extern "C" {
     fn CGEventPostToPid(pid: i32, event: core_graphics::sys::CGEventRef);
     fn CGDisplayPixelsWide(display: u32) -> usize;
     fn CGDisplayPixelsHigh(display: u32) -> usize;
+    fn CGDisplayCopyDisplayMode(display: u32) -> *mut c_void;
+    fn CGDisplayModeGetPixelWidth(mode: *mut c_void) -> usize;
+    fn CGDisplayModeGetPixelHeight(mode: *mut c_void) -> usize;
+    fn CGDisplayModeRelease(mode: *mut c_void);
 }
 
 /// Capture the fixed selection without a PNG round trip. The image is the

@@ -390,7 +390,11 @@ impl LongCaptureManager {
                 Some(Session::Outputting(_)) => {
                     return Err("a long capture is already finishing".into())
                 }
-                None => return Err(MSG_FINISH_FAILED.into()),
+                None => {
+                    // 会话已经没了，但覆盖层可能还在点击穿透，先退出才能关掉。
+                    crate::window::leave_long_screenshot_mode();
+                    return Err(MSG_FINISH_FAILED.into());
+                }
                 _ => slot
                     .replace(Session::Outputting(cancelled.clone()))
                     .unwrap(),
