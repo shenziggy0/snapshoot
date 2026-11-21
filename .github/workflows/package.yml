@@ -1,16 +1,29 @@
 name: Package
-# Snapshoot v1.0.0 manual release build.
-# Only runs when you trigger it by hand (Actions -> Package -> Run workflow).
-# One run produces exactly three artifacts:
-#   - Windows x64 installer (nsis setup exe)
-#   - macOS Apple silicon dmg (aarch64-apple-darwin)
-#   - macOS Intel dmg (x86_64-apple-darwin)
-# No release is published here and no updater signature is generated.
-# The version comes from the nearest v* tag (e.g. v1.0.0 -> 1.0.0). Tags
-# inherited from upstream Pot (3.0.x, updater) are ignored; the build fails
-# when no v* tag is reachable instead of guessing a version.
-# Artifact upload/download uses the runner's own token, so contents: read
-# is the only permission needed.
+# Manual release build (Actions -> Package -> Run workflow).
+# There is no tag-push trigger, and this workflow does not push tags.
+# One run produces exactly three unsigned installers, with the same names
+# as previous GitHub Releases:
+#   - Windows x64 NSIS: Snapshoot_VERSION_x64-setup.exe
+#   - macOS Apple Silicon: Snapshoot_VERSION_aarch64.dmg
+#   - macOS Intel: Snapshoot_VERSION_x64.dmg
+# No code signing and no updater signature. The installers are attached as
+# those bare files; they are not wrapped in zip archives.
+# Build jobs keep contents: read. The final job has contents: write and
+# uses github.token to attach the three files to the Release for the
+# version tag. If that Release already exists, the files are replaced with
+# gh release upload --clobber and its notes and published state are left
+# unchanged. Otherwise a draft is created with gh release create --draft
+# so the notes can be filled in by hand before publishing.
+#
+# Version comes from a git tag and is never guessed. It is written only on
+# the runner (package.json, tauri.conf.json, Cargo.toml), not committed:
+# - Use workflow from a tag: that tag name
+# - Use workflow from a branch: the nearest v* tag (git describe --abbrev=0)
+# After a single leading v is removed, the version must be major.minor.patch
+# or the run fails. The -N-gSHA suffix from git describe is not stripped
+# into a version. Tags inherited from upstream Pot (3.0.x, updater) do not
+# match v* and are ignored. If HEAD is not exactly on the chosen tag, the
+# run warns and still uses that tag.
 on:
     workflow_dispatch:
 permissions:
@@ -21,25 +34,55 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             version: ${{ steps.outputstep.outputs.VERSION }}
+            tag: ${{ steps.outputstep.outputs.TAG }}
         steps:
             - name: Checkout
               uses: actions/checkout@v4
               with:
+                  # Full history, including tags, so the selected or nearest
+                  # v* tag can be resolved. Do not guess a version from a shallow clone.
                   fetch-depth: 0
+                  fetch-tags: true
             - name: Install git
               run: |
                   sudo apt-get update
                   sudo apt-get install -y git
-            - id: outputstep
+            - name: Resolve version from git tag
+              id: outputstep
+              shell: bash
+              env:
+                  REF_TYPE: ${{ github.ref_type }}
+                  REF_NAME: ${{ github.ref_name }}
               run: |
-                  TAG=$(git describe --tags --match 'v*')
-                  VERSION=$(echo "$TAG" | sed 's/^v//; s/-[0-9]*-g[0-9a-f]*$//')
-                  if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-                      echo "Invalid version '$VERSION' from tag '$TAG'" >&2
+                  set -euo pipefail
+
+                  if [ "$REF_TYPE" = "tag" ]; then
+                      RAW_TAG="$REF_NAME"
+                  else
+                      if ! RAW_TAG=$(git describe --tags --abbrev=0 --match 'v*'); then
+                          echo "::error::No reachable v* tag. Push a tag such as v1.2.4, or choose that tag under Run workflow > Use workflow from. Refusing to guess a version."
+                          exit 1
+                      fi
+                  fi
+
+                  VERSION="${RAW_TAG#v}"
+                  if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                      echo "::error::Version '${VERSION}' from tag '${RAW_TAG}' is not strict major.minor.patch (for example v1.2.4). Refusing to guess a version."
                       exit 1
                   fi
-                  echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-                  echo "$VERSION"
+
+                  HEAD_COMMIT=$(git rev-parse HEAD)
+                  if ! TAG_COMMIT=$(git rev-parse -q --verify "refs/tags/${RAW_TAG}^{commit}"); then
+                      echo "::error::Cannot resolve tag '${RAW_TAG}' to a commit."
+                      exit 1
+                  fi
+
+                  echo "Version: ${VERSION} (tag: ${RAW_TAG})"
+                  echo "TAG=${RAW_TAG}" >> "$GITHUB_OUTPUT"
+                  echo "VERSION=${VERSION}" >> "$GITHUB_OUTPUT"
+                  if [ "$TAG_COMMIT" != "$HEAD_COMMIT" ]; then
+                      echo "::warning::HEAD ${HEAD_COMMIT} is not exactly tag ${RAW_TAG} (${TAG_COMMIT}). This build includes commits after that tag and still uses its version."
+                  fi
             - name: Change Version
               env:
                   VERSION: ${{ steps.outputstep.outputs.VERSION }}
@@ -137,3 +180,93 @@ jobs:
                   name: windows_${{ matrix.target }}
                   path: src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*setup*
                   if-no-files-found: error
+
+    draft-release:
+        name: upload installers to release
+        needs:
+            - change-version
+            - build-for-macos
+            - build-for-windows
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Download macOS Apple silicon dmg
+              uses: actions/download-artifact@v4
+              with:
+                  name: macos_aarch64-apple-darwin_dmg
+                  path: artifacts/macos-aarch64
+
+            - name: Download macOS Intel dmg
+              uses: actions/download-artifact@v4
+              with:
+                  name: macos_x86_64-apple-darwin_dmg
+                  path: artifacts/macos-x64
+
+            - name: Download Windows x64 installer
+              uses: actions/download-artifact@v4
+              with:
+                  name: windows_x86_64-pc-windows-msvc
+                  path: artifacts/windows-x64
+
+            - name: Stage bare installers
+              shell: bash
+              env:
+                  VERSION: ${{ needs['change-version'].outputs.version }}
+              run: |
+                  set -euo pipefail
+                  mkdir -p release-assets
+
+                  stage_asset() {
+                      local name="$1"
+                      local -a found=()
+                      local file
+                      while IFS= read -r -d '' file; do
+                          found+=("$file")
+                      done < <(find artifacts -type f -name "$name" -print0)
+                      if [ "${#found[@]}" -ne 1 ]; then
+                          echo "::error::Expected exactly one '${name}', found ${#found[@]}."
+                          find artifacts -type f -print
+                          exit 1
+                      fi
+                      cp "${found[0]}" "release-assets/${name}"
+                      test -s "release-assets/${name}"
+                  }
+
+                  stage_asset "Snapshoot_${VERSION}_aarch64.dmg"
+                  stage_asset "Snapshoot_${VERSION}_x64.dmg"
+                  stage_asset "Snapshoot_${VERSION}_x64-setup.exe"
+                  ls -lh release-assets
+
+            - name: Attach installers to the release
+              shell: bash
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+                  TAG: ${{ needs['change-version'].outputs.tag }}
+                  VERSION: ${{ needs['change-version'].outputs.version }}
+              run: |
+                  set -euo pipefail
+                  ARM="release-assets/Snapshoot_${VERSION}_aarch64.dmg"
+                  INTEL="release-assets/Snapshoot_${VERSION}_x64.dmg"
+                  WIN="release-assets/Snapshoot_${VERSION}_x64-setup.exe"
+                  for installer in "$ARM" "$INTEL" "$WIN"; do
+                      if [ ! -s "$installer" ]; then
+                          echo "::error::Missing installer ${installer}"
+                          exit 1
+                      fi
+                  done
+
+                  if gh release view "$TAG" >/dev/null 2>&1; then
+                      echo "Release ${TAG} already exists; uploading installers with --clobber. Notes and published state are left unchanged."
+                      gh release upload "$TAG" "$ARM" "$INTEL" "$WIN" --clobber
+                  else
+                      echo "Creating draft release for ${TAG}..."
+                      # --verify-tag refuses to create the git tag. The tag must already
+                      # exist; this workflow does not push tags.
+                      gh release create "$TAG" "$ARM" "$INTEL" "$WIN" \
+                          --draft \
+                          --verify-tag \
+                          --title "Snapshoot v${VERSION}" \
+                          --notes ""
+                  fi
