@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-let audioContext = new (window.AudioContext || window.webkitAudioContext)();
+let audioContext = null;
 let source = null;
 
 export const useVoice = () => {
@@ -10,7 +10,11 @@ export const useVoice = () => {
             source.disconnect();
             source = null;
         } else {
-            // 如果没在播放，开始播放
+            // 如果没在播放，开始播放。首次真正朗读时才创建 AudioContext，
+            // 避免仅 import 模块就占用音频输出、阻止系统休眠。
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
             audioContext.decodeAudioData(new Uint8Array(data).buffer, (buffer) => {
                 source = audioContext.createBufferSource();
                 source.buffer = buffer;
