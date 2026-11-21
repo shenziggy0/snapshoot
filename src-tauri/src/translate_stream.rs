@@ -135,8 +135,8 @@ pub async fn translate_stream(
             url.set_path(&format!("{path}:streamGenerateContent"));
             let params: Vec<_> = url
                 .query_pairs()
-                .filter(|(name, _)| name != "alt" && name != "key")
                 .into_owned()
+                .filter(|(name, _)| name != "alt" && name != "key")
                 .collect();
             url.query_pairs_mut()
                 .clear()
