@@ -2,7 +2,8 @@ import { INSTANCE_NAME_CONFIG_KEY } from '../../../utils/service_instance';
 import { Button, Input } from '@nextui-org/react';
 import { open } from '@tauri-apps/api/shell';
 import React, { useState } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Toaster from '../../../components/Toaster';
 import { useTranslation } from 'react-i18next';
 
 import { useToastStyle } from '../../../hooks';

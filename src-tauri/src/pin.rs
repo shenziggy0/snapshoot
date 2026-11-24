@@ -176,8 +176,10 @@ fn open_pin_rgba(image: RgbaImage) -> Result<(), String> {
             return Err(err.to_string());
         }
     };
-    let _ = window.set_position(PhysicalPosition::new(x, y));
+    // AppKit can keep the lower edge fixed while resizing. Place the final
+    // frame after sizing so its top edge stays inside the chosen monitor.
     let _ = window.set_size(PhysicalSize::new(win_w, win_h));
+    let _ = window.set_position(PhysicalPosition::new(x, y));
     #[cfg(target_os = "macos")]
     {
         let _ = window.set_decorations(false);
@@ -239,8 +241,8 @@ pub(crate) fn open_pin_text(text: String) {
             return;
         }
     };
-    let _ = window.set_position(PhysicalPosition::new(x, y));
     let _ = window.set_size(PhysicalSize::new(win_w as u32, win_h as u32));
+    let _ = window.set_position(PhysicalPosition::new(x, y));
     let _ = window.set_always_on_top(true);
     let label_for_close = label.clone();
     window.on_window_event(move |event| {

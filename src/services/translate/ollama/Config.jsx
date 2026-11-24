@@ -1,7 +1,8 @@
+import { Trash2 } from 'lucide-react';
 import { Input, Button, Switch, Textarea, Card, CardBody, Link, Tooltip, Progress } from '@nextui-org/react';
 import { INSTANCE_NAME_CONFIG_KEY } from '../../../utils/service_instance';
-import { MdDeleteOutline } from 'react-icons/md';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Toaster from '../../../components/Toaster';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/api/shell';
 import React, { useEffect, useState } from 'react';
@@ -247,7 +248,7 @@ export function Config(props) {
                                 classNames={{
                                     base: 'max-w-md',
                                     track: 'drop-shadow-md border border-default',
-                                    indicator: 'bg-gradient-to-r from-pink-500 to-yellow-500',
+                                    indicator: 'bg-primary',
                                     label: 'tracking-wider font-medium text-default-600',
                                     value: 'text-foreground/60',
                                 }}
@@ -316,7 +317,7 @@ export function Config(props) {
                                             });
                                         }}
                                     >
-                                        <MdDeleteOutline className='text-[18px]' />
+                                        <Trash2 size={18} />
                                     </Button>
                                 </div>
                             );

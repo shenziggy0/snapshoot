@@ -1,7 +1,8 @@
 import { appWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { save } from '@tauri-apps/api/dialog';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Toaster from '../../components/Toaster';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api';
 import React, { useEffect, useRef, useState } from 'react';
@@ -10,12 +11,10 @@ import { useToastStyle } from '../../hooks';
 import { renderScene } from './render';
 import Toolbar from './Toolbar';
 
-const TOOLBAR_PX = 108;
-
-function fitDisplay(width, height) {
+function fitDisplay(width, height, stage) {
     const dpr = window.devicePixelRatio || 1;
-    const maxW = Math.max(1, window.innerWidth);
-    const maxH = Math.max(1, window.innerHeight - TOOLBAR_PX);
+    const maxW = Math.max(1, stage?.clientWidth || window.innerWidth);
+    const maxH = Math.max(1, stage?.clientHeight || window.innerHeight);
     const cssW = width / dpr;
     const cssH = height / dpr;
     const fit = Math.min(maxW / cssW, maxH / cssH, 1);
@@ -80,13 +79,13 @@ export default function Annotate() {
         document.documentElement.style.borderRadius = '0px';
         document.documentElement.style.background = 'transparent';
         document.documentElement.style.height = '100%';
-        document.body.style.background = '#141414';
+        document.body.style.background = 'var(--snap-ink)';
         document.body.style.height = '100%';
         document.body.style.overflow = 'hidden';
         const root = document.getElementById('root');
         if (root) {
             root.style.height = '100%';
-            root.style.background = '#141414';
+            root.style.background = 'var(--snap-ink)';
         }
     }, []);
 
@@ -175,12 +174,12 @@ export default function Annotate() {
             }
             imageRef.current = next;
             setImage(next);
-            setBox(fitDisplay(next.naturalWidth, next.naturalHeight));
+            setBox(fitDisplay(next.naturalWidth, next.naturalHeight, stageRef.current));
             publish({ shapes: [], redo: [] });
             setDraft(null);
             setTextDraft(null);
             await showEditor();
-            setBox(fitDisplay(next.naturalWidth, next.naturalHeight));
+            setBox(fitDisplay(next.naturalWidth, next.naturalHeight, stageRef.current));
         } catch (error) {
             setImage(null);
             setLoadError(t('annotate.load_failed'));
@@ -204,11 +203,12 @@ export default function Annotate() {
             if (!current) {
                 return;
             }
-            setBox(fitDisplay(current.naturalWidth || current.width, current.naturalHeight || current.height));
+            setBox(fitDisplay(current.naturalWidth, current.naturalHeight, stageRef.current));
         };
         measure();
-        window.addEventListener('resize', measure);
-        return () => window.removeEventListener('resize', measure);
+        const observer = new ResizeObserver(measure);
+        observer.observe(stageRef.current);
+        return () => observer.disconnect();
     }, [image]);
 
     useEffect(() => {
@@ -425,7 +425,7 @@ export default function Annotate() {
     };
 
     return (
-        <div className='fixed inset-0 flex flex-col bg-neutral-900 text-white'>
+        <div className='snap-editor-stage fixed inset-0 flex flex-col text-white'>
             <Toaster />
             <div
                 ref={stageRef}
@@ -437,7 +437,7 @@ export default function Annotate() {
                 }}
             >
                 {loadError ? (
-                    <div className='max-w-[90%] px-4 text-center text-sm text-red-200'>{loadError}</div>
+                    <div className='max-w-[90%] px-4 text-center text-sm text-snap-100'>{loadError}</div>
                 ) : (
                     <div
                         className='relative'
@@ -491,10 +491,7 @@ export default function Annotate() {
                     </div>
                 )}
             </div>
-            <div
-                className='flex items-start justify-center px-1 pb-2'
-                style={{ height: TOOLBAR_PX }}
-            >
+            <div className='editor-dock'>
                 <Toolbar
                     tool={tool}
                     setTool={setTool}

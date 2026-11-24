@@ -1,16 +1,12 @@
+import { Copy, Delete, Languages, Volume2, WrapText } from 'lucide-react';
 import { Button, Card, CardBody, CardFooter, ButtonGroup, Chip, Tooltip, Spacer } from '@nextui-org/react';
 import { BaseDirectory, readTextFile } from '@tauri-apps/api/fs';
 import React, { useEffect, useRef, useState } from 'react';
 import { writeText } from '@tauri-apps/api/clipboard';
-import { HiOutlineVolumeUp } from 'react-icons/hi';
 import { appWindow } from '@tauri-apps/api/window';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { listen } from '@tauri-apps/api/event';
-import { MdContentCopy } from 'react-icons/md';
-import { MdSmartButton } from 'react-icons/md';
 import { useTranslation } from 'react-i18next';
-import { HiTranslate } from 'react-icons/hi';
-import { LuDelete } from 'react-icons/lu';
 import { invoke } from '@tauri-apps/api';
 import { atom, useAtom } from 'jotai';
 import { getServiceName, getServiceSouceType, ServiceSourceType } from '../../../../utils/service_instance';
@@ -367,12 +363,12 @@ export default function SourceArea(props) {
         <div className={hideSource && windowType !== '[INPUT_TRANSLATE]' && 'hidden'}>
             <Card
                 shadow='none'
-                className='bg-content1 rounded-[10px] mt-[1px] pb-0'
+                className='utility-card mt-[1px]'
             >
-                <Toaster />
                 <CardBody className='bg-content1 p-[12px] pb-0 max-h-[40vh] overflow-y-auto'>
                     <textarea
                         autoFocus
+                        aria-label={t('config.translate.source')}
                         ref={textAreaRef}
                         className={`text-[${appFontSize}px] bg-content1 h-full resize-none outline-none`}
                         value={sourceText}
@@ -389,6 +385,7 @@ export default function SourceArea(props) {
                         <ButtonGroup className='mr-[5px]'>
                             <Tooltip content={t('translate.speak')}>
                                 <Button
+                                    aria-label={t('translate.speak')}
                                     isIconOnly
                                     variant='light'
                                     size='sm'
@@ -398,11 +395,12 @@ export default function SourceArea(props) {
                                         });
                                     }}
                                 >
-                                    <HiOutlineVolumeUp className='text-[16px]' />
+                                    <Volume2 size={16} />
                                 </Button>
                             </Tooltip>
                             <Tooltip content={t('translate.copy')}>
                                 <Button
+                                    aria-label={t('translate.copy')}
                                     isIconOnly
                                     variant='light'
                                     size='sm'
@@ -410,11 +408,12 @@ export default function SourceArea(props) {
                                         writeText(sourceText);
                                     }}
                                 >
-                                    <MdContentCopy className='text-[16px]' />
+                                    <Copy size={16} />
                                 </Button>
                             </Tooltip>
                             <Tooltip content={t('translate.delete_newline')}>
                                 <Button
+                                    aria-label={t('translate.delete_newline')}
                                     isIconOnly
                                     variant='light'
                                     size='sm'
@@ -426,11 +425,12 @@ export default function SourceArea(props) {
                                         });
                                     }}
                                 >
-                                    <MdSmartButton className='text-[16px]' />
+                                    <WrapText size={16} />
                                 </Button>
                             </Tooltip>
                             <Tooltip content={t('common.clear')}>
                                 <Button
+                                    aria-label={t('common.clear')}
                                     variant='light'
                                     size='sm'
                                     isIconOnly
@@ -439,7 +439,7 @@ export default function SourceArea(props) {
                                         setSourceText('');
                                     }}
                                 >
-                                    <LuDelete className='text-[16px]' />
+                                    <Delete size={16} />
                                 </Button>
                             </Tooltip>
                         </ButtonGroup>
@@ -456,12 +456,13 @@ export default function SourceArea(props) {
                     </div>
                     <Tooltip content={t('translate.translate')}>
                         <Button
+                            aria-label={t('translate.translate')}
                             size='sm'
                             color='primary'
                             variant='light'
                             isIconOnly
                             className='text-[14px] font-bold'
-                            startContent={<HiTranslate className='text-[16px]' />}
+                            startContent={<Languages size={16} />}
                             onPress={() => {
                                 detect_language(sourceText).then(() => {
                                     syncSourceText();

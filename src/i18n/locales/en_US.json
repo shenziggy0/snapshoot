@@ -1,6 +1,11 @@
 {
     "translation": {
         "common": {
+            "pin_window": "Keep window on top",
+            "minimize": "Minimize",
+            "maximize": "Maximize",
+            "restore_window": "Restore window",
+            "switch_languages": "Switch languages",
             "ok": "OK",
             "cancel": "Cancel",
             "save": "Save",
@@ -43,6 +48,17 @@
             "he": "Hebrew"
         },
         "config": {
+            "shell": {
+                "settings": "Settings",
+                "workspace": "Workspace",
+                "application": "Application",
+                "startup": "Startup & capture",
+                "appearance": "Language & appearance",
+                "connection": "Local connection",
+                "show_token": "Show token",
+                "hide_token": "Hide token",
+                "unassigned": "Unassigned"
+            },
             "general": {
                 "label": "General",
                 "title": "General Settings",
@@ -67,6 +83,7 @@
                     "24": "Extra Large (24px)"
                 },
                 "default_font": "Default",
+                "theme_save_failed": "Could not save the appearance. Please try again.",
                 "theme": {
                     "light": "Light",
                     "dark": "Dark",
@@ -499,6 +516,8 @@
             "inline_empty_result": "The translation service returned no text translation."
         },
         "recognize": {
+            "original_image": "Original image",
+            "result": "Recognized text",
             "recognize": "Recognize",
             "translate": "Translate",
             "copy_img": "Copy Image",

@@ -160,6 +160,7 @@ export default function Translate() {
                         <h3>{t('config.translate.history_disable')}</h3>
                         {historyDisable !== null && (
                             <Switch
+                                aria-label={t('config.translate.history_disable')}
                                 isSelected={historyDisable}
                                 onValueChange={(v) => {
                                     setHistoryDisable(v);
@@ -171,6 +172,7 @@ export default function Translate() {
                         <h3 className='my-auto mx-0'>{t('config.translate.incremental_translate')}</h3>
                         {incrementalTranslate !== null && (
                             <Switch
+                                aria-label={t('config.translate.incremental_translate')}
                                 isSelected={incrementalTranslate}
                                 onValueChange={(v) => {
                                     setIncrementalTranslate(v);
@@ -182,6 +184,7 @@ export default function Translate() {
                         <h3 className='my-auto mx-0'>{t('config.translate.dynamic_translate')}</h3>
                         {dynamicTranslate !== null && (
                             <Switch
+                                aria-label={t('config.translate.dynamic_translate')}
                                 isSelected={dynamicTranslate}
                                 onValueChange={(v) => {
                                     setDynamicTranslate(v);
@@ -193,6 +196,7 @@ export default function Translate() {
                         <h3 className='my-auto mx-0'>{t('config.translate.delete_newline')}</h3>
                         {deleteNewline !== null && (
                             <Switch
+                                aria-label={t('config.translate.delete_newline')}
                                 isSelected={deleteNewline}
                                 onValueChange={(v) => {
                                     setDeleteNewline(v);
@@ -204,6 +208,7 @@ export default function Translate() {
                         <h3 className='my-auto mx-0'>{t('config.translate.remember_language')}</h3>
                         {rememberLanguage !== null && (
                             <Switch
+                                aria-label={t('config.translate.remember_language')}
                                 isSelected={rememberLanguage}
                                 onValueChange={(v) => {
                                     setRememberLanguage(v);
@@ -266,6 +271,7 @@ export default function Translate() {
                         <h3 className='my-auto mx-0'>{t('config.translate.remember_window_size')}</h3>
                         {rememberWindowSize !== null && (
                             <Switch
+                                aria-label={t('config.translate.remember_window_size')}
                                 isSelected={rememberWindowSize}
                                 onValueChange={(v) => {
                                     setRememberWindowSize(v);
@@ -277,6 +283,7 @@ export default function Translate() {
                         <h3 className='my-auto mx-0'>{t('config.translate.close_on_blur')}</h3>
                         {closeOnBlur !== null && (
                             <Switch
+                                aria-label={t('config.translate.close_on_blur')}
                                 isSelected={closeOnBlur}
                                 onValueChange={(v) => {
                                     setCloseOnBlur(v);
@@ -288,6 +295,7 @@ export default function Translate() {
                         <h3 className='my-auto mx-0'>{t('config.translate.always_on_top')}</h3>
                         {alwaysOnTop !== null && (
                             <Switch
+                                aria-label={t('config.translate.always_on_top')}
                                 isSelected={alwaysOnTop}
                                 onValueChange={(v) => {
                                     setAlwaysOnTop(v);
@@ -299,6 +307,7 @@ export default function Translate() {
                         <h3 className='my-auto mx-0'>{t('config.translate.hide_source')}</h3>
                         {hideSource !== null && (
                             <Switch
+                                aria-label={t('config.translate.hide_source')}
                                 isSelected={hideSource}
                                 onValueChange={(v) => {
                                     setHideSource(v);
@@ -310,6 +319,7 @@ export default function Translate() {
                         <h3 className='my-auto mx-0'>{t('config.translate.hide_language')}</h3>
                         {hideLanguage !== null && (
                             <Switch
+                                aria-label={t('config.translate.hide_language')}
                                 isSelected={hideLanguage}
                                 onValueChange={(v) => {
                                     setHideLanguage(v);
@@ -321,6 +331,7 @@ export default function Translate() {
                         <h3 className='my-auto mx-0'>{t('config.translate.hide_window')}</h3>
                         {hideWindow !== null && (
                             <Switch
+                                aria-label={t('config.translate.hide_window')}
                                 isSelected={hideWindow}
                                 onValueChange={(v) => {
                                     setHideWindow(v);

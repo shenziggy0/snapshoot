@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+import { Pin, ScanText } from 'lucide-react';
 import { readDir, BaseDirectory, readTextFile, exists } from '@tauri-apps/api/fs';
 import { appConfigDir, join } from '@tauri-apps/api/path';
 import { convertFileSrc } from '@tauri-apps/api/tauri';
@@ -5,7 +7,6 @@ import { appWindow } from '@tauri-apps/api/window';
 import React, { useState, useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { Button } from '@nextui-org/react';
-import { BsPinFill } from 'react-icons/bs';
 import { atom, useAtom } from 'jotai';
 
 import WindowControl from '../../components/WindowControl';
@@ -51,6 +52,7 @@ void listen('tauri://focus', () => {
 });
 
 export default function Recognize() {
+    const { t } = useTranslation();
     const [pluginList, setPluginList] = useAtom(pluginListAtom);
     const [closeOnBlur] = useConfig('recognize_close_on_blur', false);
     const [pined, setPined] = useState(false);
@@ -105,22 +107,16 @@ export default function Recognize() {
     return (
         pluginList &&
         serviceInstanceConfigMap !== null && (
-            <div
-                className={`bg-background h-screen ${
-                    osType === 'Linux' && 'rounded-[10px] border-1 border-default-100'
-                }`}
-            >
-                <div
-                    data-tauri-drag-region='true'
-                    className='fixed top-[5px] left-[5px] right-[5px] h-[30px]'
-                />
-                <div className={`h-[35px] flex ${osType === 'Darwin' ? 'justify-end' : 'justify-between'}`}>
+            <div className='utility-window'>
+                <header className='utility-bar' data-tauri-drag-region='true'>
+                    <h1><ScanText aria-hidden='true' />{t('config.hotkey.ocr_recognize')}</h1>
                     <Button
                         isIconOnly
                         size='sm'
                         variant='flat'
-                        disableAnimation
-                        className='my-auto mx-[5px] bg-transparent'
+                        className='utility-pin'
+                        aria-label={t('common.pin_window')}
+                        aria-pressed={pined}
                         onPress={() => {
                             if (pined) {
                                 if (closeOnBlur) {
@@ -134,24 +130,18 @@ export default function Recognize() {
                             setPined(!pined);
                         }}
                     >
-                        <BsPinFill className={`text-[20px] ${pined ? 'text-primary' : 'text-default-400'}`} />
+                        <Pin size={16} aria-hidden='true' />
                     </Button>
                     {osType !== 'Darwin' && <WindowControl />}
-                </div>
-                <div
-                    className={`${
-                        osType === 'Linux' ? 'h-[calc(100vh-87px)]' : 'h-[calc(100vh-85px)]'
-                    } grid grid-cols-2`}
-                >
+                </header>
+                <div className='ocr-panes'>
                     <ImageArea />
                     <TextArea serviceInstanceConfigMap={serviceInstanceConfigMap} />
                 </div>
-                <div className='h-[50px]'>
-                    <ControlArea
-                        serviceInstanceList={serviceInstanceList}
-                        serviceInstanceConfigMap={serviceInstanceConfigMap}
-                    />
-                </div>
+                <ControlArea
+                    serviceInstanceList={serviceInstanceList}
+                    serviceInstanceConfigMap={serviceInstanceConfigMap}
+                />
             </div>
         )
     );

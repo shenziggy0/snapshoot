@@ -1,3 +1,4 @@
+import { ChevronsDownUp, ChevronsUpDown, Copy, Replace, RotateCw, Volume2 } from 'lucide-react';
 import {
     Card,
     CardBody,
@@ -10,21 +11,15 @@ import {
     DropdownMenu,
     DropdownTrigger,
     Tooltip,
+    useProviderContext,
 } from '@nextui-org/react';
-import { BiCollapseVertical, BiExpandVertical } from 'react-icons/bi';
 import { BaseDirectory, readTextFile } from '@tauri-apps/api/fs';
 import { sendNotification } from '@tauri-apps/api/notification';
 import React, { useEffect, useState, useRef } from 'react';
 import { writeText } from '@tauri-apps/api/clipboard';
 import PulseLoader from 'react-spinners/PulseLoader';
-import { TbTransformFilled } from 'react-icons/tb';
-import { HiOutlineVolumeUp } from 'react-icons/hi';
-import { semanticColors } from '@nextui-org/theme';
-import toast, { Toaster } from 'react-hot-toast';
-import { MdContentCopy } from 'react-icons/md';
+import toast from 'react-hot-toast';
 import { useTranslation } from 'react-i18next';
-import { GiCycle } from 'react-icons/gi';
-import { useTheme } from 'next-themes';
 import { useAtomValue } from 'jotai';
 import { nanoid } from 'nanoid';
 import { useSpring, animated } from '@react-spring/web';
@@ -103,7 +98,6 @@ export default function TargetArea(props) {
     const translateId = useRef(null);
     const toastStyle = useToastStyle();
     const speak = useVoice();
-    const theme = useTheme();
 
     useEffect(() => {
         if (error) {
@@ -382,19 +376,28 @@ export default function TargetArea(props) {
     };
 
     const [boundRef, bounds] = useMeasure({ scroll: true });
+    const reduceMotion = useProviderContext()?.disableAnimation ?? false;
+    const resultHeight = hide ? 0 : bounds.height;
     const springs = useSpring({
         from: { height: 0 },
-        to: { height: hide ? 0 : bounds.height },
+        to: { height: resultHeight },
+        immediate: reduceMotion,
     });
+
+    const serviceName = getServiceName(currentTranslateServiceInstanceKey);
+    const serviceDisplayName = getInstanceName(currentTranslateServiceInstanceKey, () =>
+        whetherPluginService(currentTranslateServiceInstanceKey)
+            ? pluginList.translate[serviceName].display
+            : t(`services.translate.${serviceName}.title`)
+    );
 
     return (
         <Card
             shadow='none'
-            className='rounded-[10px]'
+            className='utility-card'
         >
-            <Toaster />
             <CardHeader
-                className={`flex justify-between py-1 px-0 bg-content2 h-[30px] ${hide ? 'rounded-[10px]' : 'rounded-t-[10px]'}`}
+                className='translation-service-heading flex justify-between'
                 {...drag}
             >
                 {/* current service instance and available service instance to change */}
@@ -426,17 +429,7 @@ export default function TargetArea(props) {
                                     )
                                 }
                             >
-                                {whetherPluginService(currentTranslateServiceInstanceKey) ? (
-                                    <div className='my-auto'>{`${getInstanceName(currentTranslateServiceInstanceKey, () => pluginList['translate'][getServiceName(currentTranslateServiceInstanceKey)].display)} `}</div>
-                                ) : (
-                                    <div className='my-auto'>
-                                        {getInstanceName(currentTranslateServiceInstanceKey, () =>
-                                            t(
-                                                `services.translate.${getServiceName(currentTranslateServiceInstanceKey)}.title`
-                                            )
-                                        )}
-                                    </div>
-                                )}
+                                <div className='my-auto'>{serviceDisplayName}</div>
                             </Button>
                         </DropdownTrigger>
                         <DropdownMenu
@@ -480,7 +473,7 @@ export default function TargetArea(props) {
                     </Dropdown>
                     <PulseLoader
                         loading={isLoading}
-                        color={theme === 'dark' ? semanticColors.dark.default[500] : semanticColors.light.default[500]}
+                        color='var(--snap-muted)'
                         size={8}
                         cssOverride={{
                             display: 'inline-block',
@@ -495,23 +488,26 @@ export default function TargetArea(props) {
                         size='sm'
                         isIconOnly
                         variant='light'
-                        className='h-[20px] w-[20px]'
+                        aria-label={t('config.translate.target')}
+                        aria-expanded={!hide}
+                        className='h-[28px] w-[28px]'
                         onPress={() => setHide(!hide)}
                     >
                         {hide ? (
-                            <BiExpandVertical className='text-[16px]' />
+                            <ChevronsUpDown size={16} />
                         ) : (
-                            <BiCollapseVertical className='text-[16px]' />
+                            <ChevronsDownUp size={16} />
                         )}
                     </Button>
                 </div>
             </CardHeader>
-            <animated.div style={{ ...springs }}>
+            <animated.div style={reduceMotion ? { height: resultHeight } : springs}>
                 <div ref={boundRef}>
                     {/* result content */}
                     <CardBody className={`p-[12px] pb-0 ${hide && 'h-0 p-0'}`}>
                         {typeof result === 'string' ? (
                             <textarea
+                                aria-label={`${t('config.translate.target')} · ${serviceDisplayName}`}
                                 ref={textAreaRef}
                                 className={`text-[${appFontSize}px] h-0 resize-none bg-transparent select-text outline-none`}
                                 readOnly
@@ -537,13 +533,16 @@ export default function TargetArea(props) {
                                                         {pronunciation['symbol']}
                                                     </span>
                                                 )}
-                                                {pronunciation['voice'] && pronunciation['voice'] !== '' && (
-                                                    <HiOutlineVolumeUp
-                                                        className={`text-[${appFontSize}px] inline-block my-auto cursor-pointer`}
-                                                        onClick={() => {
-                                                            speak(pronunciation['voice']);
-                                                        }}
-                                                    />
+                                                {pronunciation.voice?.length > 0 && typeof pronunciation.voice !== 'string' && (
+                                                    <Button
+                                                        isIconOnly
+                                                        size='sm'
+                                                        variant='light'
+                                                        aria-label={[t('translate.speak'), pronunciation.region].filter(Boolean).join(' · ')}
+                                                        onPress={() => speak(pronunciation.voice)}
+                                                    >
+                                                        <Volume2 size={16} aria-hidden='true' />
+                                                    </Button>
                                                 )}
                                             </div>
                                         );
@@ -632,7 +631,7 @@ export default function TargetArea(props) {
                                 return (
                                     <p
                                         key={v}
-                                        className={`text-[${appFontSize}px] text-red-500`}
+                                        className={`text-[${appFontSize}px] text-foreground font-medium`}
                                     >
                                         {v}
                                     </p>
@@ -649,6 +648,7 @@ export default function TargetArea(props) {
                             {/* speak button */}
                             <Tooltip content={t('translate.speak')}>
                                 <Button
+                                    aria-label={t('translate.speak')}
                                     isIconOnly
                                     variant='light'
                                     size='sm'
@@ -659,12 +659,13 @@ export default function TargetArea(props) {
                                         });
                                     }}
                                 >
-                                    <HiOutlineVolumeUp className='text-[16px]' />
+                                    <Volume2 size={16} />
                                 </Button>
                             </Tooltip>
                             {/* copy button */}
                             <Tooltip content={t('translate.copy')}>
                                 <Button
+                                    aria-label={t('translate.copy')}
                                     isIconOnly
                                     variant='light'
                                     size='sm'
@@ -673,12 +674,13 @@ export default function TargetArea(props) {
                                         writeText(result);
                                     }}
                                 >
-                                    <MdContentCopy className='text-[16px]' />
+                                    <Copy size={16} />
                                 </Button>
                             </Tooltip>
                             {/* translate back button */}
                             <Tooltip content={t('translate.translate_back')}>
                                 <Button
+                                    aria-label={t('translate.translate_back')}
                                     isIconOnly
                                     variant='light'
                                     size='sm'
@@ -804,12 +806,13 @@ export default function TargetArea(props) {
                                         }
                                     }}
                                 >
-                                    <TbTransformFilled className='text-[16px]' />
+                                    <Replace size={16} />
                                 </Button>
                             </Tooltip>
                             {/* error retry button */}
                             <Tooltip content={t('translate.retry')}>
                                 <Button
+                                    aria-label={t('translate.retry')}
                                     isIconOnly
                                     variant='light'
                                     size='sm'
@@ -820,7 +823,7 @@ export default function TargetArea(props) {
                                         translate();
                                     }}
                                 >
-                                    <GiCycle className='text-[16px]' />
+                                    <RotateCw size={16} />
                                 </Button>
                             </Tooltip>
                             {/* available collection service instance */}

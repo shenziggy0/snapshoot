@@ -1,13 +1,13 @@
+import { CircleX, Pin, Languages } from 'lucide-react';
 import { readDir, BaseDirectory, readTextFile, exists } from '@tauri-apps/api/fs';
 import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
 import { appWindow, currentMonitor } from '@tauri-apps/api/window';
 import { appConfigDir, join } from '@tauri-apps/api/path';
 import { convertFileSrc } from '@tauri-apps/api/tauri';
 import { Spacer, Button } from '@nextui-org/react';
-import { AiFillCloseCircle } from 'react-icons/ai';
+import Toaster from '../../components/Toaster';
 import React, { useState, useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { BsPinFill } from 'react-icons/bs';
 
 import LanguageArea from './components/LanguageArea';
 import SourceArea from './components/SourceArea';
@@ -228,22 +228,17 @@ export default function Translate() {
 
     return (
         pluginList && (
-            <div
-                className={`bg-background h-screen w-screen ${
-                    osType === 'Linux' && 'rounded-[10px] border-1 border-default-100'
-                }`}
-            >
-                <div
-                    className='fixed top-[5px] left-[5px] right-[5px] h-[30px]'
-                    data-tauri-drag-region='true'
-                />
-                <div className={`h-[35px] w-full flex ${osType === 'Darwin' ? 'justify-end' : 'justify-between'}`}>
+            <div className='utility-window'>
+                <Toaster />
+                <header className='utility-bar' data-tauri-drag-region='true'>
+                    <h1><Languages aria-hidden='true' />{t('translate.translate')}</h1>
                     <Button
                         isIconOnly
                         size='sm'
                         variant='flat'
-                        disableAnimation
-                        className='my-auto bg-transparent'
+                        className='utility-pin'
+                        aria-label={t('common.pin_window')}
+                        aria-pressed={pined}
                         onPress={() => {
                             if (pined) {
                                 if (closeOnBlur) {
@@ -257,23 +252,23 @@ export default function Translate() {
                             setPined(!pined);
                         }}
                     >
-                        <BsPinFill className={`text-[20px] ${pined ? 'text-primary' : 'text-default-400'}`} />
+                        <Pin size={16} aria-hidden='true' />
                     </Button>
                     <Button
                         isIconOnly
                         size='sm'
                         variant='flat'
-                        disableAnimation
+                        aria-label={t('annotate.close')}
                         className={`my-auto ${osType === 'Darwin' && 'hidden'} bg-transparent`}
                         onPress={() => {
                             void appWindow.close();
                         }}
                     >
-                        <AiFillCloseCircle className='text-[20px] text-default-400' />
+                        <CircleX size="1em" className='text-[20px] text-default-400' />
                     </Button>
-                </div>
-                <div className={`${osType === 'Linux' ? 'h-[calc(100vh-37px)]' : 'h-[calc(100vh-35px)]'} px-[8px]`}>
-                    <div className='h-full overflow-y-auto'>
+                </header>
+                <div className='translation-scroll'>
+                    <div>
                         <div>
                             {serviceInstanceConfigMap !== null && (
                                 <SourceArea

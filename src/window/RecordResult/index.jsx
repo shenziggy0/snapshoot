@@ -1,10 +1,11 @@
+import { FolderOpen, Trash2, Video, X } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api';
 import { listen } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@nextui-org/react';
-import { MdClose, MdFolderOpen, MdDeleteOutline, MdVideocam } from 'react-icons/md';
+import { osType } from '../../utils/env';
 
 export default function RecordResult() {
     const { t } = useTranslation();
@@ -49,11 +50,8 @@ export default function RecordResult() {
         }
     };
     return (
-        <div className='h-screen overflow-auto rounded-xl border border-default-200 bg-background p-4 text-foreground shadow-xl'>
-            <div
-                className='flex items-center justify-between'
-                data-tauri-drag-region
-            >
+        <div className='record-result' data-platform={osType}>
+            <header data-tauri-drag-region='true'>
                 <h1 className='text-base font-semibold'>{t('screen_record.saved')}</h1>
                 <Button
                     isIconOnly
@@ -62,14 +60,14 @@ export default function RecordResult() {
                     aria-label={t('annotate.close')}
                     onPress={() => appWindow.close()}
                 >
-                    <MdClose size={18} />
+                    <X size={18} />
                 </Button>
-            </div>
+            </header>
             {result && (
                 <>
-                    <div className='my-3 flex items-center gap-3'>
-                        <div className='flex h-16 w-24 shrink-0 items-center justify-center rounded-lg bg-default-100'>
-                            <MdVideocam
+                    <div className='record-result-details'>
+                        <div className='record-result-icon'>
+                            <Video
                                 size={30}
                                 aria-hidden='true'
                             />
@@ -96,9 +94,10 @@ export default function RecordResult() {
                         <Button
                             size='sm'
                             variant='flat'
+                            color='primary'
                             isDisabled={busy}
                             onPress={() => action('reveal')}
-                            startContent={<MdFolderOpen />}
+                            startContent={<FolderOpen size="1em" />}
                         >
                             {t('screen_record.reveal')}
                         </Button>
@@ -108,7 +107,7 @@ export default function RecordResult() {
                             color='danger'
                             isDisabled={busy}
                             onPress={() => action('delete')}
-                            startContent={<MdDeleteOutline />}
+                            startContent={<Trash2 size="1em" />}
                         >
                             {t('screen_record.delete')}
                         </Button>

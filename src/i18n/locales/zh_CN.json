@@ -1,6 +1,11 @@
 {
     "translation": {
         "common": {
+            "pin_window": "窗口置顶",
+            "minimize": "最小化",
+            "maximize": "最大化",
+            "restore_window": "还原窗口",
+            "switch_languages": "切换语言",
             "ok": "确定",
             "cancel": "取消",
             "save": "保存",
@@ -43,6 +48,17 @@
             "he": "希伯来语"
         },
         "config": {
+            "shell": {
+                "settings": "设置",
+                "workspace": "工作区",
+                "application": "应用",
+                "startup": "启动与截图",
+                "appearance": "语言与外观",
+                "connection": "本机连接",
+                "show_token": "显示令牌",
+                "hide_token": "隐藏令牌",
+                "unassigned": "未设置"
+            },
             "general": {
                 "label": "常规设置",
                 "title": "常规设置",
@@ -67,6 +83,7 @@
                     "24": "超大 (24px)"
                 },
                 "default_font": "默认",
+                "theme_save_failed": "无法保存应用外观，请重试。",
                 "theme": {
                     "light": "浅色",
                     "dark": "深色",
@@ -499,6 +516,8 @@
             "inline_empty_result": "翻译服务未返回文本译文。"
         },
         "recognize": {
+            "original_image": "原始截图",
+            "result": "识别结果",
             "recognize": "重新识别",
             "translate": "翻译",
             "copy_img": "复制图片",

@@ -1,7 +1,8 @@
 import { readTextFile, BaseDirectory } from '@tauri-apps/api/fs';
 import { DropdownTrigger } from '@nextui-org/react';
 import { useDisclosure } from '@nextui-org/react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Toaster from '../../../../components/Toaster';
 import { DropdownMenu } from '@nextui-org/react';
 import { DropdownItem } from '@nextui-org/react';
 import { useTranslation } from 'react-i18next';
@@ -248,7 +249,7 @@ export default function Backup() {
                     </div>
                 </div>
                 <div className={`config-item ${backupType !== 'aliyun' ? 'hidden' : ''}`}>
-                    <p style={{ color: '#e67e22' }}>{t('config.backup.aliyun_notice')}</p>
+                    <p style={{ color: 'var(--snap-accent)' }}>{t('config.backup.aliyun_notice')}</p>
                 </div>
                 <div className={`flex justify-center ${backupType !== 'aliyun' ? 'hidden' : ''}`}>
                     <img

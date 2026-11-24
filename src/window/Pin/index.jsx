@@ -1,12 +1,13 @@
 import { appWindow, PhysicalPosition, PhysicalSize } from '@tauri-apps/api/window';
 import { save } from '@tauri-apps/api/dialog';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Toaster from '../../components/Toaster';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { useToastStyle } from '../../hooks';
-import { useSystemDark } from '../useSystemDark';
+import { useTheme } from 'next-themes';
 
 function clamp(value, min, max) {
     return Math.min(max, Math.max(min, value));
@@ -24,7 +25,8 @@ function base64ToObjectUrl(data) {
 export default function Pin() {
     const { t } = useTranslation();
     const toastStyle = useToastStyle();
-    const dark = useSystemDark();
+    const { resolvedTheme } = useTheme();
+    const dark = resolvedTheme === 'dark';
     const infoRef = useRef(null);
     const zoomRef = useRef(1);
     const [url, setUrl] = useState('');
@@ -104,10 +106,10 @@ export default function Pin() {
 
     useEffect(() => {
         const onWheel = (event) => {
-            event.preventDefault();
-            if (!infoRef.current) {
+            if (event.target !== document.getElementById('pin-image') || !infoRef.current) {
                 return;
             }
+            event.preventDefault();
             if (event.ctrlKey || event.metaKey) {
                 const delta = event.deltaY < 0 ? 0.05 : -0.05;
                 setOpacity((value) => clamp(Number((value + delta).toFixed(2)), 0.15, 1));
@@ -176,21 +178,28 @@ export default function Pin() {
         <div className='h-screen w-screen bg-transparent'>
             <Toaster />
             {loadError ? (
-                <div className='fixed inset-0 flex items-center justify-center bg-neutral-900 p-3 text-center text-xs text-red-200'>
+                <div className='fixed inset-0 flex items-center justify-center bg-ink-900 p-3 text-center text-xs text-snap-100'>
                     {loadError}
                 </div>
             ) : null}
             {url ? (
             <img
                 id='pin-image'
-                alt=''
+                alt={t('recognize.original_image')}
+                tabIndex={0}
+                onKeyDown={(event) => {
+                    if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                        event.preventDefault();
+                        setMenu({ x: 4, y: 4 });
+                    }
+                }}
                 src={url}
                 draggable={false}
                 className='fixed inset-0 h-full w-full select-none'
                 style={{
                     opacity,
                     display: loadError ? 'none' : 'block',
-                    outline: hover ? '1px solid #1E63F0' : '1px solid transparent',
+                    outline: hover ? '1px solid var(--snap-accent)' : '1px solid transparent',
                     boxShadow: hover ? '0 10px 28px rgba(0,0,0,0.28)' : 'none',
                 }}
                 onMouseEnter={() => setHover(true)}
@@ -219,21 +228,26 @@ export default function Pin() {
             />
             ) : null}
             {zoomText ? (
-                <div className='pointer-events-none fixed left-1/2 top-3 z-40 -translate-x-1/2 rounded-full bg-black/70 px-2 py-0.5 text-xs text-white'>
+                <div className='pointer-events-none fixed left-1/2 top-3 z-40 -translate-x-1/2 snap-zoom-level text-xs text-white'>
                     {zoomText}
                 </div>
             ) : null}
             {menu && (
                 <div
-                    className={`fixed z-30 min-w-[180px] rounded-md border p-1 text-sm shadow-lg ${
-                        dark ? 'border-white/10 bg-neutral-900/95 text-white' : 'border-black/10 bg-white/95 text-neutral-800'
-                    }`}
+                    className='snap-pin-menu snap-glass fixed z-30 text-sm'
                     style={{
                         left: Math.max(4, Math.min(menu.x, window.innerWidth - 196)),
                         top: Math.max(4, Math.min(menu.y, window.innerHeight - 280)),
                     }}
                     onMouseDown={(event) => event.stopPropagation()}
                     onContextMenu={(event) => event.preventDefault()}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Escape') {
+                            event.preventDefault();
+                            setMenu(null);
+                            document.getElementById('pin-image')?.focus();
+                        }
+                    }}
                 >
                     {menuItems.map(([action, label]) =>
                         action.startsWith('sep') ? (
@@ -245,7 +259,8 @@ export default function Pin() {
                             <button
                                 key={action}
                                 type='button'
-                                className={`block w-full rounded px-2 py-1 text-left ${dark ? 'hover:bg-white/15' : 'hover:bg-black/5'}`}
+                                autoFocus={action === 'copy'}
+                                data-destructive={action === 'close'}
                                 onClick={() => {
                                     void run(action);
                                 }}

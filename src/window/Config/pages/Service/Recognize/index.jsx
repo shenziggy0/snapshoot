@@ -1,6 +1,7 @@
 import { DragDropContext, Draggable, Droppable } from 'react-beautiful-dnd';
 import { Card, Spacer, Button, useDisclosure } from '@nextui-org/react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Toaster from '../../../../../components/Toaster';
 import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 

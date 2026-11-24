@@ -1,11 +1,9 @@
+import { Copy, Space, WrapText, Text as PaneIcon } from 'lucide-react';
 import { Card, CardBody, CardFooter, Button, Skeleton, ButtonGroup, Tooltip } from '@nextui-org/react';
 import { sendNotification } from '@tauri-apps/api/notification';
 import { writeText } from '@tauri-apps/api/clipboard';
 import { atom, useAtom, useAtomValue } from 'jotai';
 import React, { useEffect, useState } from 'react';
-import { CgSpaceBetween } from 'react-icons/cg';
-import { MdContentCopy } from 'react-icons/md';
-import { MdSmartButton } from 'react-icons/md';
 import { useTranslation } from 'react-i18next';
 import { nanoid } from 'nanoid';
 
@@ -134,9 +132,9 @@ export default function TextArea(props) {
     return (
         <Card
             shadow='none'
-            className='bg-content1 h-full ml-[6px] mr-[12px]'
-            radius='10'
+            className='utility-card'
         >
+            <h2 className='utility-card-heading'><PaneIcon aria-hidden='true' />{t('recognize.result')}</h2>
             <CardBody className='bg-content1 p-0 h-full'>
                 {loading ? (
                     <div className='space-y-3 m-[12px]'>
@@ -154,6 +152,7 @@ export default function TextArea(props) {
                     <>
                         {text && (
                             <textarea
+                                aria-label={t('recognize.result')}
                                 value={text}
                                 className='bg-content1 h-full m-[12px] mb-0 resize-none focus:outline-none'
                                 onChange={(e) => {
@@ -163,9 +162,10 @@ export default function TextArea(props) {
                         )}
                         {error && (
                             <textarea
+                                aria-label={t('recognize.result')}
                                 value={error}
                                 readOnly
-                                className='bg-content1 h-full m-[12px] mb-0 resize-none focus:outline-none text-red-500'
+                                className='bg-content1 h-full m-[12px] mb-0 resize-none focus:outline-none text-foreground font-medium'
                                 onChange={(e) => {
                                     setText(e.target.value);
                                 }}
@@ -178,6 +178,7 @@ export default function TextArea(props) {
                 <ButtonGroup>
                     <Tooltip content={t('recognize.copy_text')}>
                         <Button
+                            aria-label={t('recognize.copy_text')}
                             isIconOnly
                             size='sm'
                             variant='light'
@@ -185,11 +186,12 @@ export default function TextArea(props) {
                                 writeText(text);
                             }}
                         >
-                            <MdContentCopy className='text-[16px]' />
+                            <Copy size={16} />
                         </Button>
                     </Tooltip>
                     <Tooltip content={t('recognize.delete_newline')}>
                         <Button
+                            aria-label={t('recognize.delete_newline')}
                             isIconOnly
                             variant='light'
                             size='sm'
@@ -197,11 +199,12 @@ export default function TextArea(props) {
                                 setText(text.replace(/\-\s+/g, '').replace(/\s+/g, ' '));
                             }}
                         >
-                            <MdSmartButton className='text-[16px]' />
+                            <WrapText size={16} />
                         </Button>
                     </Tooltip>
                     <Tooltip content={t('recognize.delete_space')}>
                         <Button
+                            aria-label={t('recognize.delete_space')}
                             isIconOnly
                             variant='light'
                             size='sm'
@@ -209,7 +212,7 @@ export default function TextArea(props) {
                                 setText(text.replaceAll(' ', ''));
                             }}
                         >
-                            <CgSpaceBetween className='text-[16px]' />
+                            <Space size={16} />
                         </Button>
                     </Tooltip>
                 </ButtonGroup>

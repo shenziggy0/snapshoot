@@ -9,7 +9,7 @@ export function Config(props) {
     return (
         <>
             <div>{t('services.no_need')}</div>
-            <div style={{ color: '#e67e22', margin: '8px 0' }}>
+            <div style={{ color: 'var(--snap-accent)', margin: '8px 0' }}>
                 {t('services.upstream_notice', { name: 'ECDICT', host: 'pot-app.com/api/dict' })}
             </div>
             <div>

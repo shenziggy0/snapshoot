@@ -1,73 +1,51 @@
+import ToolButton from '../Annotate/ToolButton';
+import {
+    Blend,
+    Captions,
+    Circle,
+    Copy,
+    Download,
+    GalleryVerticalEnd,
+    Grid3X3,
+    Highlighter,
+    Languages,
+    ListOrdered,
+    Minus,
+    MoveUpRight,
+    Pin,
+    Redo2,
+    ScanText,
+    ShieldCheck,
+    Spline,
+    Square,
+    Type,
+    Undo2,
+    Video,
+    X,
+} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import React from 'react';
-import {
-    MdArrowRightAlt,
-    MdBlurOn,
-    MdClose,
-    MdContentCopy,
-    MdCropSquare,
-    MdDocumentScanner,
-    MdFormatListNumbered,
-    MdGesture,
-    MdGTranslate,
-    MdGridOn,
-    MdHorizontalRule,
-    MdPrivacyTip,
-    MdPushPin,
-    MdPhotoSizeSelectActual,
-    MdRadioButtonUnchecked,
-    MdRedo,
-    MdSaveAlt,
-    MdTextFields,
-    MdTranslate,
-    MdUndo,
-    MdVideocam,
-} from 'react-icons/md';
-import { HiOutlinePencil } from 'react-icons/hi';
 
 const COLORS = ['#e11d48', '#f97316', '#eab308', '#22c55e', '#0ea5e9', '#6366f1', '#111827', '#ffffff'];
 const STROKES = [2, 4, 8, 12];
 const FONTS = [16, 24, 36, 52];
 
 const TOOLS = [
-    { id: 'rect', icon: MdCropSquare, label: 'annotate.rect' },
-    { id: 'ellipse', icon: MdRadioButtonUnchecked, label: 'annotate.ellipse' },
-    { id: 'line', icon: MdHorizontalRule, label: 'annotate.line' },
-    { id: 'arrow', icon: MdArrowRightAlt, label: 'annotate.arrow' },
-    { id: 'pen', icon: MdGesture, label: 'annotate.pen' },
-    { id: 'highlighter', icon: HiOutlinePencil, label: 'annotate.highlighter' },
-    { id: 'text', icon: MdTextFields, label: 'annotate.text' },
-    { id: 'mosaic', icon: MdGridOn, label: 'annotate.mosaic' },
-    { id: 'blur', icon: MdBlurOn, label: 'annotate.blur' },
-    { id: 'number', icon: MdFormatListNumbered, label: 'annotate.number' },
+    { id: 'rect', icon: Square, label: 'annotate.rect' },
+    { id: 'ellipse', icon: Circle, label: 'annotate.ellipse' },
+    { id: 'line', icon: Minus, label: 'annotate.line' },
+    { id: 'arrow', icon: MoveUpRight, label: 'annotate.arrow' },
+    { id: 'pen', icon: Spline, label: 'annotate.pen' },
+    { id: 'highlighter', icon: Highlighter, label: 'annotate.highlighter' },
+    { id: 'text', icon: Type, label: 'annotate.text' },
+    { id: 'mosaic', icon: Grid3X3, label: 'annotate.mosaic' },
+    { id: 'blur', icon: Blend, label: 'annotate.blur' },
+    { id: 'number', icon: ListOrdered, label: 'annotate.number' },
 ];
-
-function IconButton({ title, active, disabled, onClick, dark, children }) {
-    return (
-        <button
-            type='button'
-            title={title}
-            aria-label={title}
-            disabled={disabled}
-            onMouseDown={(event) => event.stopPropagation()}
-            onClick={onClick}
-            className={`flex h-7 w-7 items-center justify-center rounded-md disabled:opacity-30 ${
-                active
-                    ? 'bg-[#1E63F0] text-white'
-                    : dark
-                      ? 'text-white hover:bg-white/15'
-                      : 'text-neutral-800 hover:bg-black/10'
-            }`}
-        >
-            {children}
-        </button>
-    );
-}
 
 export default function CaptureToolbar(props) {
     const { t } = useTranslation();
     const {
-        dark,
         tool,
         setTool,
         color,
@@ -95,198 +73,183 @@ export default function CaptureToolbar(props) {
         onCopy,
         onClose,
     } = props;
-    const bar = dark ? 'border-white/10 bg-neutral-900/95 text-white' : 'border-black/10 bg-white/95 text-neutral-800';
+
     const showProps = Boolean(tool) && !longCaptureActive;
 
     if (recordIntent) {
         return (
-            <div className={`flex items-center gap-2 rounded-xl border p-1.5 shadow-lg ${bar}`}>
+            <div className='snap-tools snap-tools-row snap-glass'>
                 <button
                     type='button'
                     disabled={!onScreenRecord}
                     onClick={onScreenRecord}
-                    className='flex h-9 items-center gap-1 rounded-md bg-red-600 px-3 text-sm text-white disabled:opacity-40'
+                    className='snap-tool snap-tool-primary'
                 >
-                    <MdVideocam />
+                    <Video />
                     {t('screen_record.start')}
                 </button>
-                <IconButton
+                <ToolButton
                     title={t('annotate.close')}
-                    dark={dark}
                     onClick={onClose}
                 >
-                    <MdClose size={18} />
-                </IconButton>
+                    <X size={18} />
+                </ToolButton>
             </div>
         );
     }
 
     return (
-        <div className='flex flex-col items-center gap-1'>
-            <div className={`flex items-center gap-0.5 rounded-xl border px-1 py-1 shadow-lg backdrop-blur ${bar}`}>
+        <div className='snap-tools flex flex-col items-center gap-1'>
+            <div className='snap-tools-row snap-glass'>
                 {TOOLS.map((item) => {
                     const Icon = item.icon;
                     return (
-                        <IconButton
+                        <ToolButton
                             key={item.id}
                             title={t(item.label)}
                             active={tool === item.id}
                             disabled={longCaptureActive}
-                            dark={dark}
                             onClick={() => setTool(tool === item.id ? '' : item.id)}
                         >
                             <Icon size={16} />
-                        </IconButton>
+                        </ToolButton>
                     );
                 })}
-                <span className={`mx-1 h-4 w-px ${dark ? 'bg-white/20' : 'bg-black/15'}`} />
-                <IconButton
+                <span className='snap-tools-divider' aria-hidden='true' />
+                <ToolButton
                     title={t('annotate.undo')}
                     disabled={longCaptureActive || !canUndo}
-                    dark={dark}
                     onClick={onUndo}
                 >
-                    <MdUndo size={16} />
-                </IconButton>
-                <IconButton
+                    <Undo2 size={16} />
+                </ToolButton>
+                <ToolButton
                     title={t('annotate.redo')}
                     disabled={longCaptureActive || !canRedo}
-                    dark={dark}
                     onClick={onRedo}
                 >
-                    <MdRedo size={16} />
-                </IconButton>
-                <span className={`mx-1 h-4 w-px ${dark ? 'bg-white/20' : 'bg-black/15'}`} />
+                    <Redo2 size={16} />
+                </ToolButton>
+                <span className='snap-tools-divider' aria-hidden='true' />
                 {onLongScreenshot && !longCaptureActive && (
-                    <IconButton
+                    <ToolButton
                         title={t('annotate.long_screenshot')}
-                        dark={dark}
                         onClick={onLongScreenshot}
                     >
-                        <MdPhotoSizeSelectActual size={16} />
-                    </IconButton>
+                        <GalleryVerticalEnd size={16} />
+                    </ToolButton>
                 )}
                 {onScreenRecord && (
-                    <IconButton
+                    <ToolButton
                         title={t('screen_record.label')}
                         disabled={longCaptureActive}
-                        dark={dark}
                         onClick={onScreenRecord}
                     >
-                        <MdVideocam size={18} />
-                    </IconButton>
+                        <Video size={18} />
+                    </ToolButton>
                 )}
-                <IconButton
+                <ToolButton
                     title={t('annotate.ocr')}
                     disabled={longCaptureActive || redactPending}
-                    dark={dark}
                     onClick={onOcr}
                 >
-                    <MdDocumentScanner size={16} />
-                </IconButton>
-                <IconButton
+                    <ScanText size={16} />
+                </ToolButton>
+                <ToolButton
                     title={t('annotate.translate')}
                     disabled={longCaptureActive || redactPending}
-                    dark={dark}
                     onClick={onTranslate}
                 >
-                    <MdTranslate size={16} />
-                </IconButton>
+                    <Languages size={16} />
+                </ToolButton>
                 {onInlineTranslate && (
-                    <IconButton
+                    <ToolButton
                         title={t('annotate.translate_overlay')}
                         disabled={longCaptureActive || redactPending}
-                        dark={dark}
                         onClick={onInlineTranslate}
                     >
-                        <MdGTranslate size={16} />
-                    </IconButton>
+                        <Captions size={16} />
+                    </ToolButton>
                 )}
                 {onRedact && (
-                    <IconButton
+                    <ToolButton
                         title={t(redactPending ? 'annotate.redacting' : 'annotate.privacy')}
                         disabled={longCaptureActive || redactPending}
-                        dark={dark}
                         onClick={onRedact}
                     >
-                        <MdPrivacyTip size={16} />
-                    </IconButton>
+                        <ShieldCheck size={16} />
+                    </ToolButton>
                 )}
-                <IconButton
+                <ToolButton
                     title={t('annotate.pin')}
                     disabled={longCaptureActive || redactPending}
-                    dark={dark}
                     onClick={onPin}
                 >
-                    <MdPushPin size={16} />
-                </IconButton>
-                <IconButton
+                    <Pin size={16} />
+                </ToolButton>
+                <ToolButton
                     title={t('annotate.save')}
                     disabled={longCaptureActive || redactPending}
-                    dark={dark}
                     onClick={onSave}
                 >
-                    <MdSaveAlt size={16} />
-                </IconButton>
-                <IconButton
+                    <Download size={16} />
+                </ToolButton>
+                <ToolButton
                     title={`${t('annotate.copy')} (Enter)`}
                     disabled={copyBusy || redactPending}
-                    dark={dark}
+                    primary
                     onClick={onCopy}
                 >
-                    <MdContentCopy size={16} />
-                </IconButton>
-                <IconButton
+                    <Copy size={16} />
+                    {t('annotate.copy')}
+                </ToolButton>
+                <ToolButton
                     title={`${t('annotate.close')} (Esc)`}
-                    dark={dark}
                     onClick={onClose}
                 >
-                    <MdClose size={16} />
-                </IconButton>
+                    <X size={16} />
+                </ToolButton>
             </div>
             {showProps && (
-                <div className={`flex items-center gap-1 rounded-lg border px-2 py-1 shadow-md ${bar}`}>
+                <div className='snap-tools-options snap-glass'>
                     {COLORS.map((item) => (
                         <button
                             key={item}
                             type='button'
-                            title={t('annotate.color')}
+                            title={`${t('annotate.color')} · ${item}`}
+                            aria-pressed={color === item}
                             onMouseDown={(event) => event.stopPropagation()}
                             onClick={() => setColor(item)}
-                            className={`h-4 w-4 rounded-full border ${
-                                color === item ? 'border-sky-500' : 'border-black/20'
-                            }`}
-                            style={{ background: item }}
+                            className='snap-swatch'
+                            style={{ '--swatch': item }}
                         />
                     ))}
-                    <span className={`mx-1 h-3 w-px ${dark ? 'bg-white/20' : 'bg-black/15'}`} />
+                    <span className='snap-tools-divider' aria-hidden='true' />
                     {STROKES.map((item) => (
                         <button
                             key={item}
                             type='button'
-                            title={t('annotate.stroke')}
+                            title={`${t('annotate.stroke')} · ${item} px`}
+                            aria-pressed={strokeWidth === item}
                             onMouseDown={(event) => event.stopPropagation()}
                             onClick={() => setStrokeWidth(item)}
-                            className={`rounded px-1 text-[11px] ${
-                                strokeWidth === item ? (dark ? 'bg-white/20' : 'bg-black/10') : ''
-                            }`}
+                            className='snap-option'
                         >
                             {item}
                         </button>
                     ))}
                     {tool === 'text' && (
                         <>
-                            <span className={`mx-1 h-3 w-px ${dark ? 'bg-white/20' : 'bg-black/15'}`} />
+                            <span className='snap-tools-divider' aria-hidden='true' />
                             {FONTS.map((item) => (
                                 <button
                                     key={item}
                                     type='button'
-                                    title={t('annotate.font')}
+                                    title={`${t('annotate.font')} · ${item} px`}
+                                    aria-pressed={fontSize === item}
                                     onMouseDown={(event) => event.stopPropagation()}
                                     onClick={() => setFontSize(item)}
-                                    className={`rounded px-1 text-[11px] ${
-                                        fontSize === item ? (dark ? 'bg-white/20' : 'bg-black/10') : ''
-                                    }`}
+                                    className='snap-option'
                                 >
                                     {item}
                                 </button>

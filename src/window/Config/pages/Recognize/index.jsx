@@ -48,6 +48,7 @@ export default function Recognize() {
                     <h3 className='my-auto mx-0'>{t('config.recognize.delete_newline')}</h3>
                     {deleteNewline !== null && (
                         <Switch
+                            aria-label={t('config.recognize.delete_newline')}
                             isSelected={deleteNewline}
                             onValueChange={(v) => {
                                 setDeleteNewline(v);
@@ -59,6 +60,7 @@ export default function Recognize() {
                     <h3 className='my-auto mx-0'>{t('config.recognize.auto_copy')}</h3>
                     {autoCopy !== null && (
                         <Switch
+                            aria-label={t('config.recognize.auto_copy')}
                             isSelected={autoCopy}
                             onValueChange={(v) => {
                                 setAutoCopy(v);
@@ -70,6 +72,7 @@ export default function Recognize() {
                     <h3 className='my-auto mx-0'>{t('config.recognize.close_on_blur')}</h3>
                     {closeOnBlur !== null && (
                         <Switch
+                            aria-label={t('config.recognize.close_on_blur')}
                             isSelected={closeOnBlur}
                             onValueChange={(v) => {
                                 setCloseOnBlur(v);
@@ -81,6 +84,7 @@ export default function Recognize() {
                     <h3 className='my-auto mx-0'>{t('config.recognize.hide_window')}</h3>
                     {hideWindow !== null && (
                         <Switch
+                            aria-label={t('config.recognize.hide_window')}
                             isSelected={hideWindow}
                             onValueChange={(v) => {
                                 setHideWindow(v);

@@ -1,127 +1,77 @@
-import { useNavigate, useLocation } from 'react-router-dom';
-import { BsInfoSquareFill } from 'react-icons/bs';
-import { PiTranslateFill } from 'react-icons/pi';
-import { AiFillAppstore } from 'react-icons/ai';
-import { useTranslation } from 'react-i18next';
-import { PiTextboxFill } from 'react-icons/pi';
-import { MdVideocam, MdKeyboardAlt } from 'react-icons/md';
-import { MdExtension } from 'react-icons/md';
-import { AiFillCloud } from 'react-icons/ai';
-import { FaHistory } from 'react-icons/fa';
-import { Button } from '@nextui-org/react';
 import React from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { motion } from 'framer-motion';
+import { AudioLines, ChevronDown, Cloud, History, Info, Keyboard, Languages, ScanText, Settings2, Video } from 'lucide-react';
+
+const sections = [
+    ['workspace', [
+        ['general', Settings2, 'graphite'],
+        ['record', Video, 'coral'],
+        ['recognize', ScanText, 'blue'],
+        ['translate', Languages, 'teal'],
+        ['hotkey', Keyboard, 'violet'],
+    ]],
+    ['application', [
+        ['service', AudioLines, 'indigo'],
+        ['history', History, 'amber'],
+        ['backup', Cloud, 'cyan'],
+        ['about', Info, 'graphite'],
+    ]],
+];
+
+export function CompactNavigation() {
+    const { t } = useTranslation();
+    const { pathname } = useLocation();
+    const navigate = useNavigate();
+    return (
+        <label className='settings-compact-nav snap-glass'>
+            <span>{t('config.shell.settings')}</span>
+            <ChevronDown size={14} aria-hidden='true' />
+            <select
+                aria-label={t('config.shell.settings')}
+                value={pathname === '/' ? '/general' : pathname}
+                onChange={(event) => navigate(event.target.value)}
+            >
+                {sections.map(([section, pages]) => (
+                    <optgroup key={section} label={t(`config.shell.${section}`)}>
+                        {pages.map(([page]) => (
+                            <option key={page} value={`/${page}`}>{t(`config.${page}.label`)}</option>
+                        ))}
+                    </optgroup>
+                ))}
+            </select>
+        </label>
+    );
+}
 
 export default function SideBar() {
     const { t } = useTranslation();
-    const navigate = useNavigate();
-    const location = useLocation();
-
-    function setStyle(pathname) {
-        return location.pathname.includes(pathname) ? 'flat' : 'light';
-    }
-
     return (
-        <div className='mx-[12px] overflow-y-auto'>
-            <Button fullWidth size='lg' variant={setStyle('/record')} className='mb-[5px]'
-                onPress={() => navigate('/record')} startContent={<MdVideocam className='text-[24px]' />}>
-                <div className='w-full'>{t('config.record.label')}</div>
-            </Button>
-            <Button
-                fullWidth
-                size='lg'
-                variant={setStyle('/general')}
-                className='mb-[5px]'
-                onPress={() => {
-                    navigate('/general');
-                }}
-                startContent={<AiFillAppstore className='text-[24px]' />}
-            >
-                <div className='w-full'>{t('config.general.label')}</div>
-            </Button>
-            <Button
-                fullWidth
-                size='lg'
-                variant={setStyle('/translate')}
-                className='mb-[5px]'
-                onPress={() => {
-                    navigate('/translate');
-                }}
-                startContent={<PiTranslateFill className='text-[24px]' />}
-            >
-                <div className='w-full'>{t('config.translate.label')}</div>
-            </Button>
-            <Button
-                fullWidth
-                size='lg'
-                variant={setStyle('/recognize')}
-                className='mb-[5px]'
-                onPress={() => {
-                    navigate('/recognize');
-                }}
-                startContent={<PiTextboxFill className='text-[24px]' />}
-            >
-                <div className='w-full'>{t('config.recognize.label')}</div>
-            </Button>
-            <Button
-                fullWidth
-                size='lg'
-                variant={setStyle('/hotkey')}
-                className='mb-[5px]'
-                onPress={() => {
-                    navigate('/hotkey');
-                }}
-                startContent={<MdKeyboardAlt className='text-[24px]' />}
-            >
-                <div className='w-full'>{t('config.hotkey.label')}</div>
-            </Button>
-            <Button
-                fullWidth
-                size='lg'
-                variant={setStyle('/service')}
-                className='mb-[5px]'
-                onPress={() => {
-                    navigate('/service');
-                }}
-                startContent={<MdExtension className='text-[24px]' />}
-            >
-                <div className='w-full'>{t('config.service.label')}</div>
-            </Button>
-            <Button
-                fullWidth
-                size='lg'
-                variant={setStyle('/history')}
-                className='mb-[5px]'
-                onPress={() => {
-                    navigate('/history');
-                }}
-                startContent={<FaHistory className='text-[24px]' />}
-            >
-                <div className='w-full'>{t('config.history.label')}</div>
-            </Button>
-            <Button
-                fullWidth
-                size='lg'
-                variant={setStyle('/backup')}
-                className='mb-[5px]'
-                onPress={() => {
-                    navigate('/backup');
-                }}
-                startContent={<AiFillCloud className='text-[24px]' />}
-            >
-                <div className='w-full'>{t('config.backup.label')}</div>
-            </Button>
-            <Button
-                fullWidth
-                size='lg'
-                variant={setStyle('/about')}
-                className='mb-[5px]'
-                onPress={() => {
-                    navigate('/about');
-                }}
-                startContent={<BsInfoSquareFill className='text-[24px]' />}
-            >
-                <div className='w-full'>{t('config.about.label')}</div>
-            </Button>
-        </div>
+        <nav className='settings-navigation' aria-label={t('config.shell.settings')}>
+            {sections.map(([section, pages]) => (
+                <div className='settings-nav-group' key={section}>
+                    <h2>{t(`config.shell.${section}`)}</h2>
+                    {pages.map(([page, Icon, tint]) => (
+                        <NavLink key={page} to={`/${page}`}>
+                            {({ isActive }) => (
+                                <>
+                                    {isActive && (
+                                        <motion.span
+                                            aria-hidden='true'
+                                            className='settings-selection'
+                                            layoutId='settings-selection'
+                                            transition={{ type: 'spring', stiffness: 520, damping: 42 }}
+                                        />
+                                    )}
+                                    <span className={`settings-symbol tint-${tint}`} aria-hidden='true'><Icon size={16} /></span>
+                                    <span className='settings-nav-label'>{t(`config.${page}.label`)}</span>
+                                </>
+                            )}
+                        </NavLink>
+                    ))}
+                </div>
+            ))}
+        </nav>
     );
 }

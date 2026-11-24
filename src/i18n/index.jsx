@@ -24,12 +24,12 @@ import he_IL from './locales/he_IL.json';
 
 i18n.use(initReactI18next).init({
     fallbackLng: {
-        zh_tw: ['zh_cn'],
-        zh_cn: ['zh_tw'],
-        pt_pt: ['pt_br'],
-        pt_br: ['pt_pt'],
-        nb_no: ['nn_no'],
-        nn_no: ['nb_no'],
+        zh_tw: ['zh_cn', 'en'],
+        zh_cn: ['zh_tw', 'en'],
+        pt_pt: ['pt_br', 'en'],
+        pt_br: ['pt_pt', 'en'],
+        nb_no: ['nn_no', 'en'],
+        nn_no: ['nb_no', 'en'],
         default: ['en'],
     },
     debug: false,

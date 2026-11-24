@@ -1,7 +1,7 @@
+import { ArrowRightLeft } from 'lucide-react';
 import { Card, Button, CardFooter, Dropdown, DropdownMenu, DropdownTrigger, DropdownItem } from '@nextui-org/react';
 import { useTranslation } from 'react-i18next';
-import { BiTransferAlt } from 'react-icons/bi';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { atom, useAtom, useAtomValue } from 'jotai';
 
 import { languageList } from '../../../../utils/language';
@@ -21,6 +21,7 @@ export default function LanguageArea() {
     const [targetLanguage, setTargetLanguage] = useAtom(targetLanguageAtom);
     const detectLanguage = useAtomValue(detectLanguageAtom);
     const { t } = useTranslation();
+    const previousTarget = useRef(null);
 
     useEffect(() => {
         if (translateSourceLanguage) {
@@ -32,7 +33,7 @@ export default function LanguageArea() {
     }, [translateSourceLanguage, translateTargetLanguage]);
 
     useEffect(() => {
-        if (rememberLanguage !== null && rememberLanguage) {
+        if (rememberLanguage && sourceLanguage && targetLanguage) {
             setTranslateSourceLanguage(sourceLanguage);
             setTranslateTargetLanguage(targetLanguage);
         }
@@ -41,9 +42,9 @@ export default function LanguageArea() {
     return (
         <Card
             shadow='none'
-            className='bg-content2 h-[35px] rounded-[10px]'
+            className='translation-languages snap-glass'
         >
-            <CardFooter className='bg-content2 flex justify-between p-0 rounded-[10px]'>
+            <CardFooter className='flex items-center justify-between'>
                 <div className='flex'>
                     <Dropdown>
                         <DropdownTrigger>
@@ -70,33 +71,27 @@ export default function LanguageArea() {
                 </div>
                 <div className='flex'>
                     <Button
+                        aria-label={t('common.switch_languages')}
                         isIconOnly
                         size='sm'
                         variant='light'
                         className='text-[20px]'
-                        onPress={async () => {
+                        isDisabled={!sourceLanguage || !targetLanguage || !translateTargetLanguage || !translateSecondLanguage}
+                        onPress={() => {
                             if (sourceLanguage !== 'auto') {
-                                const oldSourceLanguage = sourceLanguage;
                                 setSourceLanguage(targetLanguage);
-                                setTargetLanguage(oldSourceLanguage);
+                                setTargetLanguage(sourceLanguage);
+                            } else if (detectLanguage) {
+                                setTargetLanguage(targetLanguage === translateTargetLanguage ? detectLanguage : translateTargetLanguage);
+                            } else if (targetLanguage !== translateSecondLanguage) {
+                                previousTarget.current = targetLanguage;
+                                setTargetLanguage(translateSecondLanguage);
                             } else {
-                                if (detectLanguage !== '') {
-                                    if (targetLanguage === translateTargetLanguage) {
-                                        setTargetLanguage(detectLanguage);
-                                    } else {
-                                        setTargetLanguage(translateTargetLanguage);
-                                    }
-                                } else {
-                                    if (targetLanguage === translateSecondLanguage) {
-                                        setTargetLanguage(translateTargetLanguage);
-                                    } else {
-                                        setTargetLanguage(secondLanguage);
-                                    }
-                                }
+                                setTargetLanguage(previousTarget.current ?? translateTargetLanguage);
                             }
                         }}
                     >
-                        <BiTransferAlt />
+                        <ArrowRightLeft size="1em" />
                     </Button>
                 </div>
                 <div className='flex'>

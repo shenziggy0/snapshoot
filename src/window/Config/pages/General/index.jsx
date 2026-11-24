@@ -1,7 +1,11 @@
+import { ArrowUpRight, Eye, EyeOff, ScanLine } from 'lucide-react';
+import AppearancePicker from './AppearancePicker';
+import { Link } from 'react-router-dom';
 import { enable, isEnabled, disable } from 'tauri-plugin-autostart-api';
 import { DropdownTrigger } from '@nextui-org/react';
-import React, { useState, useEffect } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
+import React, { useState, useEffect, useRef } from 'react';
+import toast from 'react-hot-toast';
+import Toaster from '../../../../components/Toaster';
 import { DropdownMenu } from '@nextui-org/react';
 import { DropdownItem } from '@nextui-org/react';
 import { useTranslation } from 'react-i18next';
@@ -14,12 +18,14 @@ import 'flag-icons/css/flag-icons.min.css';
 import { Input } from '@nextui-org/react';
 import { Card } from '@nextui-org/react';
 import { invoke } from '@tauri-apps/api';
-import { useTheme } from 'next-themes';
+import { saveAppTheme } from '../../../../utils/store';
 
 import { useConfig } from '../../../../hooks/useConfig';
 import { LanguageFlag } from '../../../../utils/language';
 import { useToastStyle } from '../../../../hooks';
 import { osType } from '../../../../utils/env';
+
+const MAC_KEYS = { Command: '⌘', Control: '⌃', Ctrl: '⌃', Shift: '⇧', Alt: '⌥' };
 
 let timer = null;
 
@@ -29,9 +35,13 @@ export default function General() {
     const [checkUpdate, setCheckUpdate] = useConfig('check_update', true);
     const [quickAccess, setQuickAccess] = useConfig('quick_access_enabled', true);
     const [serverPort, setServerPort] = useConfig('server_port', 60828);
+    const [captureShortcut] = useConfig('hotkey_screenshot_annotate', osType === 'Darwin' ? 'Command+Shift+A' : 'F1');
+    const [showToken, setShowToken] = useState(false);
     const [serverToken] = useConfig('server_token', '');
     const [appLanguage, setAppLanguage] = useConfig('app_language', 'en');
-    const [appTheme, setAppTheme] = useConfig('app_theme', 'system');
+    const [appTheme] = useConfig('app_theme', 'system');
+    const [pendingTheme, setPendingTheme] = useState(null);
+    const themeRequest = useRef(null);
     const [appFont, setAppFont] = useConfig('app_font', 'default');
     const [appFallbackFont, setAppFallbackFont] = useConfig('app_fallback_font', 'default');
     const [appFontSize, setAppFontSize] = useConfig('app_font_size', 16);
@@ -45,7 +55,6 @@ export default function General() {
     const [proxyPassword, setProxyPassword] = useConfig('proxy_password', '');
     const [noProxy, setNoProxy] = useConfig('no_proxy', 'localhost,127.0.0.1');
     const { t, i18n } = useTranslation();
-    const { setTheme } = useTheme();
     const toastStyle = useToastStyle();
 
     const languageName = {
@@ -82,11 +91,48 @@ export default function General() {
     return (
         <>
             <Toaster />
+            <Link
+                to='/hotkey'
+                className='settings-shortcut'
+            >
+                <span className='settings-shortcut-name'>
+                    <small><ScanLine size={15} aria-hidden='true' />{t('config.hotkey.label')}</small>
+                    <strong>{t('config.hotkey.screenshot_annotate')}</strong>
+                    <span className='settings-keycaps'>
+                        {captureShortcut
+                            ? captureShortcut.split('+').map((key, index) => (
+                                <kbd key={index}>{osType === 'Darwin' ? MAC_KEYS[key] || key : key}</kbd>
+                            ))
+                            : t('config.shell.unassigned')}
+                    </span>
+                </span>
+                <span className='shortcut-viewfinder' aria-hidden='true'><i /><i /><i /><i /></span>
+                <span className='shortcut-link-arrow' aria-hidden='true'><ArrowUpRight size={16} /></span>
+            </Link>
+            {appTheme !== null && (
+                <AppearancePicker
+                    value={pendingTheme ?? appTheme}
+                    onChange={(mode) => {
+                        setPendingTheme(mode);
+                        const request = saveAppTheme(mode);
+                        themeRequest.current = request;
+                        void request.catch(() => {
+                            if (themeRequest.current === request) {
+                                toast.error(t('config.general.theme_save_failed'), { style: toastStyle });
+                            }
+                        }).finally(() => {
+                            if (themeRequest.current === request) setPendingTheme(null);
+                        });
+                    }}
+                />
+            )}
+            <h2 className='settings-section-title'>{t('config.shell.startup')}</h2>
             <Card className='mb-[10px]'>
                 <CardBody>
                     <div className='config-item'>
                         <h3>{t('config.general.auto_start')}</h3>
                         <Switch
+                            aria-label={t('config.general.auto_start')}
                             isSelected={autoStart}
                             onValueChange={(v) => {
                                 setAutoStart(v);
@@ -106,6 +152,7 @@ export default function General() {
                         <h3>{t('config.general.check_update')}</h3>
                         {checkUpdate !== null && (
                             <Switch
+                                aria-label={t('config.general.check_update')}
                                 isSelected={checkUpdate}
                                 onValueChange={(v) => {
                                     setCheckUpdate(v);
@@ -117,6 +164,7 @@ export default function General() {
                         <h3>{t('config.general.quick_access')}</h3>
                         {quickAccess !== null && (
                             <Switch
+                                aria-label={t('config.general.quick_access')}
                                 isSelected={quickAccess}
                                 onValueChange={(v) => {
                                     setQuickAccess(v);
@@ -127,58 +175,9 @@ export default function General() {
                             />
                         )}
                     </div>
-                    <div className='config-item'>
-                        <div>
-                            <h3 className='my-auto'>{t('config.general.server_token')}</h3>
-                            <p className='max-w-[420px] text-sm text-default-500'>
-                                {t('config.general.server_token_hint')}
-                            </p>
-                        </div>
-                        {serverToken !== null && (
-                            <Input
-                                isReadOnly
-                                variant='bordered'
-                                value={serverToken || ''}
-                                className='max-w-[360px]'
-                            />
-                        )}
-                    </div>
-                    <div className='config-item'>
-                        <h3 className='my-auto'>{t('config.general.server_port')}</h3>
-                        {serverPort !== null && (
-                            <Input
-                                type='number'
-                                variant='bordered'
-                                value={serverPort}
-                                labelPlacement='outside-left'
-                                onValueChange={(v) => {
-                                    if (parseInt(v) !== serverPort) {
-                                        if (timer) {
-                                            clearTimeout(timer);
-                                        }
-                                        timer = setTimeout(() => {
-                                            toast.success(t('config.general.server_port_change'), {
-                                                duration: 3000,
-                                                style: toastStyle,
-                                            });
-                                        }, 1000);
-                                    }
-                                    if (v === '') {
-                                        setServerPort(0);
-                                    } else if (parseInt(v) > 65535) {
-                                        setServerPort(65535);
-                                    } else if (parseInt(v) < 0) {
-                                        setServerPort(0);
-                                    } else {
-                                        setServerPort(parseInt(v));
-                                    }
-                                }}
-                                className='max-w-[100px]'
-                            />
-                        )}
-                    </div>
                 </CardBody>
             </Card>
+            <h2 className='settings-section-title'>{t('config.shell.appearance')}</h2>
             <Card className='mb-[10px]'>
                 <CardBody>
                     <div className='config-item'>
@@ -316,44 +315,6 @@ export default function General() {
                                     >
                                         עִבְרִית
                                     </DropdownItem>
-                                </DropdownMenu>
-                            </Dropdown>
-                        )}
-                    </div>
-                    <div className='config-item'>
-                        <h3 className='my-auto'>{t('config.general.app_theme')}</h3>
-                        {appTheme !== null && (
-                            <Dropdown>
-                                <DropdownTrigger>
-                                    <Button variant='bordered'>{t(`config.general.theme.${appTheme}`)}</Button>
-                                </DropdownTrigger>
-                                <DropdownMenu
-                                    aria-label='app theme'
-                                    onAction={(key) => {
-                                        setAppTheme(key);
-                                        if (key !== 'system') {
-                                            setTheme(key);
-                                        } else {
-                                            if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                                                setTheme('dark');
-                                            } else {
-                                                setTheme('light');
-                                            }
-                                            window
-                                                .matchMedia('(prefers-color-scheme: dark)')
-                                                .addEventListener('change', (e) => {
-                                                    if (e.matches) {
-                                                        setTheme('dark');
-                                                    } else {
-                                                        setTheme('light');
-                                                    }
-                                                });
-                                        }
-                                    }}
-                                >
-                                    <DropdownItem key='system'>{t('config.general.theme.system')}</DropdownItem>
-                                    <DropdownItem key='light'>{t('config.general.theme.light')}</DropdownItem>
-                                    <DropdownItem key='dark'>{t('config.general.theme.dark')}</DropdownItem>
                                 </DropdownMenu>
                             </Dropdown>
                         )}
@@ -504,6 +465,7 @@ export default function General() {
                         <h3>{t('config.general.transparent')}</h3>
                         {transparent !== null && (
                             <Switch
+                                aria-label={t('config.general.transparent')}
                                 isSelected={transparent}
                                 onValueChange={(v) => {
                                     setTransparent(v);
@@ -515,10 +477,79 @@ export default function General() {
                         <h3>{t('config.general.dev_mode')}</h3>
                         {devMode !== null && (
                             <Switch
+                                aria-label={t('config.general.dev_mode')}
                                 isSelected={devMode}
                                 onValueChange={(v) => {
                                     setDevMode(v);
                                 }}
+                            />
+                        )}
+                    </div>
+                </CardBody>
+            </Card>
+            <h2 className='settings-section-title'>{t('config.shell.connection')}</h2>
+            <Card className='mb-[10px]'>
+                <CardBody>
+                    <div className='config-item'>
+                        <div>
+                            <h3 className='my-auto'>{t('config.general.server_token')}</h3>
+                            <p className='max-w-[420px] text-sm text-default-500'>
+                                {t('config.general.server_token_hint')}
+                            </p>
+                        </div>
+                        {serverToken !== null && (
+                            <Input
+                                aria-label={t('config.general.server_token')}
+                                type={showToken ? 'text' : 'password'}
+                                endContent={
+                                    <button
+                                        type='button'
+                                        aria-label={t(
+                                            showToken ? 'config.shell.hide_token' : 'config.shell.show_token'
+                                        )}
+                                        onClick={() => setShowToken(!showToken)}
+                                    >
+                                        {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                }
+                                isReadOnly
+                                variant='bordered'
+                                value={serverToken || ''}
+                                className='max-w-[360px]'
+                            />
+                        )}
+                    </div>
+                    <div className='config-item'>
+                        <h3 className='my-auto'>{t('config.general.server_port')}</h3>
+                        {serverPort !== null && (
+                            <Input
+                                type='number'
+                                variant='bordered'
+                                value={serverPort}
+                                labelPlacement='outside-left'
+                                onValueChange={(v) => {
+                                    if (parseInt(v) !== serverPort) {
+                                        if (timer) {
+                                            clearTimeout(timer);
+                                        }
+                                        timer = setTimeout(() => {
+                                            toast.success(t('config.general.server_port_change'), {
+                                                duration: 3000,
+                                                style: toastStyle,
+                                            });
+                                        }, 1000);
+                                    }
+                                    if (v === '') {
+                                        setServerPort(0);
+                                    } else if (parseInt(v) > 65535) {
+                                        setServerPort(65535);
+                                    } else if (parseInt(v) < 0) {
+                                        setServerPort(0);
+                                    } else {
+                                        setServerPort(parseInt(v));
+                                    }
+                                }}
+                                className='max-w-[100px]'
                             />
                         )}
                     </div>
@@ -530,6 +561,7 @@ export default function General() {
                         <h3>{t('config.general.proxy.title')}</h3>
                         {proxyEnable !== null && (
                             <Switch
+                                aria-label={t('config.general.proxy.title')}
                                 isSelected={proxyEnable}
                                 onValueChange={async (v) => {
                                     if (v) {

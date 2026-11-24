@@ -1,6 +1,11 @@
 {
     "translation": {
         "common": {
+            "pin_window": "視窗置頂",
+            "minimize": "最小化",
+            "maximize": "最大化",
+            "restore_window": "還原視窗",
+            "switch_languages": "切換語言",
             "ok": "確定",
             "cancel": "取消",
             "save": "儲存",
@@ -43,6 +48,17 @@
             "he": "希伯來語"
         },
         "config": {
+            "shell": {
+                "settings": "設定",
+                "workspace": "工作區",
+                "application": "應用程式",
+                "startup": "啟動與截圖",
+                "appearance": "語言與外觀",
+                "connection": "本機連線",
+                "show_token": "顯示權杖",
+                "hide_token": "隱藏權杖",
+                "unassigned": "尚未設定"
+            },
             "general": {
                 "label": "一般設定",
                 "title": "一般設定",
@@ -52,6 +68,7 @@
                 "server_port_change": "監聽連接埠已變更，請重新啟動應用程式以使變更生效",
                 "app_language": "顯示語言",
                 "app_theme": "主題",
+                "theme_save_failed": "無法儲存應用程式外觀，請再試一次。",
                 "theme": {
                     "light": "淺色主題",
                     "dark": "深色主題",
@@ -450,6 +467,8 @@
             "translate_back": "翻譯回原文"
         },
         "recognize": {
+            "original_image": "原始截圖",
+            "result": "辨識結果",
             "recognize": "辨識",
             "translate": "翻譯",
             "copy_img": "複製圖片",

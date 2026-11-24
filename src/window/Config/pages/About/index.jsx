@@ -1,8 +1,8 @@
+import { MessagesSquare } from 'lucide-react';
 import { Divider, Button, Popover, PopoverTrigger, PopoverContent, Tooltip } from '@nextui-org/react';
 import { appLogDir, appConfigDir } from '@tauri-apps/api/path';
 import { useTranslation } from 'react-i18next';
 import { open } from '@tauri-apps/api/shell';
-import { BsGithub } from 'react-icons/bs';
 import { invoke } from '@tauri-apps/api';
 import React from 'react';
 
@@ -12,16 +12,17 @@ export default function About() {
     const { t } = useTranslation();
 
     return (
-        <div className='h-full w-full py-[80px] px-[100px]'>
+        <div className='settings-about utility-card'>
             <img
-                src='icon.png'
+                src='/icon.svg'
+                alt=''
                 className='mx-auto h-[100px] mb-[5px]'
                 draggable={false}
             />
             <div className='content-center'>
-                <h1 className='font-bold text-2xl text-center'>Snapshoot</h1>
-                <p className='text-center text-sm text-gray-500 mb-[5px]'>{appVersion}</p>
-                <p className='text-center text-xs text-gray-500 mb-[8px]'>{t('config.about.credit')}</p>
+                <h2 className='font-bold text-2xl text-center'>Snapshoot</h2>
+                <p className='text-center text-sm text-default-500 mb-[5px]'>{appVersion}</p>
+                <p className='text-center text-xs text-default-500 mb-[8px]'>{t('config.about.credit')}</p>
                 <Divider />
                 <div className='flex justify-between'>
                     <Button
@@ -98,7 +99,7 @@ export default function About() {
                                             open('https://github.com/shenziggy0/snapshoot/issues');
                                         }}
                                     >
-                                        <BsGithub />
+                                        <MessagesSquare size="1em" />
                                     </Button>
                                 </Tooltip>
                             </div>

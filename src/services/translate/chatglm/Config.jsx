@@ -1,10 +1,11 @@
+import { Trash2 } from 'lucide-react';
 import { INSTANCE_NAME_CONFIG_KEY } from '../../../utils/service_instance';
 import { Input, Button, Textarea } from '@nextui-org/react';
 import { DropdownTrigger } from '@nextui-org/react';
-import { MdDeleteOutline } from 'react-icons/md';
 import { DropdownMenu } from '@nextui-org/react';
 import { DropdownItem } from '@nextui-org/react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Toaster from '../../../components/Toaster';
 import { useTranslation } from 'react-i18next';
 import { Dropdown } from '@nextui-org/react';
 import { open } from '@tauri-apps/api/shell';
@@ -182,7 +183,7 @@ export function Config(props) {
                                             });
                                         }}
                                     >
-                                        <MdDeleteOutline className='text-[18px]' />
+                                        <Trash2 size={18} />
                                     </Button>
                                 </div>
                             );

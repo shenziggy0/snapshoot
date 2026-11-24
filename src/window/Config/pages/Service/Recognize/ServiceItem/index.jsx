@@ -1,8 +1,6 @@
-import { RxDragHandleHorizontal } from 'react-icons/rx';
+import { GripHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Spacer, Button } from '@nextui-org/react';
-import { MdDeleteOutline } from 'react-icons/md';
 import { useTranslation } from 'react-i18next';
-import { BiSolidEdit } from 'react-icons/bi';
 import React from 'react';
 
 import {
@@ -28,19 +26,20 @@ export default function ServiceItem(props) {
         <></>
     ) : (
         serviceInstanceConfig !== null && (
-            <div className='bg-content2 rounded-md px-[10px] py-[20px] flex justify-between'>
+            <div className='settings-service-row'>
                 <div className='flex'>
                     <div
                         {...drag}
-                        className='text-2xl my-auto'
+                        className='service-grip'
                     >
-                        <RxDragHandleHorizontal />
+                        <GripHorizontal size="1em" />
                     </div>
 
                     <Spacer x={2} />
                     {serviceSourceType === ServiceSourceType.BUILDIN && (
                         <>
                             <img
+                                alt=''
                                 src={
                                     serviceName === 'system'
                                         ? `logo/${osType}.svg`
@@ -50,7 +49,7 @@ export default function ServiceItem(props) {
                                 draggable={false}
                             />
                             <Spacer x={2} />
-                            <h2 className='my-auto'>
+                            <h2 id={serviceInstanceKey} className='my-auto'>
                                 {serviceInstanceConfig[INSTANCE_NAME_CONFIG_KEY] ||
                                     t(`services.recognize.${serviceName}.title`)}
                             </h2>
@@ -59,17 +58,19 @@ export default function ServiceItem(props) {
                     {serviceSourceType === ServiceSourceType.PLUGIN && (
                         <>
                             <img
+                                alt=''
                                 src={pluginList[serviceName].icon}
                                 className='h-[24px] w-[24px] my-auto'
                                 draggable={false}
                             />
                             <Spacer x={2} />
-                            <h2 className='my-auto'>{`${serviceInstanceConfig[INSTANCE_NAME_CONFIG_KEY] || pluginList[serviceName].display} [${t('common.plugin')}]`}</h2>
+                            <h2 id={serviceInstanceKey} className='my-auto'>{`${serviceInstanceConfig[INSTANCE_NAME_CONFIG_KEY] || pluginList[serviceName].display} [${t('common.plugin')}]`}</h2>
                         </>
                     )}
                 </div>
                 <div className='flex'>
                     <Button
+                        aria-label={t('quick_access.edit')}
                         isIconOnly
                         size='sm'
                         variant='light'
@@ -78,10 +79,11 @@ export default function ServiceItem(props) {
                             onConfigOpen();
                         }}
                     >
-                        <BiSolidEdit className='text-2xl' />
+                        <Pencil size={17} aria-hidden='true' />
                     </Button>
                     <Spacer x={2} />
                     <Button
+                        aria-label={t('quick_access.delete')}
                         isIconOnly
                         size='sm'
                         variant='light'
@@ -90,7 +92,7 @@ export default function ServiceItem(props) {
                             deleteServiceInstance(serviceInstanceKey);
                         }}
                     >
-                        <MdDeleteOutline className='text-2xl' />
+                        <Trash2 size={17} aria-hidden='true' />
                     </Button>
                 </div>
             </div>

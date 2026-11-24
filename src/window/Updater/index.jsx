@@ -6,7 +6,7 @@ import { open } from '@tauri-apps/api/shell';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 
-import { useConfig } from '../../hooks';
+import { Download } from 'lucide-react';
 import { osType } from '../../utils/env';
 
 const RELEASES_PAGE = 'https://github.com/shenziggy0/snapshoot/releases';
@@ -14,7 +14,6 @@ const RELEASES_PAGE = 'https://github.com/shenziggy0/snapshoot/releases';
 // Snapshoot only tells the user about a new release and opens the installer
 // download; installers are unsigned, so nothing is installed automatically.
 export default function Updater() {
-    const [transparent] = useConfig('transparent', true);
     const [release, setRelease] = useState(null);
     const [error, setError] = useState('');
     const { t } = useTranslation();
@@ -47,25 +46,11 @@ export default function Updater() {
     }
 
     return (
-        <div
-            className={`${transparent ? 'bg-background/90' : 'bg-background'} h-screen ${
-                osType === 'Linux' && 'rounded-[10px] border-1 border-default-100'
-            }`}
-        >
-            <div className='p-[5px] h-[35px] w-full select-none cursor-default'>
-                <div
-                    data-tauri-drag-region='true'
-                    className={`h-full w-full flex ${osType === 'Darwin' ? 'justify-end' : 'justify-start'}`}
-                >
-                    <img
-                        src='icon.png'
-                        className='h-[25px] w-[25px] mr-[10px]'
-                        draggable={false}
-                    />
-                    <h2>{t('updater.title')}</h2>
-                </div>
-            </div>
-            <Card className='mx-[80px] mt-[10px] overscroll-auto h-[calc(100vh-150px)]'>
+        <div className='utility-window'>
+            <header className='utility-bar' data-tauri-drag-region='true'>
+                <h1><Download aria-hidden='true' />{t('updater.title')}</h1>
+            </header>
+            <Card className='utility-card update-content' shadow='none'>
                 <CardBody>
                     {body === '' ? (
                         <div className='space-y-3'>
@@ -123,7 +108,7 @@ export default function Updater() {
                     )}
                 </CardBody>
             </Card>
-            <div className='grid gap-4 grid-cols-2 h-[50px] my-[10px] mx-[80px]'>
+            <div className='update-actions'>
                 <Button
                     variant='flat'
                     isDisabled={downloadUrl === null}

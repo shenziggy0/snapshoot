@@ -5,7 +5,8 @@ import { Textarea, Button, ButtonGroup } from '@nextui-org/react';
 import { appConfigDir, join } from '@tauri-apps/api/path';
 import { convertFileSrc } from '@tauri-apps/api/tauri';
 import React, { useEffect, useState } from 'react';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Toaster from '../../../../components/Toaster';
 import { Pagination } from '@nextui-org/react';
 import { useTranslation } from 'react-i18next';
 

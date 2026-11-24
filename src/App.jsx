@@ -1,14 +1,14 @@
 import { appWindow } from '@tauri-apps/api/window';
 import { BrowserRouter } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { warn } from 'tauri-plugin-log-api';
 import { useTheme } from 'next-themes';
 
 import { invoke } from '@tauri-apps/api/tauri';
 import React, { lazy, Suspense, useEffect } from 'react';
-import { store } from './utils/store';
+import { store, waitForThemeSave } from './utils/store';
 import { useConfig } from './hooks';
 import './style.css';
+import './window/workspaces.css';
 import './i18n';
 
 // Each Tauri window only needs its own page. Loading every window up front
@@ -39,6 +39,7 @@ const windowMap = {
 export default function App() {
     const [devMode] = useConfig('dev_mode', false);
     const [appTheme] = useConfig('app_theme', 'system');
+    const [transparent] = useConfig('transparent', true);
     const [appLanguage] = useConfig('app_language', 'en');
     const [appFont] = useConfig('app_font', 'default');
     const [appFallbackFont] = useConfig('app_fallback_font', 'default');
@@ -51,78 +52,46 @@ export default function App() {
     }, []);
 
     useEffect(() => {
-        if (devMode !== null && devMode) {
-            document.addEventListener('keydown', async (e) => {
-                let allowKeys = ['c', 'v', 'x', 'a', 'z', 'y'];
-                if (e.ctrlKey && !allowKeys.includes(e.key.toLowerCase())) {
-                    e.preventDefault();
-                }
-                if (e.key === 'F12') {
-                    await invoke('open_devtools');
-                }
-                if (e.key.startsWith('F') && e.key.length > 1) {
-                    e.preventDefault();
-                }
-                if (e.key === 'Escape') {
-                    if (appWindow.label === 'screenshot') {
-                        await invoke('screen_record_cancel');
-                        await invoke('long_capture_cancel');
-                        await invoke('hide_screenshot_window');
-                    } else if (appWindow.label === 'quick_access') {
-                        await invoke('hide_quick_access_window');
-                    } else {
-                        await appWindow.close();
+        const onKeyDown = async (event) => {
+            if (event.defaultPrevented) return;
+            if (event.ctrlKey && !['c', 'v', 'x', 'a', 'z', 'y'].includes(event.key.toLowerCase())) {
+                event.preventDefault();
+            }
+            if (event.key.startsWith('F') && event.key.length > 1) {
+                event.preventDefault();
+                if (devMode && event.key === 'F12') await invoke('open_devtools');
+            }
+            if (event.key !== 'Escape') return;
+            // Open menus and editors handle Escape before the window does.
+            if (document.querySelector('[aria-modal="true"], [role="menu"], [role="listbox"]')) return;
+            if (appWindow.label === 'screenshot') {
+                await invoke('screen_record_cancel');
+                await invoke('long_capture_cancel');
+                await invoke('hide_screenshot_window');
+            } else if (appWindow.label === 'quick_access') {
+                await invoke('hide_quick_access_window');
+            } else {
+                if (appWindow.label === 'config') {
+                    try {
+                        await waitForThemeSave();
+                    } catch {
+                        return; // The theme picker reports the save error.
                     }
                 }
-            });
-        } else {
-            document.addEventListener('keydown', async (e) => {
-                let allowKeys = ['c', 'v', 'x', 'a', 'z', 'y'];
-                if (e.ctrlKey && !allowKeys.includes(e.key.toLowerCase())) {
-                    e.preventDefault();
-                }
-                if (e.key.startsWith('F') && e.key.length > 1) {
-                    e.preventDefault();
-                }
-                if (e.key === 'Escape') {
-                    if (appWindow.label === 'screenshot') {
-                        await invoke('screen_record_cancel');
-                        await invoke('long_capture_cancel');
-                        await invoke('hide_screenshot_window');
-                    } else if (appWindow.label === 'quick_access') {
-                        await invoke('hide_quick_access_window');
-                    } else {
-                        await appWindow.close();
-                    }
-                }
-            });
-        }
+                await appWindow.close();
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
     }, [devMode]);
 
     useEffect(() => {
-        if (appTheme !== null) {
-            if (appTheme !== 'system') {
-                setTheme(appTheme);
-            } else {
-                try {
-                    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                        setTheme('dark');
-                    } else {
-                        setTheme('light');
-                    }
-                    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                        if (e.matches) {
-                            setTheme('dark');
-                        } else {
-                            setTheme('light');
-                        }
-                    });
-                } catch {
-                    warn("Can't detect system theme.");
-                }
-            }
-        }
-    }, [appTheme]);
+        if (appTheme !== null) setTheme(appTheme);
+    }, [appTheme, setTheme]);
+
+    useEffect(() => {
+        document.documentElement.dataset.solid = String(transparent === false);
+    }, [transparent]);
 
     useEffect(() => {
         if (appLanguage !== null) {
@@ -132,9 +101,10 @@ export default function App() {
 
     useEffect(() => {
         if (appFont !== null && appFallbackFont !== null) {
-            document.documentElement.style.fontFamily = `"${appFont === 'default' ? 'sans-serif' : appFont}","${
-                appFallbackFont === 'default' ? 'sans-serif' : appFallbackFont
-            }"`;
+            const customFonts = [appFont, appFallbackFont]
+                .filter((font) => font && font !== 'default')
+                .map((font) => JSON.stringify(font));
+            document.documentElement.style.fontFamily = [...customFonts, '-apple-system', 'system-ui', 'sans-serif'].join(', ');
         }
         if (appFontSize !== null) {
             document.documentElement.style.fontSize = `${appFontSize}px`;

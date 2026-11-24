@@ -1,20 +1,21 @@
+import { Copy, X } from 'lucide-react';
 import { appWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { save } from '@tauri-apps/api/dialog';
 import { writeText } from '@tauri-apps/api/clipboard';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Toaster from '../../components/Toaster';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api';
 import { convertFileSrc } from '@tauri-apps/api/tauri';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { MdClose, MdContentCopy } from 'react-icons/md';
 
 import { drawShape } from '../Annotate/render';
 import { translateOnce } from '../../utils/translate_once';
 import { useToastStyle } from '../../hooks';
 import { osType } from '../../utils/env';
-import { useSystemDark } from '../useSystemDark';
+import { useTheme } from 'next-themes';
 import CaptureToolbar from './Toolbar';
 import RecordControls from './RecordControls';
 import { placeToolbar } from './toolbarPlacement';
@@ -117,7 +118,8 @@ function resizeRect(origin, handle, dx, dy, bounds) {
 export default function Screenshot() {
     const { t } = useTranslation();
     const toastStyle = useToastStyle();
-    const dark = useSystemDark();
+    const { resolvedTheme } = useTheme();
+    const dark = resolvedTheme === 'dark';
     const canvasRef = useRef(null);
     const sampleRef = useRef(null);
     const loupeRef = useRef(null);
@@ -1343,7 +1345,7 @@ export default function Screenshot() {
                 className='hidden'
             />
             {loadError ? (
-                <div className='absolute inset-0 z-50 flex items-center justify-center p-8 text-center text-sm text-red-200'>
+                <div className='absolute inset-0 z-50 flex items-center justify-center p-8 text-center text-sm text-snap-100'>
                     {loadError}
                 </div>
             ) : null}
@@ -1375,15 +1377,16 @@ export default function Screenshot() {
             )}
             {(selection || hover) && (
                 <div
-                    className='pointer-events-none absolute z-20'
+                    className={`pointer-events-none absolute z-20 ${recordActive ? 'snap-record-region' : ''}`}
                     style={{
                         left: (selection || hover).x,
                         top: (selection || hover).y,
                         width: Math.max(0, (selection || hover).w),
                         height: Math.max(0, (selection || hover).h),
-                        boxShadow: recordActive ? 'none' : '0 0 0 1px rgba(0,0,0,0.45), 0 0 0 9999px rgba(0,0,0,0.45)',
-                        border: recordActive ? '2px dashed #ef4444' : '1px solid rgba(255,255,255,0.92)',
-                        background: 'transparent',
+                        ...(recordActive ? {} : {
+                            boxShadow: '0 0 0 1px rgba(0,0,0,0.45), 0 0 0 9999px rgba(0,0,0,0.45)',
+                            border: '1px solid rgba(255,255,255,0.92)',
+                        }),
                     }}
                 />
             )}
@@ -1395,7 +1398,7 @@ export default function Screenshot() {
             )}
             {selection && !recordActive && (
                 <div
-                    className='pointer-events-none absolute z-20 rounded bg-black/70 px-1.5 py-0.5 text-[11px]'
+                    className='pointer-events-none absolute z-20 capture-size font-mono text-[11px] text-white'
                     style={{ left: selection.x, top: Math.max(4, selection.y - 22) }}
                 >
                     {scaleLabel()}
@@ -1412,7 +1415,7 @@ export default function Screenshot() {
                     {HANDLES.map((handle) => (
                         <div
                             key={handle}
-                            className='absolute z-40 border border-sky-500 bg-white'
+                            className='absolute z-40 capture-handle'
                             style={handleStyle(handle, { x: 0, y: 0, w: selection.w, h: selection.h })}
                             onMouseDown={(event) => {
                                 event.stopPropagation();
@@ -1485,7 +1488,6 @@ export default function Screenshot() {
                         />
                     ) : (
                         <CaptureToolbar
-                            dark={dark}
                             tool={tool}
                             setTool={setTool}
                             color={color}
@@ -1524,11 +1526,7 @@ export default function Screenshot() {
             )}
             {inlineTranslation && (
                 <div
-                    className={`absolute z-[60] max-h-[260px] overflow-hidden rounded-lg border shadow-xl ${
-                        dark
-                            ? 'border-white/15 bg-neutral-900/95 text-white'
-                            : 'border-black/10 bg-white/95 text-neutral-900'
-                    }`}
+                    className='capture-translation snap-glass absolute z-[60] max-h-[260px] overflow-hidden'
                     style={{
                         left: clamp(inlineTranslation.selection.x, 8, window.innerWidth - 368),
                         top: clamp(
@@ -1557,7 +1555,7 @@ export default function Screenshot() {
                                 }}
                                 className='flex h-6 w-6 items-center justify-center rounded hover:bg-black/10 disabled:opacity-30'
                             >
-                                <MdContentCopy size={14} />
+                                <Copy size={14} />
                             </button>
                             <button
                                 type='button'
@@ -1568,7 +1566,7 @@ export default function Screenshot() {
                                 }}
                                 className='flex h-6 w-6 items-center justify-center rounded hover:bg-black/10'
                             >
-                                <MdClose size={14} />
+                                <X size={14} />
                             </button>
                         </div>
                     </div>
@@ -1595,7 +1593,7 @@ export default function Screenshot() {
             )}
             {longCaptureActive && (
                 <div className='pointer-events-none absolute inset-x-0 bottom-6 z-50 flex justify-center'>
-                    <div className='rounded-full bg-black/70 px-4 py-1.5 text-[12px] text-white'>
+                    <div className='capture-hint text-[12px]'>
                         {longCaptureFrozen
                             ? t('long_screenshot.copy_retry')
                             : t(longCaptureStatus?.message || 'long_screenshot.scroll_hint')}
@@ -1604,7 +1602,7 @@ export default function Screenshot() {
             )}
             {loupe && !selection && (
                 <div
-                    className='pointer-events-none absolute z-50 overflow-hidden rounded-md border border-white/80 bg-black shadow-lg'
+                    className='pointer-events-none absolute z-50 capture-loupe overflow-hidden'
                     style={{ left: loupe.left, top: loupe.top, width: 132 }}
                 >
                     <canvas

@@ -1,0 +1,66 @@
+.snap-tools { max-width: calc(100vw - 16px); color: var(--snap-text); }
+.snap-tools-row, .snap-tools-options {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 22px;
+}
+.snap-tools-row { animation: snap-pop 175ms var(--snap-ease); }
+.snap-tools-options { gap: 4px; padding: 4px 9px; border-radius: 17px; animation: snap-pop 145ms var(--snap-ease); }
+.snap-tool {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    height: 34px;
+    min-width: 33px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background-color 150ms, color 150ms, transform var(--snap-settle) var(--snap-spring);
+}
+.snap-tool svg { width: 17px; height: 17px; stroke-width: 1.85; }
+.snap-tool:disabled, .snap-record button:disabled { opacity: .38; cursor: default; }
+.snap-tool:not(:disabled):hover, .snap-option:hover, .snap-editor-mode:hover { background-color: var(--snap-well); }
+.snap-tool:not(:disabled):active, .snap-option:active { transform: scale(.9); transition-duration: var(--snap-press); }
+.snap-tool[aria-pressed='true'] { color: var(--snap-accent); background: var(--snap-well); box-shadow: inset 0 0 0 1px var(--snap-glass-edge); }
+.snap-tool[aria-pressed='true']::after { content: ''; position: absolute; bottom: 2px; width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+.snap-tool.snap-tool-primary { min-width: 42px; border-radius: 20px; padding: 0 11px; gap: 5px; font-size: .78rem; font-weight: 650; color: var(--snap-on-accent); background: var(--snap-action); }
+.snap-tool.snap-tool-primary:hover { background: var(--snap-action); filter: brightness(1.07); }
+.snap-tools button:focus-visible, .snap-record button:focus-visible { outline-offset: -2px; }
+.snap-tools-divider { height: 16px; width: 1px; margin-inline: 3px; background: var(--snap-glass-edge); }
+.snap-swatch { position: relative; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; }
+.snap-swatch::before { content: ''; width: 15px; height: 15px; border-radius: 50%; background: var(--swatch); box-shadow: inset 0 0 0 1px #54627466; }
+.snap-swatch[aria-pressed='true'] { box-shadow: inset 0 0 0 2px var(--snap-accent); }
+.snap-option, .snap-editor-mode { min-height: 24px; min-width: 24px; border-radius: 20px; padding: 1px 6px; font-size: .73rem; line-height: 1.2; }
+.snap-option { font-variant-numeric: tabular-nums; }
+.snap-option[aria-pressed='true'], .snap-editor-mode { background: var(--snap-well); color: var(--snap-accent); font-weight: 650; }
+.snap-option[aria-pressed='true'] { box-shadow: inset 0 0 0 1px var(--snap-glass-edge); }
+.snap-editor-tools { display: flex; flex-direction: column; align-items: center; gap: 5px; max-height: 100%; overflow-y: auto; padding: 2px 0 5px; }
+.editor-dock { display: flex; flex: none; align-items: flex-start; justify-content: center; max-height: 46vh; padding: 2px 4px 6px; overflow-y: auto; }
+.snap-editor-stage { background: #171a21; }
+.capture-size, .capture-hint { padding: 2px 8px; border-radius: 20px; color: white; background: #182235e8; font-variant-numeric: tabular-nums; }
+.capture-handle { border: 1px solid #fff; background: #1974db; border-radius: 50%; box-shadow: 0 0 0 1px #17223780; }
+.capture-loupe { border-radius: 16px; border: 1px solid #ffffffad; color: white; background: #192131; box-shadow: var(--snap-shadow); font-variant-numeric: tabular-nums; }
+.capture-translation { border-radius: 18px; max-width: calc(100vw - 16px); }
+.snap-record-region {
+    border: 2px dashed #ef4444;
+    box-shadow: inset 0 0 0 1px #fff, inset 0 0 0 2px #17181e;
+}
+.snap-record { padding: 5px 7px; border-radius: 23px; font-size: .8rem; }
+.snap-record-row { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+.snap-record-row button { display: inline-flex; align-items: center; gap: 5px; min-height: 34px; padding: 2px 9px; border-radius: 20px; }
+.snap-record-row button:hover { background: var(--snap-well); }
+.snap-record-row button svg { width: 15px; height: 15px; }
+.snap-record-dot { width: 9px; height: 9px; margin-inline: 6px 2px; border-radius: 50%; background: var(--snap-danger); }
+.snap-record[data-paused='true'] .snap-record-dot { background: var(--snap-muted); }
+.snap-record[data-paused='false'] .snap-record-dot { animation: record-pulse 1.5s ease-in-out infinite; }
+@keyframes record-pulse { 50% { opacity: .5; } }
+@media (prefers-reduced-motion: reduce) {
+    .snap-tool:not(:disabled):active, .snap-option:active { transform: none; }
+}
+@media (pointer: coarse) {
+    .snap-tool, .snap-swatch, .snap-option, .snap-editor-mode, .snap-record-row button { min-width: 44px; min-height: 44px; }
+}

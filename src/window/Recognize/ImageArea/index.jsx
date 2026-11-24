@@ -1,8 +1,8 @@
+import { Copy, Image as PaneIcon } from 'lucide-react';
 import { Card, CardBody, CardFooter, Button, Tooltip } from '@nextui-org/react';
 import { appWindow } from '@tauri-apps/api/window';
 import React, { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { MdContentCopy } from 'react-icons/md';
 import { useTranslation } from 'react-i18next';
 import { invoke } from '@tauri-apps/api';
 import { atom, useAtom } from 'jotai';
@@ -46,12 +46,13 @@ export default function ImageArea() {
     return (
         <Card
             shadow='none'
-            className='bg-content1 h-full ml-[12px] mr-[6px]'
-            radius='10'
+            className='utility-card'
         >
-            <CardBody className='bg-content1 h-full p-0'>
+            <h2 className='utility-card-heading'><PaneIcon aria-hidden='true' />{t('recognize.original_image')}</h2>
+            <CardBody className='ocr-image-well min-h-0 p-0'>
                 {base64 !== '' && (
                     <img
+                        alt={t('recognize.original_image')}
                         ref={imgRef}
                         draggable={false}
                         className='object-contain h-full w-full'
@@ -62,6 +63,8 @@ export default function ImageArea() {
             <CardFooter className='bg-content1 flex justify-start px-[12px]'>
                 <Tooltip content={t('recognize.copy_img')}>
                     <Button
+                        aria-label={t('recognize.copy_img')}
+                        isDisabled={!base64}
                         isIconOnly
                         size='sm'
                         variant='light'
@@ -72,7 +75,7 @@ export default function ImageArea() {
                             });
                         }}
                     >
-                        <MdContentCopy className='text-[16px]' />
+                        <Copy size={16} />
                     </Button>
                 </Tooltip>
             </CardFooter>

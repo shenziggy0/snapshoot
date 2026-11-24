@@ -1,81 +1,88 @@
 import { useLocation, useRoutes } from 'react-router-dom';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { appWindow } from '@tauri-apps/api/window';
-import { Card, Divider } from '@nextui-org/react';
 import { useTranslation } from 'react-i18next';
-
 import WindowControl from '../../components/WindowControl';
-import SideBar from './components/SideBar';
-import { osType } from '../../utils/env';
-import { useConfig } from '../../hooks';
+import SideBar, { CompactNavigation } from './components/SideBar';
+import { appVersion, osType } from '../../utils/env';
+import { waitForThemeSave } from '../../utils/store';
 import routes from './routes';
 import './style.css';
 
 export default function Config() {
-    const [transparent] = useConfig('transparent', true);
     const { t } = useTranslation();
     const location = useLocation();
     const page = useRoutes(routes);
+    const pageName = location.pathname.slice(1) || 'general';
+    const title = t([`config.${pageName}.title`, `config.${pageName}.label`]);
+    const scrollArea = useRef(null);
+    const heading = useRef(null);
+    const [collapsedPage, setCollapsedPage] = useState('');
 
     useEffect(() => {
-        if (appWindow.label === 'config') {
-            appWindow.show();
-        }
+        const observer = new IntersectionObserver(([entry]) => {
+            setCollapsedPage(entry.isIntersecting ? '' : pageName);
+        }, { root: scrollArea.current, rootMargin: '-38px 0px 0px' });
+        observer.observe(heading.current);
+        return () => observer.disconnect();
+    }, [pageName]);
+
+    useEffect(() => {
+        let mounted = true;
+        const closeListener = appWindow.onCloseRequested(async (event) => {
+            try {
+                await waitForThemeSave();
+            } catch {
+                event.preventDefault();
+            }
+        });
+
+        void closeListener
+            .catch((error) => console.error('Could not subscribe to settings close requests', error))
+            .then(() => {
+                if (mounted) return appWindow.show();
+            })
+            .catch((error) => console.error('Could not show the settings window', error));
+
+        return () => {
+            mounted = false;
+            void closeListener.then((unlisten) => unlisten(), () => {});
+        };
     }, []);
 
+    const closeSettings = async () => {
+        try {
+            await waitForThemeSave();
+        } catch {
+            return; // The theme picker reports the save error.
+        }
+        await appWindow.close();
+    };
+
     return (
-        <>
-            <Card
-                shadow='none'
-                className={`${
-                    transparent ? 'bg-background/90' : 'bg-content1'
-                } float-left w-[230px] h-screen rounded-none ${
-                    osType === 'Linux' && 'rounded-l-[10px] border-1'
-                } border-r-1 border-default-100 select-none cursor-default`}
-            >
-                <div className='h-[35px] p-[5px]'>
-                    <div
-                        className='w-full h-full'
-                        data-tauri-drag-region='true'
-                    />
-                </div>
-                <div className='p-[5px]'>
-                    <div data-tauri-drag-region='true'>
-                        <img
-                            alt='Snapshoot logo'
-                            src='icon.svg'
-                            className='h-[60px] w-[60px] m-auto mb-[30px]'
-                            draggable={false}
-                        />
-                    </div>
+        <div className='settings-shell' data-platform={osType}>
+            <aside className='settings-rail snap-glass'>
+                <div className='settings-top-space' data-tauri-drag-region='true' />
+                <div className='settings-brand' data-tauri-drag-region='true'>
+                    <img src='/icon.svg' draggable={false} alt='' />
+                    <strong>Snapshoot</strong>
                 </div>
                 <SideBar />
-            </Card>
-            <div
-                className={`bg-background ml-[230px] h-screen select-none cursor-default ${
-                    osType === 'Linux' && 'rounded-r-[10px] border-1 border-l-0 border-default-100'
-                }`}
-            >
-                <div
-                    data-tauri-drag-region='true'
-                    className='top-[5px] left-[235px] right-[5px] h-[30px] fixed'
-                />
-                <div className='h-[35px] flex justify-between'>
-                    <div className='flex'>
-                        <h2 className='m-auto ml-[10px]'>{t(`config.${location.pathname.slice(1)}.title`)}</h2>
+                {appVersion && <small className='settings-version'>Snapshoot <span>v{appVersion}</span></small>}
+            </aside>
+            <main className='settings-main'>
+                <div className='settings-titlebar' data-collapsed={collapsedPage === pageName} data-tauri-drag-region='true'>
+                    <span className='settings-compact-title' aria-hidden='true'>{title}</span>
+                    <CompactNavigation />
+                    {osType !== 'Darwin' && <WindowControl onClose={closeSettings} />}
+                </div>
+                <div key={pageName} ref={scrollArea} className='settings-scroll'>
+                    <div className='settings-content'>
+                        <h1 className='settings-heading' ref={heading}>{title}</h1>
+                        {page}
                     </div>
-
-                    <div className='flex'>{osType !== 'Darwin' && <WindowControl />}</div>
                 </div>
-                <Divider />
-                <div
-                    className={`p-[10px] overflow-y-auto ${
-                        osType === 'Linux' ? 'h-[calc(100vh-38px)]' : 'h-[calc(100vh-36px)]'
-                    }`}
-                >
-                    {page}
-                </div>
-            </div>
-        </>
+            </main>
+        </div>
     );
 }

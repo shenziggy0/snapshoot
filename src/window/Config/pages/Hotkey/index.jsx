@@ -1,5 +1,6 @@
 import { unregister, isRegistered } from '@tauri-apps/api/globalShortcut';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import Toaster from '../../../../components/Toaster';
 import { useTranslation } from 'react-i18next';
 import { CardBody } from '@nextui-org/react';
 import { Button } from '@nextui-org/react';

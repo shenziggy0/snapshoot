@@ -1,39 +1,39 @@
-import { VscChromeClose, VscChromeMinimize, VscChromeMaximize, VscChromeRestore } from 'react-icons/vsc';
+import { Copy, Minus, Square, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { appWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 import { Button } from '@nextui-org/react';
 
-import { osType } from '../../utils/env';
+import { useTranslation } from 'react-i18next';
 import './style.css';
 
-export default function WindowControl() {
+export default function WindowControl({ onClose = () => appWindow.close() }) {
+    const { t } = useTranslation();
     const [isMax, setIsMax] = useState(false);
 
     useEffect(() => {
-        listen('tauri://resize', async () => {
-            if (await appWindow.isMaximized()) {
-                setIsMax(true);
-            } else {
-                setIsMax(false);
-            }
-        });
+        const update = () => appWindow.isMaximized().then(setIsMax);
+        void update();
+        const listener = listen('tauri://resize', update);
+        return () => { listener.then((unlisten) => unlisten()); };
     }, []);
 
     return (
-        <div>
+        <div className='snap-window-controls'>
             <Button
                 isIconOnly
                 variant='light'
-                className='w-[35px] h-[35px] rounded-none'
+                className='window-action'
+                aria-label={t('common.minimize')}
                 onPress={() => appWindow.minimize()}
             >
-                <VscChromeMinimize className='text-[16px]' />
+                <Minus size={16} />
             </Button>
             <Button
                 isIconOnly
                 variant='light'
-                className='w-[35px] h-[35px] rounded-none'
+                className='window-action'
+                aria-label={t(isMax ? 'common.restore_window' : 'common.maximize')}
                 onPress={() => {
                     if (isMax) {
                         appWindow.unmaximize();
@@ -42,15 +42,16 @@ export default function WindowControl() {
                     }
                 }}
             >
-                {isMax ? <VscChromeRestore className='text-[16px]' /> : <VscChromeMaximize className='text-[16px]' />}
+                {isMax ? <Copy size={16} /> : <Square size={16} />}
             </Button>
             <Button
                 isIconOnly
                 variant='light'
-                className={`w-[35px] h-[35px] rounded-none close-button ${osType === 'Linux' && 'rounded-tr-[10px]'}`}
-                onPress={() => appWindow.close()}
+                className='window-action close-button'
+                aria-label={t('annotate.close')}
+                onPress={onClose}
             >
-                <VscChromeClose className='text-[16px]' />
+                <X size={16} />
             </Button>
         </div>
     );

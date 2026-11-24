@@ -1,9 +1,8 @@
+import { Languages, RotateCw } from 'lucide-react';
 import { Dropdown, DropdownItem, DropdownMenu, DropdownTrigger, Button } from '@nextui-org/react';
 import { atom, useAtom, useSetAtom, useAtomValue } from 'jotai';
 import { fetch, Body } from '@tauri-apps/api/http';
 import { useTranslation } from 'react-i18next';
-import { HiTranslate } from 'react-icons/hi';
-import { GiCycle } from 'react-icons/gi';
 import React, { useEffect } from 'react';
 import { nanoid } from 'nanoid';
 import * as builtinService from '../../../services/recognize';
@@ -51,7 +50,7 @@ export default function ControlArea(props) {
     }, [serviceInstanceList, recognizeLanguage]);
 
     return (
-        <div className='flex justify-between px-[12px] h-full'>
+        <div className='ocr-actions snap-glass'>
             {currentServiceInstanceKey && (
                 <Dropdown>
                     <DropdownTrigger>
@@ -151,7 +150,7 @@ export default function ControlArea(props) {
                 color='secondary'
                 size='sm'
                 className='my-auto'
-                startContent={<GiCycle className='text-[16px]' />}
+                startContent={<RotateCw size={16} />}
                 onPress={() => {
                     setRecognizeFlag(nanoid());
                 }}
@@ -163,7 +162,7 @@ export default function ControlArea(props) {
                 color='primary'
                 size='sm'
                 className='my-auto'
-                startContent={<HiTranslate className='text-[16px]' />}
+                startContent={<Languages size={16} />}
                 onPress={async () => {
                     if (text) {
                         void fetch(`http://127.0.0.1:${serverPort}/translate`, {

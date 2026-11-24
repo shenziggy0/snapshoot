@@ -162,11 +162,20 @@ fn build_window(label: &str, title: &str) -> (Window, bool) {
 }
 
 pub fn config_window() {
-    let (window, _exists) = build_window("config", "Snapshoot");
+    let (window, exists) = build_window("config", "Snapshoot");
+    if exists {
+        return;
+    }
     window
-        .set_min_size(Some(tauri::LogicalSize::new(800, 400)))
+        .set_min_size(Some(tauri::LogicalSize::new(375, 360)))
         .unwrap();
-    window.set_size(tauri::LogicalSize::new(800, 600)).unwrap();
+    let mut size = tauri::LogicalSize::new(920.0, 660.0);
+    if let Ok(Some(monitor)) = window.current_monitor() {
+        let screen = monitor.size().to_logical::<f64>(monitor.scale_factor());
+        size.width = (screen.width - 24.0).clamp(375.0, size.width);
+        size.height = (screen.height - 72.0).clamp(360.0, size.height);
+    }
+    window.set_size(size).unwrap();
     window.center().unwrap();
 }
 
