@@ -1,44 +1,62 @@
 const { nextui } = require('@nextui-org/react');
+const plugin = require('tailwindcss/plugin');
 
 const blue = {
-    50: '#f0f6ff', 100: '#e4efff', 200: '#cbdfff', 300: '#9ec9ff', 400: '#65a8ff',
-    500: '#0865cf', 600: '#0658b4', 700: '#12468b', 800: '#193561', 900: '#14223d',
+    50: '#f3f7ff', 100: '#e8f0fe', 200: '#c8dafe', 300: '#a5c4fc', 400: '#88b3ff',
+    500: '#2f6feb', 600: '#2560d6', 700: '#204eab', 800: '#203451', 900: '#192c47',
 };
 const gray = {
-    50: '#f8f9fb', 100: '#eff0f4', 200: '#e0e2e9', 300: '#c9cbd5', 400: '#9295a3',
-    500: '#646774', 600: '#4a4d59', 700: '#343641', 800: '#24252e', 900: '#16171d',
+    50: '#fbfbfb', 100: '#f3f3f4', 200: '#ebebed', 300: '#d6d6da', 400: '#8e8e93',
+    500: '#65656b', 600: '#505056', 700: '#3c3c43', 800: '#29292d', 900: '#1d1d1f',
 };
 
-function semanticTheme(dark) {
-    const shades = (palette) => dark
+// Both the window CSS and the component library use the same surface and action colors.
+const light = {
+    paper: '#fbfbfb', panel: '#ffffff', well: '#f3f3f4', hover: '#ebebed',
+    text: '#1d1d1f', secondary: '#3c3c43', muted: '#65656b', faint: '#c2c2c7',
+    line: '#eaeaea', 'line-strong': '#d6d6da', accent: '#2f6feb', link: '#2560d6',
+    'accent-hover': '#2560d6', 'accent-soft': '#e8f0fe', focus: '#3b82f6',
+};
+const dark = {
+    paper: '#101011', panel: '#141416', well: '#222224', hover: '#29292d',
+    text: '#f0efed', secondary: '#cfcecc', muted: '#a3a3a8', faint: '#74747c',
+    line: '#2c2c2f', 'line-strong': '#414145', accent: '#3672d6', link: '#88b3ff',
+    'accent-hover': '#326ac6', 'accent-soft': '#203451', focus: '#88b3ff',
+};
+
+function semanticTheme(tokens, isDark) {
+    const shades = (palette) => isDark
         ? Object.fromEntries(Object.keys(palette).map((key, i) => [key, Object.values(palette).reverse()[i]]))
         : palette;
     return {
         colors: {
-            background: dark ? '#18191f' : '#f5f5f9',
-            foreground: dark ? '#f6f6fb' : '#20212a',
-            content1: dark ? '#26272e' : '#ffffff',
-            content2: dark ? '#33343d' : '#eceef4',
-            content3: dark ? '#41434d' : '#e1e4eb',
-            content4: dark ? '#51535f' : '#d5d8e2',
-            divider: dark ? '#444650' : '#dbdde5',
-            focus: dark ? '#83bdff' : blue[500],
-            default: { ...shades(gray), DEFAULT: dark ? '#3b3d48' : gray[200], foreground: dark ? '#fff' : gray[900] },
-            primary: { ...shades(blue), DEFAULT: dark ? '#87beff' : blue[500], foreground: dark ? '#102642' : '#fff' },
-            secondary: { DEFAULT: dark ? '#c3b8ff' : '#6453ab', foreground: dark ? '#231947' : '#fff' },
-            success: { DEFAULT: dark ? '#76d69c' : '#237c49', foreground: dark ? '#103520' : '#fff' },
-            warning: { DEFAULT: dark ? '#ffcb77' : '#92600c', foreground: dark ? '#372500' : '#fff' },
-            danger: { DEFAULT: dark ? '#ff9096' : '#b8293d', foreground: dark ? '#410c12' : '#fff' },
+            background: tokens.paper, foreground: tokens.text, content1: tokens.panel, content2: tokens.well,
+            content3: tokens.hover, content4: tokens['line-strong'], divider: tokens.line, focus: tokens.focus,
+            default: { ...shades(gray), DEFAULT: tokens.hover, foreground: tokens.text },
+            primary: { ...shades(blue), DEFAULT: tokens.accent, foreground: '#ffffff' },
+            secondary: { DEFAULT: isDark ? '#c3b8ff' : '#6453ab', foreground: isDark ? '#231947' : '#fff' },
+            success: { DEFAULT: isDark ? '#76d69c' : '#237c49', foreground: isDark ? '#103520' : '#fff' },
+            warning: { DEFAULT: isDark ? '#ffcb77' : '#92600c', foreground: isDark ? '#372500' : '#fff' },
+            danger: { DEFAULT: isDark ? '#ff9096' : '#b8293d', foreground: isDark ? '#410c12' : '#fff' },
         },
     };
 }
+
+const variables = (tokens) => Object.fromEntries(Object.entries(tokens).map(([key, value]) => [`--snap-${key}`, value]));
 
 module.exports = {
     content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}', './node_modules/@nextui-org/theme/dist/**/*.{js,ts,jsx,tsx}'],
     theme: { extend: { colors: { snap: blue, ink: gray } } },
     darkMode: 'class',
-    plugins: [nextui({
-        layout: { radius: { small: '10px', medium: '15px', large: '20px' } },
-        themes: { light: semanticTheme(false), dark: semanticTheme(true) },
-    })],
+    plugins: [
+        nextui({
+            layout: { radius: { small: '8px', medium: '10px', large: '12px' } },
+            themes: { light: semanticTheme(light, false), dark: semanticTheme(dark, true) },
+        }),
+        plugin(({ addBase }) => addBase({
+            ':root': variables(light),
+            '.dark': variables(dark),
+            '.snap-glass, [data-slot="content"]:has([role="menu"], [role="listbox"])': variables(light),
+        })),
+    ],
 };

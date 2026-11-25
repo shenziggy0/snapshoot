@@ -1,5 +1,5 @@
 import { useLocation, useNavigate, useRoutes } from 'react-router-dom';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect } from 'react';
 import { appWindow } from '@tauri-apps/api/window';
 import { useTranslation } from 'react-i18next';
 import WindowControl from '../../components/WindowControl';
@@ -16,18 +16,6 @@ export default function Config() {
     const page = useRoutes(routes);
     const pageName = location.pathname.slice(1) || 'general';
     const title = t([`config.${pageName}.title`, `config.${pageName}.label`]);
-    const scrollArea = useRef(null);
-    const heading = useRef(null);
-    const [collapsedPage, setCollapsedPage] = useState('');
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(([entry]) => {
-            setCollapsedPage(entry.isIntersecting ? '' : pageName);
-        }, { root: scrollArea.current, rootMargin: '-38px 0px 0px' });
-        observer.observe(heading.current);
-        return () => observer.disconnect();
-    }, [pageName]);
-
     useEffect(() => {
         let mounted = true;
         const closeListener = appWindow.onCloseRequested(async (event) => {
@@ -67,24 +55,22 @@ export default function Config() {
 
     return (
         <div className='settings-shell' data-platform={osType}>
-            <aside className='settings-rail snap-glass'>
+            <aside className='settings-rail'>
                 <div className='settings-top-space' data-tauri-drag-region='true' />
                 <div className='settings-brand' data-tauri-drag-region='true'>
                     <img src='/icon.svg' draggable={false} alt='' />
-                    <strong>Snapshoot</strong>
+                    <div><strong>Snapshoot</strong>{appVersion && <small className='settings-version'>v{appVersion}</small>}</div>
                 </div>
                 <SideBar />
-                {appVersion && <small className='settings-version'>Snapshoot <span>v{appVersion}</span></small>}
             </aside>
             <main className='settings-main'>
-                <div className='settings-titlebar' data-collapsed={collapsedPage === pageName} data-tauri-drag-region='true'>
-                    <span className='settings-compact-title' aria-hidden='true'>{title}</span>
+                <div className='settings-titlebar' data-tauri-drag-region='true'>
+                    <h1 className='settings-heading'>{title}</h1>
                     <CompactNavigation />
                     {osType !== 'Darwin' && <WindowControl onClose={closeSettings} />}
                 </div>
-                <div key={pageName} ref={scrollArea} className='settings-scroll'>
+                <div key={pageName} className='settings-scroll'>
                     <div className='settings-content'>
-                        <h1 className='settings-heading' ref={heading}>{title}</h1>
                         {page}
                     </div>
                 </div>

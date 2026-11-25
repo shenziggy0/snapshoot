@@ -1,4 +1,4 @@
-import { ArrowUpRight, Eye, EyeOff, ScanLine } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, History, Keyboard, MousePointer2, Scan, Video } from 'lucide-react';
 import AppearancePicker from './AppearancePicker';
 import { Link } from 'react-router-dom';
 import { enable, isEnabled, disable } from 'tauri-plugin-autostart-api';
@@ -37,6 +37,7 @@ export default function General() {
     const [serverPort, setServerPort] = useConfig('server_port', 60828);
     const [captureShortcut] = useConfig('hotkey_screenshot_annotate', osType === 'Darwin' ? 'Command+Shift+A' : 'F1');
     const [captureError, setCaptureError] = useState('');
+    const [startingCapture, setStartingCapture] = useState(false);
     const [showToken, setShowToken] = useState(false);
     const [serverToken] = useConfig('server_token', '');
     const [appLanguage, setAppLanguage] = useConfig('app_language', 'en');
@@ -92,28 +93,44 @@ export default function General() {
     return (
         <>
             <Toaster />
-            <button type='button' className='settings-shortcut w-full text-left' onClick={async () => {
-                setCaptureError('');
-                try {
-                    await invoke('start_capture', { mode: 'annotate' });
-                } catch (error) {
-                    setCaptureError(String(error));
-                }
-            }}>
-                <span className='settings-shortcut-name'>
-                    <strong><ScanLine className='mr-2 inline-block' size={21} aria-hidden='true' />{t('capture.start')}</strong>
-                    <span className='settings-keycaps'>
-                        {captureShortcut
-                            ? captureShortcut.split('+').map((key, index) => (
-                                <kbd key={index}>{osType === 'Darwin' ? MAC_KEYS[key] || key : key}</kbd>
-                            ))
-                            : t('config.shell.unassigned')}
-                    </span>
-                </span>
-                <span className='shortcut-viewfinder' aria-hidden='true'><i /><i /><i /><i /></span>
-                <span className='shortcut-link-arrow' aria-hidden='true'><ArrowUpRight size={16} /></span>
-            </button>
-            <Link to='/hotkey' className='mt-2 inline-block text-sm text-primary'>{t('capture.change_shortcut')}</Link>
+            <section className='capture-launcher' aria-labelledby='capture-title'>
+                <div className='launcher-body'>
+                    <div className='launcher-command'>
+                        <h2 id='capture-title'>{t('config.hotkey.screenshot_annotate')}</h2>
+                        <Link to='/hotkey' className='launcher-shortcut' title={t('capture.change_shortcut')} aria-label={t('capture.change_shortcut')}>
+                            <Keyboard size={15} />
+                            <span className='settings-keycaps'>
+                                {captureShortcut
+                                    ? captureShortcut.split('+').map((key, index) => (
+                                        <kbd key={index}>{osType === 'Darwin' ? MAC_KEYS[key] || key : key}</kbd>
+                                    ))
+                                    : t('config.shell.unassigned')}
+                            </span>
+                            <ChevronRight size={12} />
+                        </Link>
+                        <button type='button' className='launcher-start' disabled={startingCapture} onClick={async () => {
+                            setStartingCapture(true);
+                            setCaptureError('');
+                            try {
+                                await invoke('start_capture', { mode: 'annotate' });
+                            } catch (error) {
+                                setCaptureError(String(error));
+                            } finally {
+                                setStartingCapture(false);
+                            }
+                        }}>
+                            <Scan size={16} />{t('capture.start')}
+                        </button>
+                    </div>
+                    <div className='launcher-preview' aria-hidden='true'>
+                        <span className='launcher-selection'><i /><i /><i /><i /><MousePointer2 /></span>
+                    </div>
+                </div>
+                <div className='launcher-links'>
+                    <Link to='/record'><Video />{t('config.record.label')}<ChevronRight /></Link>
+                    <Link to='/recent'><History />{t('config.recent.label')}<ChevronRight /></Link>
+                </div>
+            </section>
             {captureError && (
                 <div role='alert' className='mt-2 flex flex-wrap items-center gap-2 text-sm text-danger'>
                     {t(captureError)}

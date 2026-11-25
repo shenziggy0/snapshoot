@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardBody, Select, SelectItem, Switch, Button, Input } from '@nextui-org/react';
+import { Video } from 'lucide-react';
 import { invoke } from '@tauri-apps/api';
 import { open } from '@tauri-apps/api/dialog';
 import { useTranslation } from 'react-i18next';
@@ -93,12 +94,14 @@ export default function Record() {
     };
     return (
         <Card>
-            <CardBody className='gap-4'>
+            <CardBody className='record-preferences'>
                 {support?.supported && (
-                    <div className='grid gap-2'>
+                    <div className='record-command'>
                         <div>
                             <Button
                                 color='primary'
+                                size='sm'
+                                startContent={<Video size={15} />}
                                 isLoading={starting}
                                 isDisabled={!settingsReady || Boolean(audioUnavailable) || starting}
                                 onPress={beginRecording}
@@ -106,10 +109,10 @@ export default function Record() {
                                 {t('config.record.begin')}
                             </Button>
                         </div>
-                        <p className='text-sm text-default-500'>
+                        <p className='text-xs text-default-600'>
                             {t('config.record.source_summary', { source: t(`config.record.${source}`) })}
                         </p>
-                        <p className='break-all text-sm text-default-500'>
+                        <p className='select-text break-all text-xs text-default-600'>
                             {t('config.record.destination_summary', {
                                 path: directory || support.save_dir || t('config.record.default_dir'),
                             })}
@@ -119,28 +122,30 @@ export default function Record() {
                 {support && !support.supported && (
                     <p className='text-sm text-default-500'>{t('screen_record.unsupported')}</p>
                 )}
-                {[
-                    ['resolution', resolution, setResolution, ['original', '1080p', '720p']],
-                    ['fps', fps, (v) => setFps(Number(v)), ['15', '30', '60']],
-                    ['quality', quality, setQuality, ['high', 'standard', 'small']],
-                ].map(([key, value, setValue, choices]) => (
-                    <Select
-                        key={key}
-                        label={t(`config.record.${key}`)}
-                        selectedKeys={value === null ? [] : [String(value)]}
-                        disallowEmptySelection
-                        onSelectionChange={(keys) => {
-                            const next = Array.from(keys)[0];
-                            if (next) setValue(next);
-                        }}
-                    >
-                        {choices.map((choice) => (
-                            <SelectItem key={choice}>
-                                {key === 'fps' ? `${choice} fps` : t(`config.record.${choice}`)}
-                            </SelectItem>
-                        ))}
-                    </Select>
-                ))}
+                <div className='record-format'>
+                    {[
+                        ['resolution', resolution, setResolution, ['original', '1080p', '720p']],
+                        ['fps', fps, (v) => setFps(Number(v)), ['15', '30', '60']],
+                        ['quality', quality, setQuality, ['high', 'standard', 'small']],
+                    ].map(([key, value, setValue, choices]) => (
+                        <Select
+                            key={key}
+                            label={t(`config.record.${key}`)}
+                            selectedKeys={value === null ? [] : [String(value)]}
+                            disallowEmptySelection
+                            onSelectionChange={(keys) => {
+                                const next = Array.from(keys)[0];
+                                if (next) setValue(next);
+                            }}
+                        >
+                            {choices.map((choice) => (
+                                <SelectItem key={choice}>
+                                    {key === 'fps' ? `${choice} fps` : t(`config.record.${choice}`)}
+                                </SelectItem>
+                            ))}
+                        </Select>
+                    ))}
+                </div>
                 <Switch
                     isSelected={cursor === true}
                     onValueChange={setCursor}

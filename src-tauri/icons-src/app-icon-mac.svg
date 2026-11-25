@@ -1,57 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="-24 -24 248 248">
   <title>Snapshoot</title>
   <defs>
-    <linearGradient id="rim" x2=".75" y2="1" gradientUnits="objectBoundingBox">
-      <stop stop-color="#eef8ff"/>
-      <stop offset=".36" stop-color="#bad5ec"/>
-      <stop offset=".62" stop-color="#f6fbff"/>
-      <stop offset="1" stop-color="#a7c5e2"/>
+    <linearGradient id="tile" x1="20" y1="0" x2="166" y2="196" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#588dff"/><stop offset=".46" stop-color="#2f6feb"/><stop offset="1" stop-color="#1847af"/>
     </linearGradient>
-    <linearGradient id="glass" x1="0" y1="0" x2="1" y2=".9">
-      <stop stop-color="#fff"/>
-      <stop offset=".48" stop-color="#f3f8fd"/>
-      <stop offset="1" stop-color="#deedfb"/>
+    <linearGradient id="selection" x2="1" y2="1">
+      <stop stop-color="#fff" stop-opacity=".23"/><stop offset="1" stop-color="#fff" stop-opacity=".04"/>
     </linearGradient>
-    <linearGradient id="brackets" x1="25" y1="34" x2="174" y2="169" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0b68d9"/>
-      <stop offset="1" stop-color="#074db3"/>
+    <linearGradient id="pointer" x2=".75" y2="1">
+      <stop stop-color="#fff"/><stop offset="1" stop-color="#d9e8ff"/>
     </linearGradient>
-    <linearGradient id="ridge" x1="46" y1="116" x2="114" y2="65" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0755c3"/>
-      <stop offset=".65" stop-color="#087ff1"/>
-      <stop offset="1" stop-color="#53c3ff"/>
-    </linearGradient>
-    <linearGradient id="shade" x1="55" y1="131" x2="111" y2="84" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0758c6"/>
-      <stop offset="1" stop-color="#083b96"/>
-    </linearGradient>
-    <linearGradient id="fold" x1="108" y1="87" x2="129" y2="123" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0969dc"/>
-      <stop offset="1" stop-color="#2ca4fc"/>
-    </linearGradient>
-    <linearGradient id="snow" x1="103" y1="78" x2="134" y2="103" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#75c6ff"/>
-      <stop offset=".52" stop-color="#c6efff"/>
-      <stop offset="1" stop-color="#80cfff"/>
-    </linearGradient>
-    <linearGradient id="foothill" x1="125" y1="109" x2="147" y2="138" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#084cb8"/>
-      <stop offset="1" stop-color="#0a84ef"/>
-    </linearGradient>
-    <path id="tile" d="M58 1H142C165 1 177 4 187 14S199 38 199 58V142C199 165 196 177 186 187S162 199 142 199H58C35 199 23 196 13 186S1 162 1 142V58C1 35 4 23 14 13S38 1 58 1Z"/>
   </defs>
-
-  <!-- A narrow polished rim keeps the ice-glass tile visible on a white desktop. -->
-  <use href="#tile" fill="url(#rim)" stroke="#bbcede" stroke-width=".65"/>
-  <use href="#tile" transform="translate(2.8 2.3) scale(.972)" fill="url(#glass)" stroke="#fafdff" stroke-width="1.5"/>
-
-  <!-- The two corners mark the selection. The facets are a captured alpine landscape. -->
-  <path d="M77 39H45Q31 39 31 53V77 M169 119V145Q169 160 154 160H121"
-        fill="none" stroke="url(#brackets)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
-  <path fill="url(#ridge)" d="M35 130L74 88L82 90L110 61L139 106L143 105L159 130Z"/>
-  <path fill="url(#shade)" d="M35 130L108 85L96 130Z"/>
-  <path fill="url(#fold)" d="M96 130L108 85L143 105Z"/>
-  <path fill="#def6ff" d="M110 61L108 85L94 94Z"/>
-  <path fill="url(#snow)" d="M110 61L139 106L108 85Z"/>
-  <path fill="url(#foothill)" d="M96 130L143 105L159 130Z"/>
+  <rect x="1" y="1" width="198" height="198" rx="47" fill="url(#tile)" stroke="#2154b9" stroke-width="1.3"/>
+  <rect x="3" y="3" width="194" height="194" rx="45" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="1.4"/>
+  <rect x="45" y="46" width="108" height="103" rx="11" fill="url(#selection)"/>
+  <path d="M46 75V58Q46 46 58 46H78 M119 46H138Q151 46 151 59V74 M46 117V135Q46 148 59 148H77"
+        fill="none" stroke="#fff" stroke-width="13" stroke-linecap="round"/>
+  <path d="M94 90Q92 85 97 87L162 114Q169 117 162 120L139 129L155 150Q157 153 154 156L148 161Q145 163 142 160L126 139L114 158Q111 163 109 157Z"
+        fill="#103c9b" opacity=".44" transform="translate(0 3)"/>
+  <path d="M94 90Q92 85 97 87L162 114Q169 117 162 120L139 129L155 150Q157 153 154 156L148 161Q145 163 142 160L126 139L114 158Q111 163 109 157Z" fill="url(#pointer)"/>
 </svg>

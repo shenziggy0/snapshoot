@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Tab, Tabs } from '@nextui-org/react';
+import { Link } from 'react-router-dom';
+import { Images, Video } from 'lucide-react';
 import { invoke } from '@tauri-apps/api';
 import { listen } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
@@ -53,11 +55,11 @@ function ScreenshotTile({ item, selected, checked, onSelect, onCheck, onError })
     const description = `${item.width} × ${item.height} · ${date}`;
     return (
         <li
-            className={`overflow-hidden rounded-xl border bg-content1 ${selected ? 'border-primary' : 'border-divider'}`}
+            className='recent-tile' data-selected={selected}
         >
             <button
                 type='button'
-                className='relative flex h-24 w-full cursor-grab items-center justify-center bg-default-100 [&_img]:max-h-full [&_img]:max-w-full'
+                className='recent-preview'
                 title={t('quick_access.drag_label')}
                 aria-label={description}
                 aria-pressed={selected}
@@ -66,13 +68,13 @@ function ScreenshotTile({ item, selected, checked, onSelect, onCheck, onError })
             >
                 <CaptureThumb item={item} />
             </button>
-            <label className='flex items-center gap-2 p-2 text-xs'>
+            <label className='recent-caption'>
                 <input
                     type='checkbox'
                     checked={checked}
                     onChange={onCheck}
                 />
-                {description}
+                <span><strong>{item.width} × {item.height}</strong><time>{date}</time></span>
             </label>
         </li>
     );
@@ -103,7 +105,9 @@ function Screenshots({ reportError }) {
 
     if (loading) return <p role='status'>{t('recent.loading')}</p>;
     if (error) return <p role='alert'>{t(error)}</p>;
-    if (!current) return <p>{t('quick_access.empty_hint')}</p>;
+    if (!current) return (
+        <div className='recent-empty'><Images /><p>{t('quick_access.empty_hint')}</p><Link to='/general'>{t('config.hotkey.screenshot_annotate')}</Link></div>
+    );
     return (
         <div className='grid gap-4'>
             <div
@@ -149,7 +153,7 @@ function Screenshots({ reportError }) {
                     {t('recent.tutorial')}
                 </Button>
             </div>
-            <ul className='grid grid-cols-[repeat(auto-fill,minmax(125px,1fr))] gap-3'>
+            <ul className='recent-gallery'>
                 {items.map((item) => (
                     <ScreenshotTile
                         key={item.id}
@@ -192,7 +196,9 @@ function Recordings({ reportError }) {
     if (loading) return <p role='status'>{t('recent.loading')}</p>;
     if (error) return <p role='alert'>{t(error)}</p>;
     const visible = items.filter(({ id }) => !forgotten.includes(id));
-    if (!visible.length) return <p>{t('record_history.empty')}</p>;
+    if (!visible.length) return (
+        <div className='recent-empty'><Video /><p>{t('record_history.empty')}</p><Link to='/record'>{t('config.record.label')}</Link></div>
+    );
     return (
         <ul className='grid gap-2'>
             {visible.map((item) => (
@@ -200,7 +206,7 @@ function Recordings({ reportError }) {
                     key={item.id}
                     className='grid gap-2 rounded-xl border border-divider bg-content1 p-3'
                 >
-                    <strong className='break-all text-sm'>{item.path.split(/[\\/]/).pop()}</strong>
+                    <strong className='select-text break-all text-sm' title={item.path}>{item.path.split(/[\\/]/).pop()}</strong>
                     <span className='text-xs text-default-600'>
                         {new Date(item.createdAt).toLocaleString()} · {item.width} × {item.height} ·{' '}
                         {(item.durationMs / 1000).toFixed(1)} s

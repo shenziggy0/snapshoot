@@ -142,7 +142,7 @@ export default function QuickAccess() {
         <div className='quick-window'>
             <Toaster />
             <section
-                className='quick-card snap-glass'
+                className='quick-card'
                 onMouseEnter={() => {
                     hovering.current = true;
                     clearTimeout(hideTimer.current);
@@ -163,7 +163,7 @@ export default function QuickAccess() {
                 }}
             >
                 <header
-                    className='quick-heading'
+                    className='quick-heading snap-glass'
                     data-tauri-drag-region='true'
                 >
                     <span
@@ -244,7 +244,7 @@ export default function QuickAccess() {
                                 {current.width} × {current.height}
                             </span>
                         </DragCaptureButton>
-                        <div className='quick-actions'>
+                        <div className='quick-actions snap-glass'>
                             {captureActions.map(([action, key, Icon]) => (
                                 <button
                                     type='button'
