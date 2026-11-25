@@ -13,6 +13,7 @@ import { flushSync } from 'react-dom';
 
 import { drawShape } from '../Annotate/render';
 import { translateOnce } from '../../utils/translate_once';
+import { loadCaptureImage } from '../../utils/captureImage';
 import { useToastStyle } from '../../hooks';
 import { osType } from '../../utils/env';
 import { useTheme } from 'next-themes';
@@ -30,39 +31,6 @@ function normalize(rect) {
     const x = rect.w < 0 ? rect.x + rect.w : rect.x;
     const y = rect.h < 0 ? rect.y + rect.h : rect.y;
     return { x, y, w: Math.abs(rect.w), h: Math.abs(rect.h) };
-}
-
-function loadHtmlImage(src, withCors = false) {
-    return new Promise((resolve, reject) => {
-        const image = new Image();
-        if (withCors) {
-            // The asset response allows the webview origin. Requesting CORS
-            // keeps the canvas untainted so copy/save can still export it.
-            image.crossOrigin = 'anonymous';
-        }
-        image.onload = () => resolve(image);
-        image.onerror = () => reject(new Error('decode'));
-        image.src = src;
-    });
-}
-
-async function loadCaptureImage(src) {
-    try {
-        return await loadHtmlImage(src, true);
-    } catch (corsError) {
-        // Some WKWebView versions do not apply CORS to custom schemes. Fetching
-        // the same local asset and decoding a blob keeps the canvas exportable.
-        const response = await fetch(src);
-        if (!response.ok) {
-            throw corsError;
-        }
-        const url = URL.createObjectURL(await response.blob());
-        try {
-            return await loadHtmlImage(url);
-        } finally {
-            URL.revokeObjectURL(url);
-        }
-    }
 }
 
 function handleStyle(handle, rect) {
@@ -135,9 +103,15 @@ export default function Screenshot() {
     const layoutRef = useRef(null);
     const framesRef = useRef([]);
     const originRef = useRef({ x: 0, y: 0 });
+    const displayRef = useRef(null);
+    const prefilledRef = useRef(null);
     const bootSeqRef = useRef(0);
     const inlineRequestRef = useRef(0);
+    const finishBusyRef = useRef(false);
     const redactPendingRef = useRef(false);
+    const redactRequestRef = useRef(0);
+    const redactPreviewRef = useRef(null);
+    const redactCopyingRef = useRef(false);
     const colorRef = useRef('#e11d48');
     const strokeRef = useRef(4);
     const fontRef = useRef(24);
@@ -172,6 +146,8 @@ export default function Screenshot() {
     const [loadError, setLoadError] = useState('');
     const [inlineTranslation, setInlineTranslation] = useState(null);
     const [redactPending, setRedactPending] = useState(false);
+    const [redactPreview, setRedactPreview] = useState(null);
+    const [redactCopying, setRedactCopying] = useState(false);
     const [cursor, setCursor] = useState({ x: 0, y: 0 });
     const [loupe, setLoupe] = useState(null);
     const [toolbarSize, setToolbarSize] = useState({ w: 566, h: 72 });
@@ -222,7 +198,22 @@ export default function Screenshot() {
     };
 
     const commitShape = (shape) => {
+        if (redactPreviewRef.current && shape.type === 'mosaic') {
+            const pixels = normalize(shape);
+            if (pixels.w < 2 || pixels.h < 2) return;
+            updateRedactPreview([...redactPreviewRef.current, {
+                ...shape, ...pixels,
+                block: Math.max(12, Math.ceil(Math.min(pixels.w, pixels.h))),
+                enabled: true,
+            }]);
+            return;
+        }
         publish([...shapesRef.current, shape], []);
+    };
+
+    const updateRedactPreview = (items) => {
+        redactPreviewRef.current = items;
+        setRedactPreview(items);
     };
 
     const paint = () => {
@@ -236,6 +227,9 @@ export default function Screenshot() {
         ctx.drawImage(current, 0, 0);
         for (const shape of shapesRef.current) {
             drawShape(ctx, shape, false);
+        }
+        for (const shape of redactPreviewRef.current || []) {
+            if (shape.enabled) drawShape(ctx, shape, false);
         }
         if (draft) {
             drawShape(ctx, draft, true);
@@ -276,8 +270,15 @@ export default function Screenshot() {
         setLoadError('');
         setInlineTranslation(null);
         inlineRequestRef.current += 1;
+        finishBusyRef.current = false;
+        redactRequestRef.current += 1;
         redactPendingRef.current = false;
+        redactCopyingRef.current = false;
         setRedactPending(false);
+        setRedactCopying(false);
+        updateRedactPreview(null);
+        displayRef.current = null;
+        prefilledRef.current = null;
         setSelection(null);
         setHover(null);
         setTool('');
@@ -334,14 +335,19 @@ export default function Screenshot() {
                 return;
             }
             imageRef.current = next;
+            if (payload.display?.width === next.naturalWidth && payload.display.height === next.naturalHeight) {
+                displayRef.current = payload.display;
+                prefilledRef.current = payload.selection || null;
+            }
             const placed = placeImage(next, intentRef.current);
+            const initialSelection = placed.selection || projectSelection(prefilledRef.current, next, placed.layout);
             layoutRef.current = placed.layout;
             flushSync(() => {
                 setLayout(placed.layout);
                 setImage(next);
-                if (placed.selection) {
-                    selectionRef.current = placed.selection;
-                    setSelection(placed.selection);
+                if (initialSelection) {
+                    selectionRef.current = initialSelection;
+                    setSelection(initialSelection);
                 }
             });
             paint();
@@ -366,6 +372,21 @@ export default function Screenshot() {
             }
         }
     };
+
+    useEffect(() => {
+        const fitPrefill = () => {
+            const current = imageRef.current;
+            if (!current || !prefilledRef.current) return;
+            const { layout: fitted } = placeImage(current, intentRef.current);
+            const next = projectSelection(prefilledRef.current, current, fitted);
+            layoutRef.current = fitted;
+            selectionRef.current = next;
+            setLayout(fitted);
+            setSelection(next);
+        };
+        window.addEventListener('resize', fitPrefill);
+        return () => window.removeEventListener('resize', fitPrefill);
+    }, []);
 
     useEffect(() => {
         let cancel = false;
@@ -825,10 +846,15 @@ export default function Screenshot() {
         }
     };
 
-    const recordHistory = (data, action) => {
-        void invoke('capture_history_add', { data, action, showQuick: true }).catch((error) => {
+    const recordHistory = async (data, action, region) => {
+        try {
+            await invoke('capture_history_add', { data, action, showQuick: true, region });
+            return true;
+        } catch (error) {
             console.error('capture history failed', error);
-        });
+            toast.error(t('quick_access.history_failed'), { style: toastStyle });
+            return false;
+        }
     };
 
     const closeCapture = () => {
@@ -837,25 +863,31 @@ export default function Screenshot() {
         return invoke('hide_screenshot_window');
     };
 
-    const finish = async (action, rect) => {
-        if (longCaptureBusyRef.current) return;
+    const finish = async (action, rect, confirmedRedaction = false) => {
+        if (longCaptureBusyRef.current || finishBusyRef.current) return;
         if (longCaptureRef.current) {
             await finishLongCapture();
             return;
         }
-        if (redactPendingRef.current) {
+        if (redactPendingRef.current || (redactPreviewRef.current && !confirmedRedaction)) {
             return;
         }
-        const data = exportBase64(rect || selectionRef.current);
+        const chosen = rect || selectionRef.current;
+        const pixels = selectionImageRect(chosen);
+        const display = displayRef.current;
+        const historyRegion = display && pixels ? { display, pixels } : null;
+        const data = exportBase64(chosen);
         if (!data) {
             return;
         }
+        const capture = bootSeqRef.current;
+        finishBusyRef.current = true;
         inlineRequestRef.current += 1;
         setInlineTranslation(null);
         try {
             if (action === 'copy') {
                 await invoke('copy_png_base64', { data });
-                recordHistory(data, 'copy');
+                if (!(await recordHistory(data, 'copy', historyRegion))) return;
             } else if (action === 'save') {
                 const path = await save({
                     defaultPath: 'snapshoot-screenshot.png',
@@ -865,20 +897,23 @@ export default function Screenshot() {
                     return;
                 }
                 await invoke('save_png_base64', { path, data });
-                recordHistory(data, 'save');
-                toast.success(t('annotate.saved'), { style: toastStyle });
+                if (await recordHistory(data, 'save', historyRegion)) {
+                    toast.success(t('annotate.saved'), { style: toastStyle });
+                }
                 return;
             } else if (action === 'pin') {
                 await invoke('pin_png_base64', { data });
-                recordHistory(data, 'pin');
+                if (!(await recordHistory(data, 'pin', historyRegion))) return;
             } else if (action === 'ocr') {
                 await invoke('open_ocr_from_png_base64', { data });
             } else if (action === 'translate') {
                 await invoke('open_translate_from_png_base64', { data });
             }
-            await invoke('hide_screenshot_window');
+            if (capture === bootSeqRef.current) await invoke('hide_screenshot_window');
         } catch (error) {
             toast.error(String(error), { style: toastStyle });
+        } finally {
+            if (capture === bootSeqRef.current) finishBusyRef.current = false;
         }
     };
 
@@ -949,44 +984,78 @@ export default function Screenshot() {
     const redactSensitive = async () => {
         const current = selectionRef.current;
         const region = selectionImageRect(current);
-        if (!region || redactPendingRef.current) {
+        if (!region || redactPendingRef.current || redactPreviewRef.current) {
             return;
         }
-        const capture = bootSeqRef.current;
+        const request = ++redactRequestRef.current;
+        prefilledRef.current = null;
         inlineRequestRef.current += 1;
         setInlineTranslation(null);
         redactPendingRef.current = true;
         setRedactPending(true);
+        updateRedactPreview([]);
         try {
             const data = exportBase64(current);
             const layout = await invoke('system_ocr_layout', { data });
-            if (capture !== bootSeqRef.current) {
+            if (request !== redactRequestRef.current) {
                 return;
             }
             const redactions = (layout.lines || [])
                 .filter((line) => sensitiveLine(line.text))
-                .map((line) => ({
-                    type: 'mosaic',
-                    x: region.x + line.x - 2,
-                    y: region.y + line.y - 2,
-                    w: line.width + 4,
-                    h: line.height + 4,
-                    block: Math.max(8, Math.round(line.height / 2)),
-                }));
+                .map((line) => {
+                    const left = clamp(Math.floor(line.x) - 2, 0, region.width);
+                    const top = clamp(Math.floor(line.y) - 2, 0, region.height);
+                    const right = clamp(Math.ceil(line.x + line.width) + 2, left, region.width);
+                    const bottom = clamp(Math.ceil(line.y + line.height) + 2, top, region.height);
+                    return {
+                        type: 'mosaic',
+                        x: region.x + left, y: region.y + top,
+                        w: right - left, h: bottom - top,
+                        block: Math.max(12, Math.ceil(line.height)),
+                        enabled: true,
+                    };
+                })
+                .filter(({ w, h }) => w >= 2 && h >= 2);
             if (redactions.length === 0) {
                 toast(t('annotate.no_sensitive'), { style: toastStyle });
-                return;
             }
-            publish([...shapesRef.current, ...redactions], []);
-            toast.success(t('annotate.redacted', { count: redactions.length }), { style: toastStyle });
+            updateRedactPreview(redactions);
         } catch (error) {
-            if (capture === bootSeqRef.current) {
-                toast.error(String(error), { style: toastStyle });
+            if (request === redactRequestRef.current) {
+                console.error('redaction OCR failed', error);
+                toast.error(t('annotate.redact_failed'), { style: toastStyle });
             }
         } finally {
-            if (capture === bootSeqRef.current) {
+            if (request === redactRequestRef.current) {
                 redactPendingRef.current = false;
                 setRedactPending(false);
+            }
+        }
+    };
+
+    const cancelRedaction = () => {
+        if (redactCopyingRef.current) return;
+        redactRequestRef.current += 1;
+        redactPendingRef.current = false;
+        setRedactPending(false);
+        dragRef.current = null;
+        draftRef.current = null;
+        setDraft(null);
+        updateRedactPreview(null);
+    };
+
+    const confirmRedaction = async () => {
+        if (redactCopyingRef.current || redactPendingRef.current || draftRef.current ||
+            !redactPreviewRef.current?.some((shape) => shape.enabled)) return;
+        const request = redactRequestRef.current;
+        redactCopyingRef.current = true;
+        setRedactCopying(true);
+        try {
+            await finish('copy', undefined, true);
+        } finally {
+            if (request === redactRequestRef.current) {
+                redactCopyingRef.current = false;
+                setRedactCopying(false);
             }
         }
     };
@@ -1008,6 +1077,16 @@ export default function Screenshot() {
                 return;
             }
             if (document.activeElement?.tagName === 'INPUT') {
+                return;
+            }
+            if (redactPreviewRef.current) {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    cancelRedaction();
+                } else if (event.key === 'Enter' && document.activeElement?.tagName !== 'BUTTON') {
+                    event.preventDefault();
+                    await confirmRedaction();
+                }
                 return;
             }
             if (event.key === 'Enter' && selectionRef.current) {
@@ -1035,6 +1114,7 @@ export default function Screenshot() {
                 }
             } else if (event.key.startsWith('Arrow') && selectionRef.current) {
                 event.preventDefault();
+                prefilledRef.current = null;
                 const step = event.shiftKey ? 10 : 1;
                 const delta = {
                     ArrowLeft: [-step, 0],
@@ -1085,11 +1165,12 @@ export default function Screenshot() {
     };
 
     const startDraw = (event) => {
-        if (event.button !== 0) {
+        if (event.button !== 0 || redactPendingRef.current || redactCopyingRef.current) {
             return;
         }
+        prefilledRef.current = null;
         event.stopPropagation();
-        const active = toolRef.current;
+        const active = redactPreviewRef.current ? 'mosaic' : toolRef.current;
         const point = imagePoint(event.clientX, event.clientY);
         if (!active) {
             dragRef.current = {
@@ -1150,6 +1231,12 @@ export default function Screenshot() {
             return;
         }
         const point = imagePoint(event.clientX, event.clientY);
+        if (redactPreviewRef.current) {
+            const region = selectionImageRect(selectionRef.current);
+            if (!region) return;
+            point.x = clamp(point.x, region.x, region.x + region.width);
+            point.y = clamp(point.y, region.y, region.y + region.height);
+        }
         let next = currentDraft;
         if (currentDraft.type === 'pen' || currentDraft.type === 'highlighter') {
             next = { ...currentDraft, points: [...currentDraft.points, point] };
@@ -1201,6 +1288,7 @@ export default function Screenshot() {
     };
 
     const editing = Boolean(selection) && intentRef.current !== 'ocr' && intentRef.current !== 'translate';
+    const redactRegion = redactPreview && selection ? selectionImageRect(selection) : null;
 
     useLayoutEffect(() => {
         const toolbar = toolbarRef.current;
@@ -1406,19 +1494,20 @@ export default function Screenshot() {
             )}
             {selection && editing && !longCaptureActive && !recordActive && (
                 <div
-                    className='absolute z-30'
+                    className={`absolute z-30 ${redactPreview ? 'cursor-crosshair overflow-hidden' : ''}`}
                     style={{ left: selection.x, top: selection.y, width: selection.w, height: selection.h }}
                     onMouseDown={startDraw}
                     onMouseMove={onDrawMove}
                     onMouseUp={onDrawUp}
                 >
-                    {HANDLES.map((handle) => (
+                    {!redactPreview && HANDLES.map((handle) => (
                         <div
                             key={handle}
                             className='absolute z-40 capture-handle'
                             style={handleStyle(handle, { x: 0, y: 0, w: selection.w, h: selection.h })}
                             onMouseDown={(event) => {
                                 event.stopPropagation();
+                                prefilledRef.current = null;
                                 dragRef.current = {
                                     kind: 'resize',
                                     handle,
@@ -1429,7 +1518,29 @@ export default function Screenshot() {
                             }}
                         />
                     ))}
-                    {textDraft && (
+                    {redactRegion && redactPreview.map((shape, index) => (
+                        <button
+                            type='button'
+                            key={index}
+                            aria-label={t('annotate.redact_toggle', { index: index + 1 })}
+                            aria-pressed={shape.enabled}
+                            className={`absolute z-40 cursor-pointer border-2 focus-visible:outline focus-visible:outline-white ${
+                                shape.enabled ? 'border-sky-400' : 'border-dashed border-white/90'
+                            }`}
+                            style={{
+                                left: `${(shape.x - redactRegion.x) / redactRegion.width * 100}%`,
+                                top: `${(shape.y - redactRegion.y) / redactRegion.height * 100}%`,
+                                width: `${shape.w / redactRegion.width * 100}%`,
+                                height: `${shape.h / redactRegion.height * 100}%`,
+                            }}
+                            disabled={redactCopying}
+                            onMouseDown={(event) => event.stopPropagation()}
+                            onClick={() => updateRedactPreview(redactPreview.map((candidate, position) =>
+                                position === index ? { ...candidate, enabled: !candidate.enabled } : candidate
+                            ))}
+                        />
+                    ))}
+                    {!redactPreview && textDraft && (
                         <input
                             autoFocus
                             value={textDraft.value}
@@ -1486,6 +1597,24 @@ export default function Screenshot() {
                             onStop={() => recordAction('stop')}
                             onCancel={() => recordAction('cancel')}
                         />
+                    ) : redactPreview ? (
+                        <div className='snap-tools snap-tools-row snap-glass items-center gap-2 px-2' onMouseDown={(event) => event.stopPropagation()}>
+                            <span className='max-w-[200px] text-[11px]' role='status'>
+                                {t(redactPending ? 'annotate.redacting' : 'annotate.redact_hint')}
+                            </span>
+                            <button
+                                type='button'
+                                className='snap-tool snap-tool-primary'
+                                disabled={redactPending || redactCopying || Boolean(draft) || !redactPreview.some((shape) => shape.enabled)}
+                                onClick={confirmRedaction}
+                            >
+                                <Copy size={16} />
+                                {t('annotate.redact_copy')}
+                            </button>
+                            <button type='button' className='snap-tool' disabled={redactCopying} onClick={cancelRedaction}>
+                                {t('common.cancel')}
+                            </button>
+                        </div>
                     ) : (
                         <CaptureToolbar
                             tool={tool}
@@ -1664,5 +1793,17 @@ function placeImage(image, intent) {
     return {
         layout: { left, top, width, height },
         selection: { x: left, y: top, w: width, h: height },
+    };
+}
+
+function projectSelection(pixels, image, layout) {
+    if (!pixels) return null;
+    const scaleX = layout.width / image.naturalWidth;
+    const scaleY = layout.height / image.naturalHeight;
+    return {
+        x: layout.left + pixels.x * scaleX,
+        y: layout.top + pixels.y * scaleY,
+        w: pixels.width * scaleX,
+        h: pixels.height * scaleY,
     };
 }

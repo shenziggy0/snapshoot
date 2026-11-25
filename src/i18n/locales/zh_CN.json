@@ -1,5 +1,45 @@
 {
     "translation": {
+        "capture": {
+            "start": "开始截图",
+            "change_shortcut": "修改快捷键",
+            "busy": "正在准备截图或处理录制，请稍后再试。",
+            "invalid_mode": "无法识别截图模式。",
+            "settings_unavailable": "此系统没有对应的权限设置入口。",
+            "open_settings": "打开系统设置"
+        },
+        "recent": {
+            "screenshots": "截图",
+            "translations": "翻译",
+            "loading": "正在读取最近使用记录…",
+            "recapture": "重截同一区域",
+            "compare": "前后对比",
+            "tutorial": "制作多图教程",
+            "screenshot_actions": "截图操作",
+            "before": "改前",
+            "after": "改后",
+            "side_by_side": "并排对比",
+            "slider_mode": "滑块对比",
+            "export_png": "导出 PNG",
+            "tutorial_hint": "用上下箭头调整顺序，点图放置步骤编号。",
+            "step": "第 {{number}} 步",
+            "mark_step": "标记第 {{number}} 步",
+            "move_up": "上移",
+            "move_down": "下移",
+            "remove_step": "移除此步",
+            "capture_missing": "截图文件已移动或删除。",
+            "output_too_large": "图片太大，请减少选图或缩小截图。"
+        },
+        "record_history": {
+            "empty": "还没有录屏记录。",
+            "file_missing": "文件已移动或删除。",
+            "open": "播放",
+            "open_failed": "无法打开此录像。",
+            "copy": "复制文件",
+            "forget": "移除记录",
+            "write_failed": "录像已保存，但未加入最近使用。",
+            "invalid_action": "无法识别录像操作。"
+        },
         "common": {
             "pin_window": "窗口置顶",
             "minimize": "最小化",
@@ -48,6 +88,9 @@
             "he": "希伯来语"
         },
         "config": {
+            "recent": {
+                "label": "最近使用"
+            },
             "shell": {
                 "settings": "设置",
                 "workspace": "工作区",
@@ -235,6 +278,15 @@
                 "credit": "基于 Pot（pot-app/pot-desktop），GPL-3.0"
             },
             "record": {
+                "begin": "选择区域并开始录制",
+                "source_summary": "本次音源：{{source}}",
+                "destination_summary": "保存位置：{{path}}",
+                "no_audio": "无声音",
+                "system_source": "系统声音",
+                "microphone_source": "麦克风",
+                "both_sources": "系统声音和麦克风",
+                "microphone_independent": "录制麦克风",
+                "audio_unavailable": "选定的音源当前不可用，请调整音源或检查系统权限。",
                 "label": "录屏",
                 "resolution": "分辨率",
                 "original": "原始尺寸（最长边 4096 像素）",
@@ -516,6 +568,18 @@
             "inline_empty_result": "翻译服务未返回文本译文。"
         },
         "recognize": {
+            "locate_lines": "定位原图文字",
+            "reset_image_zoom": "查看整图",
+            "note_title": "截图笔记",
+            "note_source": "来源（选填）",
+            "note_translate": "生成译文",
+            "note_translation": "译文",
+            "note_export_html": "导出 HTML",
+            "note_copy_markdown": "复制 Markdown",
+            "note_saved": "笔记已保存",
+            "note_copied": "已复制 Markdown",
+            "note_html_extension": "请选择以 .html 结尾的文件名",
+            "language_unsupported": "当前识别服务不支持所选语言。",
             "original_image": "原始截图",
             "result": "识别结果",
             "recognize": "重新识别",
@@ -526,6 +590,12 @@
             "delete_space": "删除空格"
         },
         "annotate": {
+            "redact_preview": "确认打码",
+            "redact_manual": "手工补遮",
+            "redact_failed": "自动识别失败，可手工补遮。",
+            "redact_toggle": "遮盖区域 {{index}}",
+            "redact_copy": "打码后复制",
+            "redact_hint": "点击遮盖框可取消，拖动空白区域可补遮。",
             "title": "截图标注",
             "rect": "矩形",
             "ellipse": "椭圆",
@@ -601,6 +671,7 @@
             "load_failed": "无法显示这张贴图。"
         },
         "screen_record": {
+            "audio_unavailable": "选定的音源当前不可用，请调整音源或检查系统权限。",
             "label": "区域录屏",
             "start": "开始录制",
             "pause": "暂停",
@@ -625,6 +696,11 @@
             "clipboard_failed": "视频已保存，但未能复制到剪贴板。"
         },
         "quick_access": {
+            "history_failed": "操作已完成，但截图未加入最近使用。",
+            "recapture_unavailable": "显示器或缩放已变化，请重新框选截图。",
+            "drag_failed": "未能开始拖放，请按住截图缩略图再拖动。",
+            "drag_unsupported": "当前系统不支持拖出文件。",
+            "drag_label": "拖出截图文件",
             "history": "截图历史",
             "recent": "最近截图",
             "empty": "暂无截图",

@@ -9,6 +9,7 @@ import * as builtinService from '../../../services/recognize';
 import { languageList } from '../../../utils/language';
 import { useConfig } from '../../../hooks';
 import { textAtom } from '../TextArea';
+import NoteExport from '../NoteExport';
 import { pluginListAtom } from '..';
 import { osType } from '../../../utils/env';
 import {
@@ -24,7 +25,7 @@ export const languageAtom = atom();
 export const recognizeFlagAtom = atom();
 
 export default function ControlArea(props) {
-    const { serviceInstanceConfigMap, serviceInstanceList } = props;
+    const { serviceInstanceConfigMap, serviceInstanceList, onNoteOpenChange } = props;
     const pluginList = useAtomValue(pluginListAtom);
     const [recognizeLanguage] = useConfig('recognize_language', 'auto');
     const [serverPort] = useConfig('server_port', 60828);
@@ -157,6 +158,7 @@ export default function ControlArea(props) {
             >
                 {t('recognize.recognize')}
             </Button>
+            <NoteExport onOpenChange={onNoteOpenChange} />
             <Button
                 variant='flat'
                 color='primary'

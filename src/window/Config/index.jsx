@@ -1,4 +1,4 @@
-import { useLocation, useRoutes } from 'react-router-dom';
+import { useLocation, useNavigate, useRoutes } from 'react-router-dom';
 import React, { useEffect, useRef, useState } from 'react';
 import { appWindow } from '@tauri-apps/api/window';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +12,7 @@ import './style.css';
 export default function Config() {
     const { t } = useTranslation();
     const location = useLocation();
+    const navigate = useNavigate();
     const page = useRoutes(routes);
     const pageName = location.pathname.slice(1) || 'general';
     const title = t([`config.${pageName}.title`, `config.${pageName}.label`]);
@@ -49,6 +50,11 @@ export default function Config() {
             void closeListener.then((unlisten) => unlisten(), () => {});
         };
     }, []);
+
+    useEffect(() => {
+        const unsubscribe = appWindow.listen('open-recent', () => navigate('/recent'));
+        return () => { void unsubscribe.then((remove) => remove()); };
+    }, [navigate]);
 
     const closeSettings = async () => {
         try {

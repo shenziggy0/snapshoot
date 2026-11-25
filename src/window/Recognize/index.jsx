@@ -19,43 +19,12 @@ import TextArea from './TextArea';
 
 export const pluginListAtom = atom();
 
-let blurTimeout = null;
-
-const listenBlur = () => {
-    return listen('tauri://blur', () => {
-        if (appWindow.label === 'recognize') {
-            if (blurTimeout) {
-                clearTimeout(blurTimeout);
-            }
-            // 50ms后关闭窗口，因为在 windows 下拖动窗口时会先切换成 blur 再立即切换成 focus
-            // 如果直接关闭将导致窗口无法拖动
-            blurTimeout = setTimeout(async () => {
-                await appWindow.close();
-            }, 50);
-        }
-    });
-};
-
-let unlisten = listenBlur();
-// 取消 blur 监听
-const unlistenBlur = () => {
-    unlisten.then((f) => {
-        f();
-    });
-};
-
-// 监听 focus 事件取消 blurTimeout 时间之内的关闭窗口
-void listen('tauri://focus', () => {
-    if (blurTimeout) {
-        clearTimeout(blurTimeout);
-    }
-});
-
 export default function Recognize() {
     const { t } = useTranslation();
     const [pluginList, setPluginList] = useAtom(pluginListAtom);
     const [closeOnBlur] = useConfig('recognize_close_on_blur', false);
     const [pined, setPined] = useState(false);
+    const [noteOpen, setNoteOpen] = useState(false);
     const [serviceInstanceList] = useConfig('recognize_service_list', ['system', 'tesseract']);
     const [serviceInstanceConfigMap, setServiceInstanceConfigMap] = useState(null);
 
@@ -97,12 +66,26 @@ export default function Recognize() {
     useEffect(() => {
         loadPluginList();
     }, []);
-    // 是否自动关闭窗口
     useEffect(() => {
-        if (closeOnBlur !== null && !closeOnBlur) {
-            unlistenBlur();
-        }
-    }, [closeOnBlur]);
+        if (!closeOnBlur || pined || noteOpen) return;
+        let active = true;
+        let timer;
+        const cancelClose = () => clearTimeout(timer);
+        const subscriptions = [
+            listen('tauri://blur', () => {
+                if (!active) return;
+                cancelClose();
+                // Windows may briefly lose focus while dragging the window.
+                timer = setTimeout(() => { void appWindow.close(); }, 50);
+            }),
+            listen('tauri://focus', cancelClose),
+        ];
+        return () => {
+            active = false;
+            cancelClose();
+            for (const subscription of subscriptions) void subscription.then((dispose) => dispose()).catch(console.error);
+        };
+    }, [closeOnBlur, pined, noteOpen]);
 
     return (
         pluginList &&
@@ -117,16 +100,8 @@ export default function Recognize() {
                         className='utility-pin'
                         aria-label={t('common.pin_window')}
                         aria-pressed={pined}
-                        onPress={() => {
-                            if (pined) {
-                                if (closeOnBlur) {
-                                    unlisten = listenBlur();
-                                }
-                                appWindow.setAlwaysOnTop(false);
-                            } else {
-                                unlistenBlur();
-                                appWindow.setAlwaysOnTop(true);
-                            }
+                        onPress={async () => {
+                            await appWindow.setAlwaysOnTop(!pined);
                             setPined(!pined);
                         }}
                     >
@@ -141,6 +116,7 @@ export default function Recognize() {
                 <ControlArea
                     serviceInstanceList={serviceInstanceList}
                     serviceInstanceConfigMap={serviceInstanceConfigMap}
+                    onNoteOpenChange={setNoteOpen}
                 />
             </div>
         )

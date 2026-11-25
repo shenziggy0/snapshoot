@@ -93,7 +93,7 @@ pub fn update_tray(app_handle: tauri::AppHandle, mut language: String, mut copy_
         "Update tray with language: {}, copy mode: {}",
         language, copy_mode
     );
-    let menu = match language.as_str() {
+    let mut menu = match language.as_str() {
         "en" => tray_menu_en(),
         "zh_cn" => tray_menu_zh_cn(),
         "zh_tw" => tray_menu_zh_tw(),
@@ -107,6 +107,13 @@ pub fn update_tray(app_handle: tauri::AppHandle, mut language: String, mut copy_
         "uk" => tray_menu_uk(),
         _ => tray_menu_en(),
     };
+    let recent = match language.as_str() {
+        "zh_cn" => "最近使用",
+        "zh_tw" => "最近使用",
+        _ => "Recent items",
+    };
+    let recent_entry = SystemTrayMenu::new().add_item(CustomMenuItem::new("recent", recent));
+    menu.items.splice(0..0, recent_entry.items);
     #[cfg(target_os = "macos")]
     let menu = menu.add_item(CustomMenuItem::new(
         "macos_permissions",
@@ -170,6 +177,7 @@ pub fn tray_event_handler(app: &AppHandle, event: SystemTrayEvent) {
             "ocr_recognize" => on_ocr_recognize_click(),
             "ocr_translate" => on_ocr_translate_click(),
             "config" => on_config_click(),
+            "recent" => crate::window::show_recent_window(),
             #[cfg(target_os = "macos")]
             "macos_permissions" => crate::macos_permissions::show_status(app.clone(), 0),
             "check_update" => on_check_update_click(),

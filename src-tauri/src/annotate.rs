@@ -8,7 +8,7 @@ use image::GenericImageView;
 use serde::Serialize;
 
 pub fn screenshot_annotate() {
-    crate::window::open_frozen_overlay("annotate");
+    let _ = crate::window::open_frozen_overlay("annotate");
 }
 
 #[derive(Serialize)]

@@ -113,6 +113,10 @@ pub(crate) fn new_overlay_builder(
 
 // Creating a window on the mouse monitor
 fn build_window(label: &str, title: &str) -> (Window, bool) {
+    build_window_at(label, title, "index.html")
+}
+
+fn build_window_at(label: &str, title: &str, initial_path: &str) -> (Window, bool) {
     let (mouse_x, mouse_y) = mouse_physical_position();
     let current_monitor = get_current_monitor(mouse_x, mouse_y);
     let position = current_monitor.position();
@@ -132,7 +136,7 @@ fn build_window(label: &str, title: &str) -> (Window, bool) {
             let mut builder = tauri::WindowBuilder::new(
                 app_handle,
                 label,
-                tauri::WindowUrl::App("index.html".into()),
+                tauri::WindowUrl::App(initial_path.into()),
             )
             .position(position.x.into(), position.y.into())
             .focused(true)
@@ -162,8 +166,19 @@ fn build_window(label: &str, title: &str) -> (Window, bool) {
 }
 
 pub fn config_window() {
-    let (window, exists) = build_window("config", "Snapshoot");
+    show_config("index.html");
+}
+
+pub(crate) fn show_recent_window() {
+    show_config("recent");
+}
+
+fn show_config(initial_path: &str) {
+    let (window, exists) = build_window_at("config", "Snapshoot", initial_path);
     if exists {
+        if initial_path == "recent" {
+            let _ = window.emit("open-recent", ());
+        }
         return;
     }
     window
@@ -177,6 +192,25 @@ pub fn config_window() {
     }
     window.set_size(size).unwrap();
     window.center().unwrap();
+}
+
+#[tauri::command]
+pub fn open_capture_privacy_settings(source: &str) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let pane = match source {
+            "screen" => "Privacy_ScreenCapture",
+            "microphone" => "Privacy_Microphone",
+            _ => return Err("capture.invalid_mode".into()),
+        };
+        crate::macos_permissions::open_settings(pane);
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = source;
+        Err("capture.settings_unavailable".into())
+    }
 }
 
 fn translate_window() -> Window {
@@ -363,34 +397,46 @@ pub fn recognize_window() {
     window.emit("new_image", "").unwrap();
 }
 
-fn place_screenshot_window(window: &Window) {
+fn place_screenshot_window(window: &Window, target: Option<&crate::screenshot::CaptureTarget>) -> bool {
     #[cfg(target_os = "macos")]
     {
-        crate::capture_macos::cover_monitor(window);
+        crate::capture_macos::cover_monitor(window, target.map(|item| item.display_id))
     }
     #[cfg(not(target_os = "macos"))]
     {
         #[cfg(windows)]
-        if cover_monitor_win(window) {
-            return;
+        if cover_monitor_win(window, target) {
+            return true;
         }
-        let monitor = monitor_at_mouse();
-        let pos = monitor.position();
-        let size = monitor.size();
-        let _ = window.set_position(tauri::PhysicalPosition::new(pos.x, pos.y));
-        let _ = window.set_size(tauri::PhysicalSize::new(size.width, size.height));
+        let (x, y, width, height) = match target {
+            Some(target) => (target.x, target.y, target.width, target.height),
+            None => {
+                let monitor = monitor_at_mouse();
+                let pos = monitor.position();
+                let size = monitor.size();
+                (pos.x, pos.y, size.width, size.height)
+            }
+        };
+        window.set_position(tauri::PhysicalPosition::new(x, y)).is_ok()
+            && window.set_size(tauri::PhysicalSize::new(width, height)).is_ok()
     }
 }
 
 #[cfg(windows)]
-fn cover_monitor_win(window: &Window) -> bool {
+fn cover_monitor_win(window: &Window, target: Option<&crate::screenshot::CaptureTarget>) -> bool {
     let generation = OVERLAY_PLACEMENT_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
     let Ok(hwnd) = window.hwnd() else {
         return false;
     };
     unsafe {
         let raw = hwnd.0 as *mut std::ffi::c_void;
-        let Some(rect) = monitor_rect_at_cursor_win() else {
+        let rect = target.map(|target| WinRect {
+            left: target.x,
+            top: target.y,
+            right: target.x + target.width as i32,
+            bottom: target.y + target.height as i32,
+        }).or_else(|| monitor_rect_at_cursor_win());
+        let Some(rect) = rect else {
             return false;
         };
         if !fit_monitor_rect_win(raw, rect) {
@@ -669,7 +715,7 @@ fn build_screenshot_window() -> Result<Window, tauri::Error> {
             overlay_gate().cancel();
         }
     });
-    place_screenshot_window(&window);
+    place_screenshot_window(&window, None);
     Ok(window)
 }
 
@@ -704,7 +750,11 @@ fn screenshot_window_for_request(request_id: u64) -> Option<Window> {
 
     let app_handle = APP.get()?;
     if let Some(window) = app_handle.get_window("screenshot") {
-        place_screenshot_window(&window);
+        if !place_screenshot_window(&window, crate::screenshot::record_capture_target().as_ref()) {
+            overlay_gate().abort(request_id);
+            crate::screenshot::report_capture_failure("quick_access.recapture_unavailable");
+            return None;
+        }
         #[cfg(target_os = "macos")]
         crate::capture_macos::set_window_alpha(&window, 0.0);
         let _ = window.set_always_on_top(true);
@@ -721,6 +771,11 @@ fn screenshot_window_for_request(request_id: u64) -> Option<Window> {
             return None;
         }
     };
+    if !place_screenshot_window(&window, crate::screenshot::record_capture_target().as_ref()) {
+        overlay_gate().abort(request_id);
+        crate::screenshot::report_capture_failure("quick_access.recapture_unavailable");
+        return None;
+    }
     #[cfg(target_os = "macos")]
     crate::capture_macos::set_window_alpha(&window, 0.0);
     arm_overlay_reveal_watchdog(request_id, window.clone());
@@ -829,16 +884,40 @@ pub(crate) fn screenshot_window() -> Option<Window> {
     screenshot_window_for_request(request_id)
 }
 
-pub(crate) fn open_frozen_overlay(intent: &str) {
+pub(crate) fn open_frozen_overlay(intent: &str) -> Result<(), String> {
+    open_frozen_overlay_with_region(intent, None)
+}
+
+#[tauri::command]
+pub fn start_capture(mode: &str) -> Result<(), String> {
+    match mode {
+        "annotate" => {},
+        "record" if !crate::screen_record::screen_record_support().supported => {
+            return Err("screen_record.unsupported".into());
+        }
+        "record" => crate::screen_record::validate_audio_sources()?,
+        _ => return Err("capture.invalid_mode".into()),
+    }
+    #[cfg(target_os = "macos")]
+    if !crate::capture_macos::screen_recording_allowed() {
+        return Err("screen_record.permission_denied".into());
+    }
+    open_frozen_overlay(mode)
+}
+
+pub(crate) fn open_frozen_overlay_with_region(
+    intent: &str,
+    region: Option<crate::screenshot::SavedCaptureRegion>,
+) -> Result<(), String> {
     if crate::long_screenshot::is_active() || crate::screen_record::is_active() {
         warn!("ignoring screenshot request while scroll capture is active");
-        return;
+        return Err("capture.busy".into());
     }
-    crate::quick_access::hide_for_capture();
     let Some(request_id) = begin_overlay_request() else {
         warn!("ignoring screenshot request while the previous overlay is still loading");
-        return;
+        return Err("capture.busy".into());
     };
+    crate::quick_access::hide_for_capture();
     // Snapshot the intent only after this request owns the gate. A duplicate
     // shortcut must not overwrite the capture that is already in flight.
     crate::screenshot::prepare_screen_capture(intent);
@@ -851,7 +930,10 @@ pub(crate) fn open_frozen_overlay(intent: &str) {
             // only runs when a new capture replaces a visible frozen frame.
             std::thread::sleep(std::time::Duration::from_millis(32));
         }
-        let result = crate::screenshot::capture_for_overlay();
+        let result = match region {
+            Some(region) => crate::screenshot::capture_overlay_region(Some(region)),
+            None => crate::screenshot::capture_for_overlay(),
+        };
         crate::image_io::diag_log(
             "overlay_capture",
             &format!(
@@ -876,6 +958,7 @@ pub(crate) fn open_frozen_overlay(intent: &str) {
             overlay_gate().abort(request_id);
         }
     });
+    Ok(())
 }
 
 /// Hide the frozen screenshot before the long-capture worker starts reading the
@@ -1234,10 +1317,10 @@ fn forward_scroll_windows(
 }
 
 pub fn ocr_recognize() {
-    open_frozen_overlay("ocr");
+    let _ = open_frozen_overlay("ocr");
 }
 pub fn ocr_translate() {
-    open_frozen_overlay("translate");
+    let _ = open_frozen_overlay("translate");
 }
 
 #[tauri::command(async)]

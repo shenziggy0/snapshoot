@@ -137,6 +137,8 @@ pub struct RecordSupport {
     pub supported: bool,
     pub system_audio: bool,
     pub microphone: bool,
+    pub dual_audio: bool,
+    pub save_dir: Option<PathBuf>,
 }
 
 #[derive(Clone)]
@@ -157,6 +159,7 @@ pub(super) struct RecordOptions {
 pub struct ScreenRecordManager {
     active: Mutex<Option<platform::Recorder>>,
     last: Mutex<Option<RecordResult>>,
+    history_save_failed: AtomicBool,
     generation: AtomicU64,
     closing: AtomicBool,
 }
@@ -200,6 +203,33 @@ fn config_string(key: &str, default: &str) -> String {
         .unwrap_or_else(|| default.into())
 }
 
+fn recording_directory() -> Option<PathBuf> {
+    let configured = config_string("record_save_dir", "");
+    if configured.is_empty() {
+        dirs::video_dir().map(|path| path.join("Snapshoot"))
+    } else {
+        Some(PathBuf::from(configured))
+    }
+}
+
+fn configured_audio_sources() -> Result<(bool, bool), String> {
+    let system = crate::config::get("record_system_audio")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false);
+    let microphone = crate::config::get("record_microphone")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false);
+    let (system_supported, microphone_supported) = audio_capabilities();
+    if (system && !system_supported) || (microphone && !microphone_supported) {
+        return Err("screen_record.audio_unavailable".into());
+    }
+    Ok((system, microphone))
+}
+
+pub(crate) fn validate_audio_sources() -> Result<(), String> {
+    configured_audio_sources().map(|_| ())
+}
+
 impl ScreenRecordManager {
     fn start(&self, region: CaptureRegion) -> Result<RecordStatus, String> {
         let mut active = self.active.lock().unwrap();
@@ -236,12 +266,8 @@ impl ScreenRecordManager {
             .and_then(|v| v.as_u64())
             .filter(|v| [15, 30, 60].contains(v))
             .unwrap_or(30) as u32;
-        let directory = config_string("record_save_dir", "");
-        let directory = if directory.is_empty() {
-            dirs::video_dir().ok_or(DISK_FAILED)?.join("Snapshoot")
-        } else {
-            PathBuf::from(directory)
-        };
+        let (audio, microphone) = configured_audio_sources()?;
+        let directory = recording_directory().ok_or(DISK_FAILED)?;
         std::fs::create_dir_all(&directory).map_err(|_| DISK_FAILED)?;
         let stem = format!("Snapshoot_{}", chrono::Local::now().format("%Y%m%d_%H%M%S"));
         let mut path = directory.join(format!("{stem}.mp4"));
@@ -260,13 +286,6 @@ impl ScreenRecordManager {
                 Err(_) => return Err(DISK_FAILED.into()),
             }
         }
-        let microphone = crate::config::get("record_microphone")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        let audio = !microphone
-            && crate::config::get("record_system_audio")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
         let options = RecordOptions {
             target,
             region,
@@ -358,7 +377,11 @@ impl ScreenRecordManager {
         }
         let clipboard_ok = copied.is_ok();
         result.clipboard_copied = clipboard_ok;
+        self.history_save_failed.store(history::add(&result).is_err(), Ordering::SeqCst);
         *self.last.lock().unwrap() = Some(result.clone());
+        if let Some(app) = APP.get() {
+            let _ = app.emit_all("record-history-changed", ());
+        }
         let _ =
             crate::image_io::spawn_main(move || crate::window::record_result_window(clipboard_ok));
         Ok(result)
@@ -403,12 +426,11 @@ pub fn screen_record_hotkey() {
             }
         });
     } else if platform::supported() && !crate::long_screenshot::is_active() {
-        crate::window::open_frozen_overlay("record");
+        let _ = crate::window::open_frozen_overlay("record");
     }
 }
 
-#[tauri::command]
-pub fn screen_record_support() -> RecordSupport {
+fn audio_capabilities() -> (bool, bool) {
     let supported = platform::supported();
     #[cfg(target_os = "macos")]
     let system_audio = supported && macos::audio_supported();
@@ -418,10 +440,18 @@ pub fn screen_record_support() -> RecordSupport {
     let microphone = supported && macos::microphone_supported();
     #[cfg(not(target_os = "macos"))]
     let microphone = false;
+    (system_audio, microphone)
+}
+
+#[tauri::command]
+pub fn screen_record_support() -> RecordSupport {
+    let (system_audio, microphone) = audio_capabilities();
     RecordSupport {
-        supported,
+        supported: platform::supported(),
         system_audio,
         microphone,
+        dual_audio: system_audio && microphone,
+        save_dir: dirs::video_dir().map(|path| path.join("Snapshoot")),
     }
 }
 
@@ -462,6 +492,11 @@ pub fn screen_record_cancel(manager: State<'_, ScreenRecordManager>) -> Result<(
 pub fn screen_record_last_result(manager: State<'_, ScreenRecordManager>) -> Option<RecordResult> {
     manager.last.lock().unwrap().clone()
 }
+
+#[tauri::command]
+pub fn screen_record_history_save_failed(manager: State<'_, ScreenRecordManager>) -> bool {
+    manager.history_save_failed.load(Ordering::SeqCst)
+}
 #[tauri::command]
 pub fn screen_record_reveal_last(manager: State<'_, ScreenRecordManager>) -> Result<(), String> {
     let last = manager.last.lock().unwrap();
@@ -476,6 +511,10 @@ pub fn screen_record_delete_last(manager: State<'_, ScreenRecordManager>) -> Res
             Ok(()) => {}
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(_) => return Err(DISK_FAILED.into()),
+        }
+        let _ = history::forget_file(&result.path);
+        if let Some(app) = APP.get() {
+            let _ = app.emit_all("record-history-changed", ());
         }
     }
     *last = None;
@@ -538,3 +577,4 @@ mod tests {
         assert_eq!(compute_bitrate(800, 500, 30, "standard"), 960_000);
     }
 }
+pub mod history;

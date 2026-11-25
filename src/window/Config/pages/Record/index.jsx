@@ -4,6 +4,8 @@ import { invoke } from '@tauri-apps/api';
 import { open } from '@tauri-apps/api/dialog';
 import { useTranslation } from 'react-i18next';
 import { useConfig } from '../../../../hooks';
+import { osType } from '../../../../utils/env';
+import { store } from '../../../../utils/store';
 
 export default function Record() {
     const { t } = useTranslation();
@@ -16,11 +18,71 @@ export default function Record() {
     const [directory, setDirectory] = useConfig('record_save_dir', '');
     const [support, setSupport] = useState(null);
     const [error, setError] = useState('');
+    const [starting, setStarting] = useState(false);
+    const microphoneUnavailable = microphone === true && support && !support.microphone;
+    const audioUnavailable = microphoneUnavailable || (audio === true && support && !support.system_audio);
+    const source =
+        audio && microphone ? 'both_sources' : audio ? 'system_source' : microphone ? 'microphone_source' : 'no_audio';
+    const settingsReady = [resolution, fps, quality, cursor, audio, microphone, directory].every(
+        (value) => value !== null
+    );
+
     useEffect(() => {
-        invoke('screen_record_support')
-            .then(setSupport)
-            .catch((e) => setError(String(e)));
+        let active = true;
+        const refreshSupport = async () => {
+            try {
+                const capabilities = await invoke('screen_record_support');
+                if (active) setSupport(capabilities);
+            } catch (e) {
+                if (active) setError(String(e));
+            }
+        };
+        void refreshSupport();
+        window.addEventListener('focus', refreshSupport);
+        return () => {
+            active = false;
+            window.removeEventListener('focus', refreshSupport);
+        };
     }, []);
+
+    const beginRecording = async () => {
+        setStarting(true);
+        setError('');
+        try {
+            // The configuration fields debounce saves. Flush the values shown
+            // next to Start so an immediate click uses the selected settings.
+            await Promise.all(
+                Object.entries({
+                    record_resolution: resolution,
+                    record_fps: fps,
+                    record_quality: quality,
+                    record_cursor: cursor,
+                    record_system_audio: audio,
+                    record_microphone: microphone,
+                    record_save_dir: directory,
+                }).map(([key, value]) => store.set(key, value))
+            );
+            await store.save();
+            await invoke('reload_store');
+            await invoke('start_capture', { mode: 'record' });
+        } catch (e) {
+            setError(String(e));
+        } finally {
+            setStarting(false);
+        }
+    };
+    const openPermissions = async () => {
+        try {
+            await invoke('open_capture_privacy_settings', {
+                source:
+                    microphoneUnavailable || (microphone && error === 'screen_record.audio_unavailable')
+                        ? 'microphone'
+                        : 'screen',
+            });
+        } catch (e) {
+            setError(String(e));
+        }
+    };
     const chooseDirectory = async () => {
         try {
             const selected = await open({ directory: true, multiple: false });
@@ -32,6 +94,28 @@ export default function Record() {
     return (
         <Card>
             <CardBody className='gap-4'>
+                {support?.supported && (
+                    <div className='grid gap-2'>
+                        <div>
+                            <Button
+                                color='primary'
+                                isLoading={starting}
+                                isDisabled={!settingsReady || Boolean(audioUnavailable) || starting}
+                                onPress={beginRecording}
+                            >
+                                {t('config.record.begin')}
+                            </Button>
+                        </div>
+                        <p className='text-sm text-default-500'>
+                            {t('config.record.source_summary', { source: t(`config.record.${source}`) })}
+                        </p>
+                        <p className='break-all text-sm text-default-500'>
+                            {t('config.record.destination_summary', {
+                                path: directory || support.save_dir || t('config.record.default_dir'),
+                            })}
+                        </p>
+                    </div>
+                )}
                 {support && !support.supported && (
                     <p className='text-sm text-default-500'>{t('screen_record.unsupported')}</p>
                 )}
@@ -63,26 +147,30 @@ export default function Record() {
                 >
                     {t('config.record.cursor')}
                 </Switch>
-                {support?.system_audio && (
+                {(support?.system_audio || audio) && (
                     <Switch
-                        isSelected={audio === true && microphone !== true}
-                        isDisabled={microphone === true}
+                        isSelected={audio === true}
+                        isDisabled={!support?.dual_audio && microphone === true && audio !== true}
                         onValueChange={setAudio}
                     >
                         {t('config.record.system_audio')}
                     </Switch>
                 )}
-                {support?.microphone && (
+                {(support?.microphone || microphone) && (
                     <Switch
                         isSelected={microphone === true}
                         onValueChange={(value) => {
                             setMicrophone(value);
-                            if (value) {
+                            if (value && !support?.dual_audio && audio === true) {
                                 setAudio(false);
                             }
                         }}
                     >
-                        {t('config.record.microphone')}
+                        {t(
+                            support?.dual_audio || !support?.system_audio
+                                ? 'config.record.microphone_independent'
+                                : 'config.record.microphone'
+                        )}
                     </Switch>
                 )}
                 <Input
@@ -105,14 +193,27 @@ export default function Record() {
                         {t('config.record.reset_dir')}
                     </Button>
                 </div>
-                {error && (
+                {(error || audioUnavailable) && (
                     <p
                         role='alert'
                         className='text-sm text-danger'
                     >
-                        {t(error)}
+                        {t(error || 'screen_record.audio_unavailable')}
                     </p>
                 )}
+                {osType === 'Darwin' &&
+                    (microphoneUnavailable ||
+                        error === 'screen_record.permission_denied' ||
+                        (microphone && error === 'screen_record.audio_unavailable')) && (
+                        <div>
+                            <Button
+                                variant='flat'
+                                onPress={openPermissions}
+                            >
+                                {t('capture.open_settings')}
+                            </Button>
+                        </div>
+                    )}
             </CardBody>
         </Card>
     );

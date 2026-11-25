@@ -2,6 +2,7 @@ use crate::screenshot::rgba_is_blank;
 use core_foundation::base::{CFRelease, TCFType};
 use core_foundation::string::CFString;
 use core_foundation::url::CFURL;
+use core_foundation::uuid::{CFUUIDCreateString, CFUUIDRef};
 use core_graphics::display::CGDisplay;
 use core_graphics::event::{CGEvent, CGEventTapLocation, EventField, ScrollEventUnit};
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
@@ -52,6 +53,36 @@ struct DisplayTarget {
     geometry: CaptureGeometry,
 }
 
+fn display_target(id: u32) -> DisplayTarget {
+    let display = CGDisplay::new(id);
+    let bounds = display.bounds();
+    DisplayTarget {
+        id,
+        bounds,
+        geometry: geometry_for(&display, bounds),
+    }
+}
+
+#[link(name = "ColorSync", kind = "framework")]
+extern "C" {
+    fn CGDisplayCreateUUIDFromDisplayID(display: u32) -> CFUUIDRef;
+}
+
+pub fn display_identity(id: u32) -> Option<String> {
+    unsafe {
+        let uuid = CGDisplayCreateUUIDFromDisplayID(id);
+        if uuid.is_null() {
+            return None;
+        }
+        let string = CFUUIDCreateString(std::ptr::null(), uuid);
+        CFRelease(uuid.cast());
+        if string.is_null() {
+            return None;
+        }
+        Some(CFString::wrap_under_create_rule(string).to_string())
+    }
+}
+
 /// Display under the cursor, in the same point space `CGDisplayBounds` uses.
 /// Tauri monitor origins are physical pixels, so they must not be compared
 /// with these point values on a Retina display.
@@ -64,12 +95,8 @@ fn display_under_cursor() -> Result<DisplayTarget, String> {
     let mut fallback = None;
     for id in ids {
         let display = CGDisplay::new(id);
-        let bounds = display.bounds();
-        let target = DisplayTarget {
-            id,
-            bounds,
-            geometry: geometry_for(&display, bounds),
-        };
+        let target = display_target(id);
+        let bounds = target.bounds;
         if fallback.is_none() && display.is_main() {
             fallback = Some(target_clone(&target));
         }
@@ -192,32 +219,46 @@ pub fn set_window_alpha(window: &tauri::Window, alpha: f64) {
 
 /// Borderless window covering the whole monitor, above the menu bar and Dock,
 /// on every Space including other apps' fullscreen spaces.
-pub fn cover_monitor(window: &tauri::Window) {
+pub fn cover_monitor(window: &tauri::Window, display_id: Option<u32>) -> bool {
     let Some(ns_window) = ns_window(window) else {
-        return;
+        return false;
     };
     unsafe {
         let mouse: NsPoint = msg_send![class!(NSEvent), mouseLocation];
         let screens: *mut Object = msg_send![class!(NSScreen), screens];
         if screens.is_null() {
-            return;
+            return false;
         }
         let count: usize = msg_send![screens, count];
         if count == 0 {
-            return;
+            return false;
         }
         let mut screen: *mut Object = msg_send![screens, objectAtIndex:0usize];
+        let mut matched = display_id.is_none();
         for index in 0..count {
             let candidate: *mut Object = msg_send![screens, objectAtIndex:index];
             let frame: NsRect = msg_send![candidate, frame];
-            let inside = mouse.x >= frame.origin.x
-                && mouse.y >= frame.origin.y
-                && mouse.x < frame.origin.x + frame.size.width
-                && mouse.y < frame.origin.y + frame.size.height;
+            let inside = if let Some(id) = display_id {
+                let description: *mut Object = msg_send![candidate, deviceDescription];
+                let key: *mut Object =
+                    msg_send![class!(NSString), stringWithUTF8String: c"NSScreenNumber".as_ptr()];
+                let number: *mut Object = msg_send![description, objectForKey:key];
+                let actual: u32 = msg_send![number, unsignedIntValue];
+                !number.is_null() && actual == id
+            } else {
+                mouse.x >= frame.origin.x
+                    && mouse.y >= frame.origin.y
+                    && mouse.x < frame.origin.x + frame.size.width
+                    && mouse.y < frame.origin.y + frame.size.height
+            };
             if inside {
                 screen = candidate;
+                matched = true;
                 break;
             }
+        }
+        if !matched {
+            return false;
         }
         let frame: NsRect = msg_send![screen, frame];
         // NSWindowStyleMaskBorderless
@@ -240,6 +281,7 @@ pub fn cover_monitor(window: &tauri::Window) {
             "overlay frame {:.0},{:.0} {:.0}x{:.0}",
             frame.origin.x, frame.origin.y, frame.size.width, frame.size.height
         );
+        true
     }
 }
 
@@ -573,9 +615,12 @@ fn ns_window(window: &tauri::Window) -> Option<*mut Object> {
     window.ns_window().ok().map(|raw| raw as *mut Object)
 }
 
-pub fn capture_to(path: &Path) -> Result<(), String> {
-    let target = display_under_cursor()?;
-    capture_resolved(&target, path)
+pub fn capture_to(id: u32, path: &Path) -> Result<(), String> {
+    let ids = CGDisplay::active_displays().map_err(|err| format!("displays: {err}"))?;
+    if !ids.contains(&id) {
+        return Err("quick_access.recapture_unavailable".into());
+    }
+    capture_resolved(&display_target(id), path)
 }
 
 #[derive(Clone, Copy)]
@@ -592,34 +637,49 @@ pub struct DisplayCaptureTarget {
 }
 
 pub fn capture_target_at_mouse() -> Result<DisplayCaptureTarget, String> {
-    let target = display_under_cursor()?;
-    // The region sent by the frontend is expressed in the same pixel space
-    // as the image returned by CGDisplayCreateImage. On some Retina setups
-    // that image is already downsampled to logical pixels (for example,
-    // 1470x956), while NSScreen.backingScaleFactor still reports 2. Using
-    // the latter would halve the event location and post scrolls to the
-    // wrong part of the display. Derive the conversion from the actual
-    // capture geometry instead.
-    let scale = target.geometry.width as f64 / target.bounds.size.width.max(1.0);
-    crate::image_io::diag_log(
-        "event_scale",
-        &format!(
-            "id={} image={}x{} bounds={:.1}x{:.1} scale={scale:.3}",
-            target.id,
-            target.geometry.width,
-            target.geometry.height,
-            target.bounds.size.width,
-            target.bounds.size.height
-        ),
-    );
-    Ok(DisplayCaptureTarget {
-        id: target.id,
-        x: target.geometry.x,
-        y: target.geometry.y,
-        width: target.geometry.width,
-        height: target.geometry.height,
-        scale,
-    })
+    Ok(display_under_cursor()?.into())
+}
+
+pub fn capture_targets() -> Result<Vec<DisplayCaptureTarget>, String> {
+    CGDisplay::active_displays()
+        .map_err(|err| format!("displays: {err}"))
+        .map(|ids| {
+            ids.into_iter()
+                .map(|id| display_target(id).into())
+                .collect()
+        })
+}
+
+impl From<DisplayTarget> for DisplayCaptureTarget {
+    fn from(target: DisplayTarget) -> Self {
+        // The region sent by the frontend is expressed in the same pixel space
+        // as the image returned by CGDisplayCreateImage. On some Retina setups
+        // that image is already downsampled to logical pixels (for example,
+        // 1470x956), while NSScreen.backingScaleFactor still reports 2. Using
+        // the latter would halve the event location and post scrolls to the
+        // wrong part of the display. Derive the conversion from the actual
+        // capture geometry instead.
+        let scale = target.geometry.width as f64 / target.bounds.size.width.max(1.0);
+        crate::image_io::diag_log(
+            "event_scale",
+            &format!(
+                "id={} image={}x{} bounds={:.1}x{:.1} scale={scale:.3}",
+                target.id,
+                target.geometry.width,
+                target.geometry.height,
+                target.bounds.size.width,
+                target.bounds.size.height
+            ),
+        );
+        Self {
+            id: target.id,
+            x: target.geometry.x,
+            y: target.geometry.y,
+            width: target.geometry.width,
+            height: target.geometry.height,
+            scale,
+        }
+    }
 }
 
 fn capture_resolved(target: &DisplayTarget, path: &Path) -> Result<(), String> {

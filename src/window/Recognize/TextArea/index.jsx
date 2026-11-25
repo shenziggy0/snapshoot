@@ -1,22 +1,34 @@
-import { Copy, Space, WrapText, Text as PaneIcon } from 'lucide-react';
-import { Card, CardBody, CardFooter, Button, Skeleton, ButtonGroup, Tooltip } from '@nextui-org/react';
+import { Copy, ScanLine, Space, WrapText, Text as PaneIcon } from 'lucide-react';
+import {
+    Card,
+    CardBody,
+    CardFooter,
+    Button,
+    Skeleton,
+    ButtonGroup,
+    Tooltip,
+    Dropdown,
+    DropdownItem,
+    DropdownMenu,
+    DropdownTrigger,
+} from '@nextui-org/react';
 import { sendNotification } from '@tauri-apps/api/notification';
 import { writeText } from '@tauri-apps/api/clipboard';
-import { atom, useAtom, useAtomValue } from 'jotai';
+import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { nanoid } from 'nanoid';
 
 import { getServiceName, getServiceSouceType, ServiceSourceType } from '../../../utils/service_instance';
 import { currentServiceInstanceKeyAtom, languageAtom, recognizeFlagAtom } from '../ControlArea';
 import { invoke_plugin } from '../../../utils/invoke_plugin';
 import * as builtinServices from '../../../services/recognize';
+import { recognizeLayout } from '../../../services/recognize/system';
 import { useConfig } from '../../../hooks';
-import { base64Atom } from '../ImageArea';
+import { osType } from '../../../utils/env';
+import { base64Atom, focusedLineAtom } from '../ImageArea';
 import { pluginListAtom } from '..';
 
 export const textAtom = atom();
-let recognizeId = 0;
 
 export default function TextArea(props) {
     const { serviceInstanceConfigMap } = props;
@@ -30,111 +42,98 @@ export default function TextArea(props) {
     const [loading, setLoading] = useState(false);
     const [text, setText] = useAtom(textAtom);
     const [error, setError] = useState('');
+    const [layout, setLayout] = useState(null);
+    const setFocusedLine = useSetAtom(focusedLineAtom);
     const pluginList = useAtomValue(pluginListAtom);
     const { t } = useTranslation();
 
     useEffect(() => {
         setText('');
         setError('');
+        setLayout(null);
+        setFocusedLine(null);
         if (
-            base64 !== '' &&
-            currentServiceInstanceKey &&
-            autoCopy !== null &&
-            deleteNewline !== null &&
-            hideWindow !== null
+            !base64 ||
+            !currentServiceInstanceKey ||
+            !language ||
+            [autoCopy, deleteNewline, hideWindow].includes(null)
         ) {
-            setLoading(true);
-            if (getServiceSouceType(currentServiceInstanceKey) === ServiceSourceType.PLUGIN) {
-                if (language in pluginList[getServiceName(currentServiceInstanceKey)].language) {
-                    let id = nanoid();
-                    recognizeId = id;
-                    const pluginConfig = serviceInstanceConfigMap[currentServiceInstanceKey] ?? {};
-
-                    invoke_plugin('recognize', getServiceName(currentServiceInstanceKey)).then(([func, utils]) => {
-                        func(base64, pluginList[getServiceName(currentServiceInstanceKey)].language[language], {
-                            config: pluginConfig,
-                            utils,
-                        }).then(
-                            (v) => {
-                                if (recognizeId !== id) return;
-                                v = v.trim();
-                                if (deleteNewline) {
-                                    v = v.replace(/\-\s+/g, '').replace(/\s+/g, ' ');
-                                }
-                                setText(v);
-                                setLoading(false);
-                                if (autoCopy) {
-                                    writeText(v).then(() => {
-                                        if (hideWindow) {
-                                            sendNotification({
-                                                title: t('common.write_clipboard'),
-                                                body: v,
-                                            });
-                                        }
-                                    });
-                                }
-                            },
-                            (e) => {
-                                if (recognizeId !== id) return;
-                                setError(e.toString());
-                                setLoading(false);
-                            }
-                        );
-                    });
-                }
-            } else {
-                const instanceConfig = serviceInstanceConfigMap[currentServiceInstanceKey] ?? {};
-                if (language in builtinServices[getServiceName(currentServiceInstanceKey)].Language) {
-                    let id = nanoid();
-                    recognizeId = id;
-                    builtinServices[getServiceName(currentServiceInstanceKey)]
-                        .recognize(
-                            base64,
-                            builtinServices[getServiceName(currentServiceInstanceKey)].Language[language],
-                            {
-                                config: instanceConfig,
-                            }
-                        )
-                        .then(
-                            (v) => {
-                                if (recognizeId !== id) return;
-                                v = v.trim();
-                                if (deleteNewline) {
-                                    v = v.replace(/\-\s+/g, '').replace(/\s+/g, ' ');
-                                }
-                                setText(v);
-                                setLoading(false);
-                                if (autoCopy) {
-                                    writeText(v).then(() => {
-                                        if (hideWindow) {
-                                            sendNotification({
-                                                title: t('common.write_clipboard'),
-                                                body: v,
-                                            });
-                                        }
-                                    });
-                                }
-                            },
-                            (e) => {
-                                if (recognizeId !== id) return;
-                                setError(e.toString());
-                                setLoading(false);
-                            }
-                        );
-                } else {
-                    setError('Language not supported');
-                    setLoading(false);
-                }
-            }
+            setLoading(false);
+            return;
         }
-    }, [base64, currentServiceInstanceKey, language, recognizeFlag, autoCopy, deleteNewline, hideWindow]);
+
+        let current = true;
+        setLoading(true);
+        const read = async () => {
+            const name = getServiceName(currentServiceInstanceKey);
+            const config = serviceInstanceConfigMap[currentServiceInstanceKey] ?? {};
+            const isPlugin = getServiceSouceType(currentServiceInstanceKey) === ServiceSourceType.PLUGIN;
+            const languageMap = isPlugin ? pluginList[name]?.language : builtinServices[name]?.Language;
+            if (!languageMap || !Object.prototype.hasOwnProperty.call(languageMap, language)) {
+                throw new Error('recognize.language_unsupported');
+            }
+            const selectedLanguage = languageMap[language];
+            if (isPlugin) {
+                const [recognize, utils] = await invoke_plugin('recognize', name);
+                return { text: await recognize(base64, selectedLanguage, { config, utils }) };
+            }
+            if (name === 'system' && osType === 'Darwin') {
+                const layout = await recognizeLayout(base64, selectedLanguage);
+                return { text: layout.text, layout };
+            }
+            return { text: await builtinServices[name].recognize(base64, selectedLanguage, { config }) };
+        };
+
+        void read()
+            .then(({ text: raw, layout }) => {
+                if (!current) return;
+                const trimmed = raw.trim();
+                const value = deleteNewline ? trimmed.replace(/-\s+/g, '').replace(/\s+/g, ' ') : trimmed;
+                setText(value);
+                setLayout(layout ?? null);
+                setLoading(false);
+                if (autoCopy && value) {
+                    void writeText(value)
+                        .then(() => {
+                            if (current && hideWindow) {
+                                return sendNotification({ title: t('common.write_clipboard'), body: value });
+                            }
+                        })
+                        .catch(console.error);
+                }
+            })
+            .catch((error) => {
+                if (!current) return;
+                setError(error?.message ?? String(error));
+                setLoading(false);
+            });
+        return () => {
+            current = false;
+        };
+    }, [
+        base64,
+        currentServiceInstanceKey,
+        language,
+        recognizeFlag,
+        autoCopy,
+        deleteNewline,
+        hideWindow,
+        pluginList,
+        serviceInstanceConfigMap,
+        setFocusedLine,
+        setText,
+        t,
+    ]);
 
     return (
         <Card
             shadow='none'
             className='utility-card'
         >
-            <h2 className='utility-card-heading'><PaneIcon aria-hidden='true' />{t('recognize.result')}</h2>
+            <h2 className='utility-card-heading'>
+                <PaneIcon aria-hidden='true' />
+                {t('recognize.result')}
+            </h2>
             <CardBody className='bg-content1 p-0 h-full'>
                 {loading ? (
                     <div className='space-y-3 m-[12px]'>
@@ -150,10 +149,10 @@ export default function TextArea(props) {
                     </div>
                 ) : (
                     <>
-                        {text && (
+                        {!error && (
                             <textarea
                                 aria-label={t('recognize.result')}
-                                value={text}
+                                value={text ?? ''}
                                 className='bg-content1 h-full m-[12px] mb-0 resize-none focus:outline-none'
                                 onChange={(e) => {
                                     setText(e.target.value);
@@ -163,12 +162,9 @@ export default function TextArea(props) {
                         {error && (
                             <textarea
                                 aria-label={t('recognize.result')}
-                                value={error}
+                                value={t(error)}
                                 readOnly
                                 className='bg-content1 h-full m-[12px] mb-0 resize-none focus:outline-none text-foreground font-medium'
-                                onChange={(e) => {
-                                    setText(e.target.value);
-                                }}
                             />
                         )}
                     </>
@@ -180,6 +176,7 @@ export default function TextArea(props) {
                         <Button
                             aria-label={t('recognize.copy_text')}
                             isIconOnly
+                            isDisabled={!text}
                             size='sm'
                             variant='light'
                             onPress={() => {
@@ -193,6 +190,7 @@ export default function TextArea(props) {
                         <Button
                             aria-label={t('recognize.delete_newline')}
                             isIconOnly
+                            isDisabled={!text}
                             variant='light'
                             size='sm'
                             onPress={() => {
@@ -206,6 +204,7 @@ export default function TextArea(props) {
                         <Button
                             aria-label={t('recognize.delete_space')}
                             isIconOnly
+                            isDisabled={!text}
                             variant='light'
                             size='sm'
                             onPress={() => {
@@ -216,6 +215,33 @@ export default function TextArea(props) {
                         </Button>
                     </Tooltip>
                 </ButtonGroup>
+                {!!layout?.lines?.length && (
+                    <Dropdown>
+                        <DropdownTrigger>
+                            <Button
+                                size='sm'
+                                variant='light'
+                                startContent={<ScanLine size={16} />}
+                            >
+                                {t('recognize.locate_lines')}
+                            </Button>
+                        </DropdownTrigger>
+                        <DropdownMenu
+                            aria-label={t('recognize.locate_lines')}
+                            className='max-h-[50vh] max-w-[min(27rem,80vw)] overflow-auto'
+                            onAction={(key) => setFocusedLine({ base64, layout, index: Number(key) })}
+                        >
+                            {layout.lines.map((line, index) => (
+                                <DropdownItem
+                                    key={index}
+                                    textValue={line.text}
+                                >
+                                    <span className='whitespace-normal'>{line.text}</span>
+                                </DropdownItem>
+                            ))}
+                        </DropdownMenu>
+                    </Dropdown>
+                )}
             </CardFooter>
         </Card>
     );

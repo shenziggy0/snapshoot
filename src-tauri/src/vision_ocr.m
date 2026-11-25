@@ -31,7 +31,8 @@ static NSDictionary *box_json(CGRect box, size_t width, size_t height) {
     };
 }
 
-const char *snapshoot_vision_ocr(const unsigned char *bytes, size_t length) {
+static const char *recognize(const unsigned char *bytes, size_t length, const char *language, int *status)
+    API_AVAILABLE(macos(10.15)) {
     if (bytes == NULL || length == 0) {
         return NULL;
     }
@@ -56,7 +57,31 @@ const char *snapshoot_vision_ocr(const unsigned char *bytes, size_t length) {
         VNRecognizeTextRequest *text_request = [[VNRecognizeTextRequest alloc] init];
         text_request.recognitionLevel = VNRequestTextRecognitionLevelAccurate;
         text_request.usesLanguageCorrection = YES;
-        text_request.automaticallyDetectsLanguage = YES;
+        BOOL auto_language = language == NULL || strcmp(language, "auto") == 0;
+        if (@available(macOS 13.0, *)) {
+            text_request.automaticallyDetectsLanguage = auto_language;
+        }
+        if (!auto_language) {
+            NSString *requested = [NSString stringWithUTF8String:language];
+            NSArray<NSString *> *supported;
+            if (@available(macOS 12.0, *)) {
+                supported = [text_request supportedRecognitionLanguagesAndReturnError:NULL];
+            } else {
+                // Older Vision versions use the class method for the same query.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+                supported = [VNRecognizeTextRequest
+                    supportedRecognitionLanguagesForTextRecognitionLevel:text_request.recognitionLevel
+                    revision:text_request.revision
+                    error:NULL];
+#pragma clang diagnostic pop
+            }
+            if (requested == nil || ![supported containsObject:requested]) {
+                *status = 1;
+                return NULL;
+            }
+            text_request.recognitionLanguages = @[requested];
+        }
 
         VNDetectBarcodesRequest *barcode_request = [[VNDetectBarcodesRequest alloc] init];
         NSError *error = nil;
@@ -99,6 +124,14 @@ const char *snapshoot_vision_ocr(const unsigned char *bytes, size_t length) {
         };
         return copy_utf8_json(result);
     }
+}
+
+const char *snapshoot_vision_ocr(const unsigned char *bytes, size_t length, const char *language, int *status) {
+    *status = 0;
+    if (@available(macOS 10.15, *)) {
+        return recognize(bytes, length, language, status);
+    }
+    return NULL;
 }
 
 void snapshoot_vision_ocr_free(char *value) {

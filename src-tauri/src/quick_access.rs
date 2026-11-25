@@ -2,12 +2,14 @@ use crate::config::get;
 use crate::image_io::{
     app_cache_dir, clipboard_on_main, cut_image_path, decode_base64_image, write_png,
 };
+use crate::screenshot::{resolve_saved_region, SavedCaptureRegion};
 use crate::window::open_edit_overlay;
 use crate::APP;
 use image::GenericImageView;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -31,6 +33,8 @@ pub struct CaptureHistoryItem {
     pub height: u32,
     pub created_at: u64,
     pub action: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<SavedCaptureRegion>,
 }
 
 fn captures_dir() -> std::path::PathBuf {
@@ -57,11 +61,20 @@ fn history() -> MutexGuard<'static, Vec<CaptureHistoryItem>> {
         .unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-fn save_index(items: &[CaptureHistoryItem]) {
-    if let Ok(data) = serde_json::to_string_pretty(items) {
-        if let Err(err) = std::fs::write(index_path(), data) {
-            warn!("write capture history index failed: {err}");
-        }
+fn save_index(items: &[CaptureHistoryItem]) -> Result<(), String> {
+    let data = serde_json::to_vec_pretty(items).map_err(|err| err.to_string())?;
+    let mut temporary =
+        tempfile::NamedTempFile::new_in(captures_dir()).map_err(|err| err.to_string())?;
+    temporary.write_all(&data).map_err(|err| err.to_string())?;
+    temporary
+        .persist(index_path())
+        .map_err(|err| err.to_string())?;
+    Ok(())
+}
+
+fn emit_history_changed() {
+    if let Some(app) = APP.get() {
+        let _ = app.emit_all("capture-history-changed", ());
     }
 }
 
@@ -79,6 +92,7 @@ pub fn capture_history_add(
     data: String,
     action: String,
     show_quick: Option<bool>,
+    region: Option<SavedCaptureRegion>,
 ) -> Result<CaptureHistoryItem, String> {
     let image = decode_base64_image(&data).map_err(|err| err.to_string())?;
     let (width, height) = image.dimensions();
@@ -92,7 +106,11 @@ pub fn capture_history_add(
     write_png(&path, &image).map_err(|err| err.to_string())?;
     let thumb =
         image::DynamicImage::ImageRgba8(image::imageops::thumbnail(&image.to_rgba8(), 360, 240));
-    write_png(&thumb_path, &thumb).map_err(|err| err.to_string())?;
+    if let Err(err) = write_png(&thumb_path, &thumb) {
+        let _ = std::fs::remove_file(path);
+        let _ = std::fs::remove_file(thumb_path);
+        return Err(err.to_string());
+    }
 
     let item = CaptureHistoryItem {
         id,
@@ -105,22 +123,25 @@ pub fn capture_history_add(
             .map(|value| value.as_millis() as u64)
             .unwrap_or_default(),
         action,
+        region: region.filter(|region| region.valid_for_image(width, height)),
     };
 
     let mut items = history();
-    items.insert(0, item.clone());
-    let mut removed = Vec::new();
-    while items.len() > HISTORY_LIMIT {
-        if let Some(old) = items.pop() {
-            removed.push(old);
-        }
+    let mut next = items.clone();
+    next.insert(0, item.clone());
+    let removed = next.split_off(next.len().min(HISTORY_LIMIT));
+    if let Err(err) = save_index(&next) {
+        let _ = std::fs::remove_file(&item.path);
+        let _ = std::fs::remove_file(&item.thumb_path);
+        return Err(err);
     }
-    save_index(&items);
+    *items = next;
     drop(items);
     for old in removed {
         let _ = std::fs::remove_file(old.path);
         let _ = std::fs::remove_file(old.thumb_path);
     }
+    emit_history_changed();
     if show_quick.unwrap_or(true) {
         QUICK_PENDING.store(true, Ordering::SeqCst);
         let _ = crate::image_io::spawn_main(|| {
@@ -147,6 +168,102 @@ pub fn capture_history_list() -> Vec<CaptureHistoryItem> {
 
 fn item_by_id(id: &str) -> Option<CaptureHistoryItem> {
     history().iter().find(|item| item.id == id).cloned()
+}
+
+#[tauri::command]
+pub fn recapture_region(id: String) -> Result<(), String> {
+    let item = item_by_id(&id).ok_or("quick_access.recapture_unavailable")?;
+    let region = item
+        .region
+        .filter(|saved| saved.valid_for_image(item.width, item.height))
+        .ok_or("quick_access.recapture_unavailable")?;
+    resolve_saved_region(&region)?;
+    crate::window::open_frozen_overlay_with_region("annotate", Some(region))
+}
+
+#[tauri::command]
+pub fn capture_history_drag(window: Window, id: String) -> Result<(), String> {
+    #[cfg(not(any(target_os = "macos", windows)))]
+    {
+        let _ = (window, id);
+        Err("quick_access.drag_unsupported".into())
+    }
+    #[cfg(any(target_os = "macos", windows))]
+    {
+        let item = item_by_id(&id).ok_or("quick_access.drag_failed")?;
+        let path = stage_drag_file(&item).map_err(|err| {
+            warn!("prepare screenshot drag: {err}");
+            "quick_access.drag_failed"
+        })?;
+        let started = start_file_drag(&window, &path);
+        if !started {
+            let _ = std::fs::remove_file(path);
+            return Err("quick_access.drag_failed".into());
+        }
+        Ok(())
+    }
+}
+
+#[cfg(any(target_os = "macos", windows))]
+fn stage_drag_file(item: &CaptureHistoryItem) -> std::io::Result<PathBuf> {
+    let base = captures_dir();
+    let capture_dir = base.canonicalize()?;
+    let expected = capture_dir.join(format!("{}.png", item.id));
+    let source = Path::new(&item.path).canonicalize()?;
+    if source != expected || !source.is_file() || source.parent() != Some(capture_dir.as_path()) {
+        return Err(std::io::Error::other("invalid screenshot source"));
+    }
+    let drag_dir = base.join("drag");
+    std::fs::create_dir_all(&drag_dir)?;
+    // Leave the file available for the receiving app to open after drop.
+    for entry in std::fs::read_dir(&drag_dir)?.flatten() {
+        let old = entry
+            .metadata()
+            .ok()
+            .filter(|metadata| metadata.is_file())
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|date| date.elapsed().ok())
+            .is_some_and(|age| age > std::time::Duration::from_secs(3600));
+        if old {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
+    let path = drag_dir.join(format!("Snapshoot_{}.png", new_id()));
+    if let Err(error) = std::fs::copy(source, &path) {
+        let _ = std::fs::remove_file(path);
+        return Err(error);
+    }
+    Ok(path)
+}
+
+#[cfg(target_os = "macos")]
+fn start_file_drag(window: &Window, path: &Path) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    extern "C" {
+        fn snapshoot_drag_file(window: *mut std::ffi::c_void, path: *const std::ffi::c_char)
+            -> i32;
+    }
+    let Ok(window) = window.ns_window() else {
+        return false;
+    };
+    let Ok(path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
+        return false;
+    };
+    unsafe { snapshoot_drag_file(window, path.as_ptr()) != 0 }
+}
+
+#[cfg(windows)]
+fn start_file_drag(_window: &Window, path: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+    extern "C" {
+        fn snapshoot_drag_file(path: *const u16) -> i32;
+    }
+    let path = path
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    unsafe { snapshoot_drag_file(path.as_ptr()) != 0 }
 }
 
 #[tauri::command(async)]
@@ -236,24 +353,28 @@ pub fn capture_history_delete(id: String) -> Result<(), String> {
     let Some(index) = items.iter().position(|item| item.id == id) else {
         return Ok(());
     };
-    let item = items.remove(index);
-    save_index(&items);
+    let mut next = items.clone();
+    let item = next.remove(index);
+    save_index(&next)?;
+    *items = next;
     drop(items);
     let _ = std::fs::remove_file(item.path);
     let _ = std::fs::remove_file(item.thumb_path);
+    emit_history_changed();
     Ok(())
 }
 
 #[tauri::command]
 pub fn capture_history_clear() -> Result<(), String> {
     let mut items = history();
+    save_index(&[])?;
     let old = std::mem::take(&mut *items);
-    save_index(&items);
     drop(items);
     for item in old {
         let _ = std::fs::remove_file(item.path);
         let _ = std::fs::remove_file(item.thumb_path);
     }
+    emit_history_changed();
     Ok(())
 }
 
@@ -349,5 +470,31 @@ pub(crate) fn prewarm_quick_access() {
     match build_quick_access_window() {
         Ok(_) => info!("quick access window prewarmed"),
         Err(err) => warn!("prewarm quick access failed: {err}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CaptureHistoryItem;
+    use serde_json::json;
+
+    #[test]
+    fn capture_history_retains_pixel_region_and_reads_older_entries() {
+        let mut value = json!({
+            "id": "capture_1_1", "path": "capture_1_1.png", "thumbPath": "capture_1_1_thumb.png",
+            "width": 800, "height": 500, "createdAt": 1, "action": "copy"
+        });
+        let legacy: CaptureHistoryItem = serde_json::from_value(value.clone()).unwrap();
+        assert!(legacy.region.is_none());
+
+        value["region"] = json!({
+            "display": { "id": "display-example", "x": 0, "y": 0, "width": 2940, "height": 1912, "scale": 2.0 },
+            "pixels": { "x": 130, "y": 288, "width": 800, "height": 500 }
+        });
+        let current: CaptureHistoryItem = serde_json::from_value(value.clone()).unwrap();
+        let region = current.region.as_ref().unwrap();
+        assert!(region.valid_for_image(800, 500));
+        assert!(!region.valid_for_image(800, 499));
+        assert_eq!(serde_json::to_value(current).unwrap(), value);
     }
 }

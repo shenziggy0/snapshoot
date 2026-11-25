@@ -26,7 +26,7 @@ import {
     whetherAvailableService,
 } from '../../../../utils/service_instance';
 
-export default function History() {
+export default function History({ embedded = false }) {
     const [collectionServiceList] = useConfig('collection_service_list', []);
     const { isOpen, onOpen, onOpenChange } = useDisclosure();
     const [pluginList, setPluginList] = useState(null);
@@ -128,7 +128,7 @@ export default function History() {
     return (
         pluginList !== null && (
             <>
-                <Toaster />
+                {!embedded && <Toaster />}
                 <Table
                     fullWidth
                     hideHeader
@@ -137,7 +137,7 @@ export default function History() {
                     aria-label='History Table'
                     classNames={{
                         base: `${
-                            osType === 'Linux' ? 'h-[calc(100vh-130px)]' : 'h-[calc(100vh-100px)]'
+                            embedded ? 'max-h-[50vh]' : osType === 'Linux' ? 'h-[calc(100vh-130px)]' : 'h-[calc(100vh-100px)]'
                         } overflow-y-auto`,
                         td: 'px-0',
                     }}

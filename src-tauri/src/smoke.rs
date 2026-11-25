@@ -270,7 +270,7 @@ fn run_steps(dir: &Path) -> Result<(), String> {
 
     if let Ok(path) = std::env::var("SNAPSHOOT_OCR_FIXTURE") {
         let bytes = fs::read(&path).map_err(|err| format!("OCR fixture: {err}"))?;
-        let layout = crate::system_ocr::system_ocr_layout(general_purpose::STANDARD.encode(bytes))?;
+        let layout = crate::system_ocr::system_ocr_layout(general_purpose::STANDARD.encode(bytes), None)?;
         if layout.lines.is_empty() {
             return Err("Vision OCR returned no lines".into());
         }
@@ -334,6 +334,7 @@ fn run_steps(dir: &Path) -> Result<(), String> {
         general_purpose::STANDARD.encode(bytes),
         "smoke".to_string(),
         Some(true),
+        None,
     )?;
     if crate::quick_access::capture_history_list().is_empty() {
         return Err("capture history is empty".into());

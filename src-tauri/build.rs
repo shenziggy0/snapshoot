@@ -1,5 +1,11 @@
 fn main() {
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
+    let target_os = std::env::var("CARGO_CFG_TARGET_OS");
+    if target_os.as_deref() == Ok("macos") {
+        println!("cargo:rerun-if-changed=src/capture_drag_macos.m");
+        cc::Build::new()
+            .file("src/capture_drag_macos.m")
+            .flag("-fobjc-arc")
+            .compile("snapshoot_capture_drag");
         println!("cargo:rerun-if-changed=src/screen_record/macos_record.m");
         cc::Build::new()
             .file("src/screen_record/macos_record.m")
@@ -28,6 +34,16 @@ fn main() {
             "Vision",
         ] {
             println!("cargo:rustc-link-lib=framework={framework}");
+        }
+    }
+    if target_os.as_deref() == Ok("windows") {
+        println!("cargo:rerun-if-changed=src/capture_drag_windows.cpp");
+        cc::Build::new()
+            .cpp(true)
+            .file("src/capture_drag_windows.cpp")
+            .compile("snapshoot_capture_drag");
+        for library in ["ole32", "shell32", "user32", "uuid"] {
+            println!("cargo:rustc-link-lib={library}");
         }
     }
     tauri_build::build();

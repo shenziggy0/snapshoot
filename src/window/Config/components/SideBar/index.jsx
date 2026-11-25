@@ -14,7 +14,7 @@ const sections = [
     ]],
     ['application', [
         ['service', AudioLines, 'indigo'],
-        ['history', History, 'amber'],
+        ['recent', History, 'amber'],
         ['backup', Cloud, 'cyan'],
         ['about', Info, 'graphite'],
     ]],
@@ -30,7 +30,7 @@ export function CompactNavigation() {
             <ChevronDown size={14} aria-hidden='true' />
             <select
                 aria-label={t('config.shell.settings')}
-                value={pathname === '/' ? '/general' : pathname}
+                value={pathname === '/' ? '/general' : pathname === '/history' ? '/recent' : pathname}
                 onChange={(event) => navigate(event.target.value)}
             >
                 {sections.map(([section, pages]) => (

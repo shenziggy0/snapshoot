@@ -28,7 +28,7 @@ fn chinese() -> bool {
         .unwrap_or(false)
 }
 
-fn open_settings(pane: &str) {
+pub(crate) fn open_settings(pane: &str) {
     if let Err(err) = Command::new("/usr/bin/open")
         .arg(format!(
             "x-apple.systempreferences:com.apple.preference.security?{pane}"

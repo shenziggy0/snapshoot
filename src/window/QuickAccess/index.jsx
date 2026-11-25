@@ -1,21 +1,12 @@
 import {
     Check,
-    Copy,
-    Download,
     History,
     Image as ImageIcon,
-    Pencil,
-    Pin,
-    ScanText,
     Trash2,
-    Upload,
     X,
 } from 'lucide-react';
 import './style.css';
-import { convertFileSrc } from '@tauri-apps/api/tauri';
 import { listen } from '@tauri-apps/api/event';
-import { save } from '@tauri-apps/api/dialog';
-import { writeText } from '@tauri-apps/api/clipboard';
 import toast from 'react-hot-toast';
 import Toaster from '../../components/Toaster';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +14,8 @@ import { invoke } from '@tauri-apps/api';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useToastStyle } from '../../hooks';
+import { captureActions, captureErrorKey, CaptureThumb, runCaptureAction } from './captureActions';
+import { useCaptureDrag } from '../Screenshot/useCaptureDrag';
 
 const AUTO_HIDE_MS = 12000;
 
@@ -33,24 +26,20 @@ function formatTime(value) {
     return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 }
 
-function CaptureThumb({ item }) {
+function DragCaptureButton({ item, onDragError, className, children, ...props }) {
+    const drag = useCaptureDrag(item.id, onDragError);
     return (
-        <img
-            src={`${convertFileSrc(item.thumbPath)}?v=${item.createdAt}`}
-            alt=''
-            draggable={false}
-        />
+        <button
+            type='button'
+            className={`${className}${drag.onPointerDown ? ' cursor-grab' : ''}`}
+            {...props}
+            {...drag}
+        >
+            <CaptureThumb key={item.id} item={item} />
+            {children}
+        </button>
     );
 }
-
-const actions = [
-    ['copy', 'annotate.copy', Copy],
-    ['edit', 'quick_access.edit', Pencil],
-    ['save', 'annotate.save', Download],
-    ['pin', 'annotate.pin', Pin],
-    ['ocr', 'annotate.ocr', ScanText],
-    ['share', 'quick_access.share', Upload],
-];
 
 export default function QuickAccess() {
     const { t } = useTranslation();
@@ -118,33 +107,10 @@ export default function QuickAccess() {
             return;
         }
         try {
-            if (action === 'copy') {
-                await invoke('capture_history_copy', { id: current.id });
-                toast.success(t('annotate.copied'), { style: toastStyle });
-            } else if (action === 'save') {
-                const path = await save({
-                    defaultPath: 'snapshoot-screenshot.png',
-                    filters: [{ name: 'PNG', extensions: ['png'] }],
-                });
-                if (!path) {
-                    return;
-                }
-                await invoke('capture_history_save', { id: current.id, path });
-                toast.success(t('annotate.saved'), { style: toastStyle });
-            } else if (action === 'share') {
-                const url = await invoke('capture_history_share', { id: current.id });
-                await writeText(url);
-                toast.success(t('quick_access.share_copied'), { style: toastStyle });
-            } else if (action === 'pin') {
-                await invoke('capture_history_pin', { id: current.id });
-            } else if (action === 'ocr') {
-                await invoke('capture_history_ocr', { id: current.id });
-            } else if (action === 'edit') {
-                await invoke('capture_history_edit', { id: current.id });
-            }
+            const message = await runCaptureAction(current, action);
+            if (message) toast.success(t(message), { style: toastStyle });
         } catch (error) {
-            const message = String(error);
-            toast.error(message.startsWith('quick_access.') ? t(message) : message, { style: toastStyle });
+            toast.error(t(captureErrorKey(error)), { style: toastStyle });
         }
     };
 
@@ -170,6 +136,7 @@ export default function QuickAccess() {
         : t('quick_access.empty');
 
     const describe = (item) => `${item.width} × ${item.height} · ${formatTime(item.createdAt)}`;
+    const reportDragError = (error) => toast.error(t(captureErrorKey(error)), { style: toastStyle });
 
     return (
         <div className='quick-window'>
@@ -237,9 +204,12 @@ export default function QuickAccess() {
                                 className='quick-tile'
                                 key={item.id}
                             >
-                                <button
+                                <DragCaptureButton
+                                    item={item}
+                                    onDragError={reportDragError}
                                     className='quick-tile-select'
-                                    title={describe(item)}
+                                    title={`${describe(item)} · ${t('quick_access.drag_label')}`}
+                                    aria-label={describe(item)}
                                     aria-pressed={current?.id === item.id}
                                     onClick={(event) => {
                                         setCurrent(item);
@@ -247,9 +217,8 @@ export default function QuickAccess() {
                                         if (event.detail === 0) historyButton.current?.focus();
                                     }}
                                 >
-                                    <CaptureThumb item={item} />
                                     <span>{formatTime(item.createdAt)}</span>
-                                </button>
+                                </DragCaptureButton>
                                 <button
                                     type='button'
                                     className='quick-delete'
@@ -263,19 +232,20 @@ export default function QuickAccess() {
                     </div>
                 ) : current ? (
                     <>
-                        <button
+                        <DragCaptureButton
+                            item={current}
+                            onDragError={reportDragError}
                             className='quick-preview'
-                            type='button'
-                            title={t('quick_access.click_edit')}
+                            title={`${t('quick_access.click_edit')} · ${t('quick_access.drag_label')}`}
+                            aria-label={t('quick_access.click_edit')}
                             onClick={() => run('edit')}
                         >
-                            <CaptureThumb key={current.id} item={current} />
                             <span className='quick-dimensions'>
                                 {current.width} × {current.height}
                             </span>
-                        </button>
+                        </DragCaptureButton>
                         <div className='quick-actions'>
-                            {actions.map(([action, key, Icon]) => (
+                            {captureActions.map(([action, key, Icon]) => (
                                 <button
                                     type='button'
                                     key={action}

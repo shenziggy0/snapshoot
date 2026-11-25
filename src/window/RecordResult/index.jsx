@@ -11,15 +11,19 @@ export default function RecordResult() {
     const { t } = useTranslation();
     const [result, setResult] = useState(null);
     const [error, setError] = useState('');
+    const [historySaveFailed, setHistorySaveFailed] = useState(false);
     const [busy, setBusy] = useState(false);
     const timer = useRef(null);
     useEffect(() => {
         let alive = true;
         const reload = async () => {
             try {
-                const result = await invoke('screen_record_last_result');
+                const [result, historyFailed] = await Promise.all([
+                    invoke('screen_record_last_result'), invoke('screen_record_history_save_failed'),
+                ]);
                 if (!alive) return;
                 setResult(result);
+                setHistorySaveFailed(historyFailed);
                 setError('');
                 clearTimeout(timer.current);
                 timer.current = setTimeout(() => appWindow.close(), 8000);
@@ -122,6 +126,7 @@ export default function RecordResult() {
                     {t(error)}
                 </p>
             )}
+            {historySaveFailed && <p role='status' className='mt-2 text-xs'>{t('record_history.write_failed')}</p>}
         </div>
     );
 }

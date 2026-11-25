@@ -1,5 +1,45 @@
 {
     "translation": {
+        "capture": {
+            "start": "Start screenshot",
+            "change_shortcut": "Change shortcut",
+            "busy": "Capture or recording is busy. Try again in a moment.",
+            "invalid_mode": "Unknown capture mode.",
+            "settings_unavailable": "Capture privacy settings are unavailable.",
+            "open_settings": "Open System Settings"
+        },
+        "recent": {
+            "screenshots": "Screenshots",
+            "translations": "Translations",
+            "loading": "Loading recent items…",
+            "recapture": "Capture same area",
+            "compare": "Compare before and after",
+            "tutorial": "Make a step-by-step image",
+            "screenshot_actions": "Screenshot actions",
+            "before": "Before",
+            "after": "After",
+            "side_by_side": "Side by side",
+            "slider_mode": "Comparison slider",
+            "export_png": "Export PNG",
+            "tutorial_hint": "Use the arrows to reorder steps. Click an image to place its step number.",
+            "step": "Step {{number}}",
+            "mark_step": "Mark step {{number}}",
+            "move_up": "Move up",
+            "move_down": "Move down",
+            "remove_step": "Remove step",
+            "capture_missing": "This screenshot was moved or deleted.",
+            "output_too_large": "The image is too large. Select fewer or smaller screenshots."
+        },
+        "record_history": {
+            "empty": "No recordings yet.",
+            "file_missing": "This file was moved or deleted.",
+            "open": "Play",
+            "open_failed": "Could not open this recording.",
+            "copy": "Copy file",
+            "forget": "Remove from history",
+            "write_failed": "Recording saved. It could not be added to Recent items.",
+            "invalid_action": "Unknown recording action."
+        },
         "common": {
             "pin_window": "Keep window on top",
             "minimize": "Minimize",
@@ -48,6 +88,9 @@
             "he": "Hebrew"
         },
         "config": {
+            "recent": {
+                "label": "Recent items"
+            },
             "shell": {
                 "settings": "Settings",
                 "workspace": "Workspace",
@@ -235,6 +278,15 @@
                 "credit": "Based on Pot (pot-app/pot-desktop), GPL-3.0"
             },
             "record": {
+                "begin": "Select area and start recording",
+                "source_summary": "Audio: {{source}}",
+                "destination_summary": "Save to: {{path}}",
+                "no_audio": "No audio",
+                "system_source": "System audio",
+                "microphone_source": "Microphone",
+                "both_sources": "System audio and microphone",
+                "microphone_independent": "Record microphone",
+                "audio_unavailable": "The selected audio source is unavailable. Change your selection or check system permissions.",
                 "label": "Recording",
                 "resolution": "Resolution",
                 "original": "Original (up to 4096 px)",
@@ -516,6 +568,18 @@
             "inline_empty_result": "The translation service returned no text translation."
         },
         "recognize": {
+            "locate_lines": "Locate text in the image",
+            "reset_image_zoom": "Show full image",
+            "note_title": "Screenshot note",
+            "note_source": "Source (optional)",
+            "note_translate": "Generate translation",
+            "note_translation": "Translation",
+            "note_export_html": "Export HTML",
+            "note_copy_markdown": "Copy Markdown",
+            "note_saved": "Note saved",
+            "note_copied": "Markdown copied",
+            "note_html_extension": "Choose a filename ending in .html",
+            "language_unsupported": "The selected recognition service does not support this language.",
             "original_image": "Original image",
             "result": "Recognized text",
             "recognize": "Recognize",
@@ -526,6 +590,12 @@
             "delete_space": "Delete Space"
         },
         "annotate": {
+            "redact_preview": "Review redactions",
+            "redact_manual": "Cover manually",
+            "redact_failed": "Automatic detection failed. You can still cover areas manually.",
+            "redact_toggle": "Covered area {{index}}",
+            "redact_copy": "Copy redacted image",
+            "redact_hint": "Click a box to remove it or drag to cover another area.",
             "title": "Annotate",
             "rect": "Rectangle",
             "ellipse": "Ellipse",
@@ -601,6 +671,7 @@
             "load_failed": "Could not display this pinned image."
         },
         "screen_record": {
+            "audio_unavailable": "The selected audio source is unavailable. Change your selection or check system permissions.",
             "label": "Record region",
             "start": "Start recording",
             "pause": "Pause",
@@ -625,6 +696,11 @@
             "clipboard_failed": "Video saved; clipboard copy failed."
         },
         "quick_access": {
+            "history_failed": "The action completed. The screenshot could not be added to Recent items.",
+            "recapture_unavailable": "The display or its scaling changed. Select a new area.",
+            "drag_failed": "Couldn't start dragging. Hold the screenshot thumbnail and drag.",
+            "drag_unsupported": "Dragging files out is unavailable on this system.",
+            "drag_label": "Drag screenshot file",
             "history": "Capture history",
             "recent": "Recent captures",
             "empty": "No captures yet",

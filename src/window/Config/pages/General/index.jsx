@@ -36,6 +36,7 @@ export default function General() {
     const [quickAccess, setQuickAccess] = useConfig('quick_access_enabled', true);
     const [serverPort, setServerPort] = useConfig('server_port', 60828);
     const [captureShortcut] = useConfig('hotkey_screenshot_annotate', osType === 'Darwin' ? 'Command+Shift+A' : 'F1');
+    const [captureError, setCaptureError] = useState('');
     const [showToken, setShowToken] = useState(false);
     const [serverToken] = useConfig('server_token', '');
     const [appLanguage, setAppLanguage] = useConfig('app_language', 'en');
@@ -91,13 +92,16 @@ export default function General() {
     return (
         <>
             <Toaster />
-            <Link
-                to='/hotkey'
-                className='settings-shortcut'
-            >
+            <button type='button' className='settings-shortcut w-full text-left' onClick={async () => {
+                setCaptureError('');
+                try {
+                    await invoke('start_capture', { mode: 'annotate' });
+                } catch (error) {
+                    setCaptureError(String(error));
+                }
+            }}>
                 <span className='settings-shortcut-name'>
-                    <small><ScanLine size={15} aria-hidden='true' />{t('config.hotkey.label')}</small>
-                    <strong>{t('config.hotkey.screenshot_annotate')}</strong>
+                    <strong><ScanLine className='mr-2 inline-block' size={21} aria-hidden='true' />{t('capture.start')}</strong>
                     <span className='settings-keycaps'>
                         {captureShortcut
                             ? captureShortcut.split('+').map((key, index) => (
@@ -108,7 +112,18 @@ export default function General() {
                 </span>
                 <span className='shortcut-viewfinder' aria-hidden='true'><i /><i /><i /><i /></span>
                 <span className='shortcut-link-arrow' aria-hidden='true'><ArrowUpRight size={16} /></span>
-            </Link>
+            </button>
+            <Link to='/hotkey' className='mt-2 inline-block text-sm text-primary'>{t('capture.change_shortcut')}</Link>
+            {captureError && (
+                <div role='alert' className='mt-2 flex flex-wrap items-center gap-2 text-sm text-danger'>
+                    {t(captureError)}
+                    {captureError === 'screen_record.permission_denied' && osType === 'Darwin' && (
+                        <Button size='sm' variant='flat' onPress={() => invoke('open_capture_privacy_settings', { source: 'screen' })}>
+                            {t('capture.open_settings')}
+                        </Button>
+                    )}
+                </div>
+            )}
             {appTheme !== null && (
                 <AppearancePicker
                     value={pendingTheme ?? appTheme}
